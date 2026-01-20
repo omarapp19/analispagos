@@ -5,8 +5,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const Configuration = () => {
     const [settings, setSettings] = useState({
-        storeName: '',
-        adminName: ''
+        storeName: 'Galpon',
+        adminName: 'Omar Pérez'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

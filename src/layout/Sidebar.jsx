@@ -1,31 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { db } from '../firebase'; // Importamos la base de datos de Firebase
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const Sidebar = ({ isOpen, onClose }) => {
     const [settings, setSettings] = useState({
-        storeName: 'Mi Negocio',
-        adminName: 'Carlos Ruiz'
+        storeName: 'Galpon',
+        adminName: 'Omar Pérez'
     });
 
     useEffect(() => {
-        fetchSettings();
-    }, []);
-
-    const fetchSettings = async () => {
-        try {
-            const response = await fetch('http://localhost:3001/api/settings');
-            if (response.ok) {
-                const data = await response.json();
-                setSettings({
-                    storeName: data.storeName,
-                    adminName: data.adminName
-                });
+        // Suscribirse a cambios en tiempo real
+        const unsub = onSnapshot(doc(db, 'settings', 'global_settings'), (doc) => {
+            if (doc.exists()) {
+                setSettings(doc.data());
             }
-        } catch (error) {
-            console.error('Error fetching settings:', error);
-        }
-    };
+        });
+
+        // Limpieza al desmontar
+        return () => unsub();
+    }, []);
 
     return (
         <>
