@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Transaction {
+  id        Int      @id @default(autoincrement())
+  amount    Float
+  type      String   // 'INCOME' or 'EXPENSE'
+  category  String   // 'Venta', 'Servicio', 'Factura'
+  date      DateTime @default(now())
+  method    String?  // 'Efectivo', 'Tarjeta', 'Transferencia'
+  status    String   @default("COMPLETED")
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model Bill {
+  id        Int      @id @default(autoincrement())
+  title     String
+  amount    Float
+  dueDate   DateTime
+  status    String   @default("PENDING") // 'PENDING', 'PAID'
+  provider  String?
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id          Int      @id @default(1)
+  storeName   String   @default("Mi Negocio")
+  adminName   String   @default("Admin")
+  updatedAt   DateTime @updatedAt
+}

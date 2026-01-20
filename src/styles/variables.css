@@ -1,0 +1,75 @@
+:root {
+  /* Colors - Based on Horizon UI (common template matching this style) */
+  --color-primary: #4318FF;
+  --color-primary-light: #E9E3FF;
+  /* Light purple tag background */
+  --color-secondary: #2B3674;
+  /* Dark Blue Text */
+  --color-secondary-grey: #A3AED0;
+  /* Muted Text */
+
+  --color-success: #05CD99;
+  --color-success-light: #E6FDF9;
+
+  --color-danger: #EE5D50;
+  --color-danger-light: #FEEFEE;
+
+  --color-warning: #FFCE20;
+  --color-warning-light: #FFF9E5;
+
+  --color-info: #11CDEF;
+
+  --color-background: #F4F7FE;
+  /* user background */
+  --color-surface: #FFFFFF;
+
+  --color-text-primary: #2B3674;
+  --color-text-secondary: #A3AED0;
+  --color-text-disabled: #E0E5F2;
+
+  --color-border: #E0E5F2;
+
+  /* Typography */
+  --font-family: 'DM Sans', sans-serif;
+
+  /* Spacing & Layout */
+  --border-radius-lg: 20px;
+  --border-radius-md: 16px;
+  --border-radius-sm: 10px;
+
+  /* Shadows - Soft and diffused */
+  --shadow-default: 0px 20px 50px rgba(112, 144, 176, 0.08);
+  /* Global softer shadow */
+  --shadow-card: 0px 3px 20px rgba(112, 144, 176, 0.06);
+  /* Card shadow */
+  --shadow-purple: 0px 10px 20px rgba(67, 24, 255, 0.18);
+  /* Primary button shadow */
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-secondary);
+}
+
+p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
