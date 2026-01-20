@@ -1,22 +1,25 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { db } from '../firebase.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get settings
 router.get('/', async (req, res) => {
     try {
-        let settings = await prisma.settings.findFirst();
-        if (!settings) {
-            settings = await prisma.settings.create({
-                data: {
-                    storeName: 'Mi Negocio',
-                    adminName: 'Admin'
-                }
-            });
+        const docRef = db.collection('settings').doc('general');
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            const defaultSettings = {
+                storeName: 'Mi Negocio',
+                adminName: 'Admin',
+                updatedAt: new Date()
+            };
+            await docRef.set(defaultSettings);
+            return res.json(defaultSettings);
         }
-        res.json(settings);
+
+        res.json(doc.data());
     } catch (error) {
         console.error('Error fetching settings:', error);
         res.status(500).json({ error: 'Failed to fetch settings' });
@@ -27,28 +30,16 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
     const { storeName, adminName } = req.body;
     try {
-        // Always update record with ID 1 since we only have one settings record
-        // Check if settings exist
-        const count = await prisma.settings.count();
-        if (count === 0) {
-            await prisma.settings.create({
-                data: {
-                    id: 1,
-                    storeName: storeName || 'Mi Negocio',
-                    adminName: adminName || 'Admin'
-                }
-            });
-        }
+        const docRef = db.collection('settings').doc('general');
+        const updateData = {
+            storeName,
+            adminName,
+            updatedAt: new Date()
+        };
 
-        const settings = await prisma.settings.update({
-            where: { id: 1 },
-            data: {
-                storeName,
-                adminName,
-                updatedAt: new Date()
-            }
-        });
-        res.json(settings);
+        await docRef.set(updateData, { merge: true }); // Merge ensures we don't overwrite if we add more fields later
+
+        res.json(updateData);
     } catch (error) {
         console.error('Error updating settings:', error);
         res.status(500).json({ error: 'Failed to update settings' });
@@ -56,3 +47,4 @@ router.put('/', async (req, res) => {
 });
 
 export default router;
+

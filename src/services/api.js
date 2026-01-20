@@ -49,4 +49,13 @@ export const api = {
         });
         return res.json();
     },
+
+    updateBill: async (id, data) => {
+        const res = await fetch(`${API_URL}/bills/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
 };

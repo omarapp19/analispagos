@@ -29,7 +29,7 @@ const NextPaymentCard = ({ bill }) => {
                 {bill && (
                     <div className="bg-orange-50 text-warning px-3 py-1 rounded-xl text-xs font-bold flex flex-col items-end leading-tight border border-orange-100/50">
                         <span className="text-[9px] opacity-70 uppercase tracking-wider">Monto</span>
-                        ${bill.amount.toLocaleString()}
+                        ${(bill.amount || 0).toLocaleString()}
                     </div>
                 )}
             </div>

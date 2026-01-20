@@ -1,12 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
 import transactionsRoutes from './routes/transactions.js';
 import billsRoutes from './routes/bills.js';
 import settingsRoutes from './routes/settings.js';
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -28,8 +26,3 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
 
-// Handle Shutdown
-process.on('SIGINT', async () => {
-    await prisma.$disconnect();
-    process.exit(0);
-});

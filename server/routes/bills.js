@@ -1,18 +1,22 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { db } from '../firebase.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/bills
 router.get('/', async (req, res) => {
     try {
         // Optional: filter by month/year via query params
-        const bills = await prisma.bill.findMany({
-            orderBy: { dueDate: 'asc' }
-        });
+        const snapshot = await db.collection('bills').orderBy('dueDate', 'asc').get();
+        const bills = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            dueDate: doc.data().dueDate.toDate ? doc.data().dueDate.toDate() : new Date(doc.data().dueDate),
+            createdAt: doc.data().createdAt ? (doc.data().createdAt.toDate ? doc.data().createdAt.toDate() : new Date(doc.data().createdAt)) : undefined
+        }));
         res.json(bills);
     } catch (error) {
+        console.error('Error fetching bills:', error);
         res.status(500).json({ error: 'Error fetching bills' });
     }
 });
@@ -21,18 +25,31 @@ router.get('/', async (req, res) => {
 router.get('/upcoming', async (req, res) => {
     try {
         // Find the next unpaid bill
-        const upcomingBill = await prisma.bill.findFirst({
-            where: {
-                status: 'PENDING',
-                dueDate: {
-                    gte: new Date() // Greater than or equal to now
-                }
-            },
-            orderBy: { dueDate: 'asc' }
-        });
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Start of day
 
-        res.json(upcomingBill || null);
+        const snapshot = await db.collection('bills')
+            .where('status', '==', 'PENDING')
+            .where('dueDate', '>=', today)
+            .orderBy('dueDate', 'asc')
+            .limit(1)
+            .get();
+
+        if (snapshot.empty) {
+            return res.json(null);
+        }
+
+        const doc = snapshot.docs[0];
+        const upcomingBill = {
+            id: doc.id,
+            ...doc.data(),
+            dueDate: doc.data().dueDate.toDate(),
+            createdAt: doc.data().createdAt?.toDate()
+        };
+
+        res.json(upcomingBill);
     } catch (error) {
+        console.error('Error fetching upcoming bill:', error);
         res.status(500).json({ error: 'Error fetching upcoming bill' });
     }
 });
@@ -42,11 +59,15 @@ router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { status, dueDate } = req.body;
-        const bill = await prisma.bill.update({
-            where: { id: parseInt(id) },
-            data: { status, dueDate }
-        });
-        res.json(bill);
+        const updateData = {};
+        if (status) updateData.status = status;
+        if (dueDate) updateData.dueDate = new Date(dueDate);
+
+        await db.collection('bills').doc(id).update(updateData);
+
+        // Return updated doc
+        const doc = await db.collection('bills').doc(id).get();
+        res.json({ id: doc.id, ...doc.data() });
     } catch (error) {
         console.error('Error updating bill:', error);
         res.status(500).json({ error: 'Failed to update bill' });
@@ -57,16 +78,20 @@ router.put('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { title, amount, dueDate, provider } = req.body;
-        const bill = await prisma.bill.create({
-            data: {
-                title,
-                amount: parseFloat(amount),
-                dueDate: new Date(dueDate),
-                provider,
-                status: 'PENDING'
-            }
+        const newBill = {
+            title,
+            amount: parseFloat(amount),
+            dueDate: new Date(dueDate),
+            provider,
+            status: 'PENDING',
+            createdAt: new Date()
+        };
+
+        const docRef = await db.collection('bills').add(newBill);
+        res.json({
+            id: docRef.id,
+            ...newBill
         });
-        res.json(bill);
     } catch (error) {
         console.error('Error creating bill:', error);
         res.status(500).json({ error: 'Failed to create bill' });
@@ -77,9 +102,7 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        await prisma.bill.delete({
-            where: { id: parseInt(id) }
-        });
+        await db.collection('bills').doc(id).delete();
         res.json({ message: 'Bill deleted' });
     } catch (error) {
         console.error('Error deleting bill:', error);
@@ -88,3 +111,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+

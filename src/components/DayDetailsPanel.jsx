@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { api } from '../services/api';
 
 const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
     const [selectedIds, setSelectedIds] = React.useState([]);
@@ -48,11 +49,7 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
         if (confirm(`¿Pagar ${selectedIds.length} facturas por ${formatCurrency(selectedTotal)}?`)) {
             try {
                 for (const id of selectedIds) {
-                    await fetch(`http://localhost:3001/api/bills/${id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ status: 'PAID' })
-                    });
+                    await api.updateBill(id, { status: 'PAID' });
                 }
                 if (onBillUpdate) onBillUpdate();
                 setSelectedIds([]);
@@ -73,11 +70,7 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
             if (!isNaN(newDate.getTime())) {
                 try {
                     for (const id of selectedIds) {
-                        await fetch(`http://localhost:3001/api/bills/${id}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ dueDate: newDate.toISOString() })
-                        });
+                        await api.updateBill(id, { dueDate: newDate.toISOString() });
                     }
                     if (onBillUpdate) onBillUpdate();
                     setSelectedIds([]);

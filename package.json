@@ -10,12 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.2",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "firebase-admin": "^13.6.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -36,7 +36,6 @@
     "globals": "^16.5.0",
     "nodemon": "^3.1.11",
     "postcss": "^8.5.6",
-    "prisma": "5.10.2",
     "tailwindcss": "^4.1.18",
     "vite": "^7.2.4",
     "vite-plugin-pwa": "^1.2.0"
