@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Building2, User } from 'lucide-react';
+import { db } from '../firebase'; // Importamos la base de datos de Firebase
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const Configuration = () => {
     const [settings, setSettings] = useState({
@@ -10,19 +12,18 @@ const Configuration = () => {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
 
+    // Referencia al documento único de configuración en Firebase
+    const settingsRef = doc(db, 'settings', 'global_settings');
+
     useEffect(() => {
         fetchSettings();
     }, []);
 
     const fetchSettings = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/settings');
-            if (response.ok) {
-                const data = await response.json();
-                setSettings({
-                    storeName: data.storeName,
-                    adminName: data.adminName
-                });
+            const docSnap = await getDoc(settingsRef);
+            if (docSnap.exists()) {
+                setSettings(docSnap.data());
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -45,31 +46,26 @@ const Configuration = () => {
         setMessage(null);
 
         try {
-            const response = await fetch('http://localhost:3001/api/settings', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(settings)
+            // Guardamos directamente en Firestore
+            await setDoc(settingsRef, {
+                ...settings,
+                updatedAt: new Date()
             });
 
-            if (response.ok) {
-                setMessage({ type: 'success', text: 'Configuración guardada exitosamente' });
-                // Optional: trigger a global update if using context
-                window.location.reload(); // Simple way to refresh sidebar for now
-            } else {
-                setMessage({ type: 'error', text: 'Error al guardar la configuración' });
-            }
+            setMessage({ type: 'success', text: 'Configuración guardada exitosamente' });
+
+            // Recarga suave para actualizar el nombre en el sidebar si es necesario
+            setTimeout(() => window.location.reload(), 1500);
         } catch (error) {
             console.error('Error saving settings:', error);
-            setMessage({ type: 'error', text: 'Error de conexión' });
+            setMessage({ type: 'error', text: 'Error al conectar con Firebase' });
         } finally {
             setSaving(false);
         }
     };
 
     if (loading) {
-        return <div className="p-8">Cargando configuración...</div>;
+        return <div className="p-8 text-center">Cargando configuración...</div>;
     }
 
     return (
