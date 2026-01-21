@@ -13,13 +13,13 @@ const MainLayout = () => {
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 {/* Mobile Header */}
                 <div className="md:hidden bg-white border-b border-gray-100 p-4 flex items-center justify-between sticky top-0 z-10">
-                    <div className="font-bold text-navy text-lg">Menu</div>
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="p-2 text-secondary hover:bg-gray-50 rounded-lg transition-colors"
                     >
                         <Menu size={24} />
                     </button>
+                    <div className="font-bold text-navy text-lg">Menu</div>
                 </div>
 
                 <main className="flex-1 overflow-y-auto p-4 md:p-8">
