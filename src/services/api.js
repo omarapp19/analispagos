@@ -17,7 +17,7 @@ export const api = {
     // Transactions
     getTransactions: async () => {
         try {
-            const q = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(50));
+            const q = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(500));
             const snapshot = await getDocs(q);
             return snapshot.docs.map(doc => {
                 const data = doc.data();

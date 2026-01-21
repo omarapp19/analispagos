@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, CreditCard, Landmark, Calendar, Check, Loader2 } from 'lucide-react';
+import { DollarSign, CreditCard, Landmark, Calendar, Check, Loader2, Smartphone } from 'lucide-react';
 import { api } from '../services/api';
 
 const SalesForm = ({ onSaleAdded }) => {
@@ -9,6 +9,7 @@ const SalesForm = ({ onSaleAdded }) => {
     const [amounts, setAmounts] = useState({
         Efectivo: '',
         Tarjeta: '',
+        'Pago Móvil': '',
         Transferencia: '',
         Divisas: ''
     });
@@ -62,7 +63,7 @@ const SalesForm = ({ onSaleAdded }) => {
             await Promise.all(promises);
 
             // Reset form
-            setAmounts({ Efectivo: '', Tarjeta: '', Transferencia: '', Divisas: '' });
+            setAmounts({ Efectivo: '', Tarjeta: '', 'Pago Móvil': '', Transferencia: '', Divisas: '' });
             setCommonData(prev => ({ ...prev, note: '' })); // Keep date? or reset? user usually wants same date
 
             if (onSaleAdded) onSaleAdded();
@@ -125,6 +126,22 @@ const SalesForm = ({ onSaleAdded }) => {
                             onChange={(e) => handleAmountChange('Tarjeta', e.target.value)}
                             placeholder="0.00"
                             className="w-full pl-4 pr-4 py-3 bg-background rounded-xl border-2 border-transparent focus:border-blue-400 focus:bg-white outline-none font-bold text-navy transition-all"
+                        />
+                    </div>
+
+                    {/* Pago Móvil */}
+                    <div className="relative">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="w-6 h-6 rounded-full bg-pink-50 text-pink-500 flex items-center justify-center"><Smartphone size={14} /></div>
+                            <label className="text-xs font-bold text-secondary uppercase">Pago Móvil</label>
+                        </div>
+                        <input
+                            type="number"
+                            step="0.01"
+                            value={amounts['Pago Móvil']}
+                            onChange={(e) => handleAmountChange('Pago Móvil', e.target.value)}
+                            placeholder="0.00"
+                            className="w-full pl-4 pr-4 py-3 bg-background rounded-xl border-2 border-transparent focus:border-pink-400 focus:bg-white outline-none font-bold text-navy transition-all"
                         />
                     </div>
 

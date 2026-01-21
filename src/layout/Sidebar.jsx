@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -46,7 +46,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 {/* Navigation */}
                 <nav className="flex-1 px-4 py-4 flex flex-col gap-2 overflow-y-auto">
                     <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" onClick={onClose} />
-                    <NavItem to="/analytics" icon={<ArrowRightLeft size={20} />} label="Movimientos" onClick={onClose} />
+                    <NavItem to="/analytics" icon={<PieChart size={20} />} label="Estadísticas" onClick={onClose} />
                     <NavItem to="/daily-sales" icon={<DollarSign size={20} />} label="Ventas Diarias" onClick={onClose} />
                     <NavItem to="/invoices" icon={<FileText size={20} />} label="Facturas" onClick={onClose} />
                     <NavItem to="/calendar" icon={<FileText size={20} />} label="Calendario" onClick={onClose} />
@@ -54,6 +54,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     {/* Divider or Spacer */}
                     <div className="flex-1"></div>
 
+                    <NavItem to="/import-assistant" icon={<Bot size={20} />} label="Asistente IA" onClick={onClose} />
                     <NavItem to="/settings" icon={<Settings size={20} />} label="Configuración" onClick={onClose} />
                 </nav>
 

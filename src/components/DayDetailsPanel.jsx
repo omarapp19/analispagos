@@ -49,7 +49,22 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
         if (confirm(`¿Pagar ${selectedIds.length} facturas por ${formatCurrency(selectedTotal)}?`)) {
             try {
                 for (const id of selectedIds) {
+                    // 1. Update Bill Status
                     await api.updateBill(id, { status: 'PAID' });
+
+                    // 2. Create Expense Transaction to reflect in Balance!
+                    const bill = bills.find(b => b.id === id);
+                    if (bill) {
+                        await api.createTransaction({
+                            amount: bill.amount,
+                            type: 'EXPENSE',
+                            category: 'Pago de Factura',
+                            note: `Pago a: ${bill.provider || 'Proveedor'} (${bill.title})`,
+                            date: new Date().toISOString().split('T')[0],
+                            method: 'Transferencia', // Default method
+                            status: 'COMPLETED'
+                        });
+                    }
                 }
                 if (onBillUpdate) onBillUpdate();
                 setSelectedIds([]);

@@ -1,5 +1,5 @@
-import React from 'react';
-import { DollarSign, FileText, Zap, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { DollarSign, FileText, Zap, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../services/api';
 
 const RecentActivity = ({ transactions = [], onTransactionDeleted }) => {
@@ -36,10 +36,46 @@ const RecentActivity = ({ transactions = [], onTransactionDeleted }) => {
 
     const sortedDates = Object.entries(groupedTransactions).sort((a, b) => b[1].rawDate.localeCompare(a[1].rawDate));
 
+    // Pagination Logic
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+    const totalPages = Math.ceil(sortedDates.length / itemsPerPage);
+
+    const paginatedDates = sortedDates.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+    const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+
     return (
         <div className="card w-full">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-secondary">Actividad Reciente (Total Diario)</h3>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-secondary font-medium mr-2">
+                            Pág {currentPage} de {totalPages}
+                        </span>
+                        <button
+                            onClick={prevPage}
+                            disabled={currentPage === 1}
+                            className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                        >
+                            <ChevronLeft size={18} className="text-navy" />
+                        </button>
+                        <button
+                            onClick={nextPage}
+                            disabled={currentPage === totalPages}
+                            className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                        >
+                            <ChevronRight size={18} className="text-navy" />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex flex-col gap-4 overflow-x-auto">
@@ -50,7 +86,7 @@ const RecentActivity = ({ transactions = [], onTransactionDeleted }) => {
                         <div className="col-span-4 text-right">TOTAL NETO</div>
                     </div>
 
-                    {sortedDates.map(([dateString, data]) => (
+                    {paginatedDates.map(([dateString, data]) => (
                         <div key={dateString} className="grid grid-cols-12 items-center py-4 border-b border-gray-50 last:border-none hover:bg-gray-50/50 transition-colors rounded-lg">
                             <div className="col-span-8">
                                 <p className="text-sm font-bold text-navy capitalize">{dateString}</p>

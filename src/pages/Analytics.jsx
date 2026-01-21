@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Wallet, Banknote, AlertCircle, Droplets } from 'lucide-react'; // Removed Calendar import if unused or keep if needed
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { api } from '../services/api';
 import StatCard from '../components/StatCard';
-import LiquidityChart from '../components/LiquidityChart';
+import ProjectionChart from '../components/ProjectionChart';
 import PaymentMixChart from '../components/PaymentMixChart';
 import DebtList from '../components/DebtList';
 
@@ -10,18 +12,62 @@ const Analytics = () => {
     const [balance, setBalance] = useState(0);
     const [transactions, setTransactions] = useState([]);
     const [bills, setBills] = useState([]);
+    const [monthlyIncome, setMonthlyIncome] = useState(0);
+    const [dailyAverage, setDailyAverage] = useState(0);
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
         try {
-            const [balanceRes, txRes, billsRes] = await Promise.all([
+            // Fetch Settings
+            let settingsInclude = false;
+            try {
+                const settingsRef = doc(db, 'settings', 'global_settings');
+                const settingsSnap = await getDoc(settingsRef);
+                if (settingsSnap.exists()) {
+                    settingsInclude = settingsSnap.data().includeDivisas || false;
+                }
+            } catch (err) {
+                console.warn("Could not fetch settings", err);
+            }
+
+            const [balanceRes, txData, billsRes] = await Promise.all([
                 api.getBalance(),
                 api.getTransactions(),
                 api.getBills()
             ]);
-            setBalance(balanceRes.balance);
-            setTransactions(txRes);
+
+            // Filter for Balance Calculation
+            const validTxs = settingsInclude
+                ? txData
+                : txData.filter(tx => tx.method !== 'Divisas');
+
             setBills(billsRes);
+
+            // --- Calculations within Scope ---
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            const calculatedIncome = validTxs.filter(tx => tx.type === 'INCOME').reduce((acc, curr) => acc + curr.amount, 0);
+            const calculatedExpense = validTxs.filter(tx => tx.type === 'EXPENSE').reduce((acc, curr) => acc + curr.amount, 0);
+            setBalance(calculatedIncome - calculatedExpense);
+
+            const mIncome = validTxs
+                .filter(tx => {
+                    if (!tx.date) return false;
+                    const dateStr = typeof tx.date === 'string' ? tx.date.split('T')[0] : '';
+                    const [y, m, d] = dateStr.split('-').map(Number);
+                    const dObj = new Date(y, m - 1, d);
+                    return tx.type === 'INCOME' && dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear;
+                })
+                .reduce((acc, curr) => acc + curr.amount, 0);
+            setMonthlyIncome(mIncome);
+
+            // Daily Average: Income / Current Day of Month
+            const dayOfMonth = now.getDate();
+            setDailyAverage(dayOfMonth > 0 ? mIncome / dayOfMonth : 0);
+
+            setTransactions(txData); // Keep raw for charts
         } catch (error) {
             console.error('Error fetching analytics data:', error);
         } finally {
@@ -47,40 +93,11 @@ const Analytics = () => {
     const pendingBills = bills.filter(b => b.status === 'PENDING' && new Date(b.dueDate) <= thirtyDaysFromNow);
     const scheduledPaymentsTotal = pendingBills.reduce((acc, curr) => acc + curr.amount, 0);
 
-    // 2. Projected Incomes (Current Month Income as proxy for now, or 0 if literally no projection logic)
-    // Let's use "Ingresos (Mes Actual)" for better accuracy than a fake projection
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const monthlyIncome = transactions
-        .filter(tx => {
-            if (!tx.date) return false;
-            const dateStr = typeof tx.date === 'string' ? tx.date.split('T')[0] : '';
-            const [y, m, d] = dateStr.split('-').map(Number);
-            const dObj = new Date(y, m - 1, d);
-
-            return tx.type === 'INCOME' && dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear;
-        })
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
-    // 3. Min Liquidity Estimation (Simplistic: Current Balance - Scheduled Payments)
-    // A better curve would be in the chart, but for a single number this works as "Worst Case"
+    // 2. Projected Incomes (Used from State)
+    // 3. Min Liquidity Estimation
     const minLiquidity = balance - scheduledPaymentsTotal;
 
-    // 4. Daily Average (Sumatoria total de cada venta / la cantidad de ventas registradas)
-    const monthlyTransactionsCount = transactions.filter(tx => {
-        if (!tx.date) return false;
-        // Robust parsing: "YYYY-MM-DD" -> split
-        const dateStr = typeof tx.date === 'string' ? tx.date.split('T')[0] : '';
-        const [y, m, d] = dateStr.split('-').map(Number);
-        // Note: m is 1-indexed in string but 0-indexed in Date, but here we compare vs getMonth (0-indexed)
-        // actually easier: just compare month/year directly from string if format is reliable, 
-        // OR construct Date(y, m-1, d) to be safe with standard Date methods
-        const dObj = new Date(y, m - 1, d);
-
-        return tx.type === 'INCOME' && dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear;
-    }).length;
-
-    const dailyAverage = monthlyTransactionsCount > 0 ? monthlyIncome / monthlyTransactionsCount : 0;
+    // 4. Daily Average (Used from State)
 
     return (
         <div className="flex flex-col gap-8 h-full">
@@ -122,7 +139,7 @@ const Analytics = () => {
                     title="Pagos Programados"
                     value={loading ? '...' : formatCurrency(scheduledPaymentsTotal)}
                     trend="down"
-                    trendValue={`${pendingBills.length} por vencer (30d)`}
+                    trendValue={`${pendingBills.length} por vencer(30d)`}
                     icon={<AlertCircle size={20} className="text-red-500" />}
                 />
                 <StatCard
@@ -136,7 +153,7 @@ const Analytics = () => {
 
             {/* Chart Section */}
             <div>
-                <LiquidityChart balance={balance} bills={bills} transactions={transactions} />
+                <ProjectionChart balance={balance} bills={bills} dailyAverage={dailyAverage} />
             </div>
 
             {/* Bottom Section: Donut & List */}

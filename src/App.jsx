@@ -6,6 +6,7 @@ import CalendarPage from './pages/Calendar';
 import Configuration from './pages/Configuration';
 import Invoices from './pages/Invoices';
 import DailySales from './pages/DailySales';
+import ImportAssistant from './pages/ImportAssistant';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="invoices" element={<Invoices />} />
           <Route path="daily-sales" element={<DailySales />} />
           <Route path="calendar" element={<CalendarPage />} />
+          <Route path="import-assistant" element={<ImportAssistant />} />
           <Route path="settings" element={<Configuration />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
