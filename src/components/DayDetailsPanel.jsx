@@ -2,7 +2,7 @@ import React from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 
-const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
+const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, type = 'PAYABLE' }) => {
     const [selectedIds, setSelectedIds] = React.useState([]);
 
     // Calculate totals
@@ -44,26 +44,42 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
 
     // Handlers
     const handlePaySelected = async () => {
-        if (selectedIds.length === 0) return alert('Selecciona al menos una factura');
+        if (selectedIds.length === 0) return alert(type === 'PAYABLE' ? 'Selecciona al menos una factura' : 'Selecciona al menos un cobro');
 
-        if (confirm(`¿Pagar ${selectedIds.length} facturas por ${formatCurrency(selectedTotal)}?`)) {
+        const confirmMsg = type === 'PAYABLE'
+            ? `¿Pagar ${selectedIds.length} facturas por ${formatCurrency(selectedTotal)}?`
+            : `¿Cobrar ${selectedIds.length} facturas por ${formatCurrency(selectedTotal)}?`;
+
+        if (confirm(confirmMsg)) {
             try {
                 for (const id of selectedIds) {
                     // 1. Update Bill Status
                     await api.updateBill(id, { status: 'PAID' });
 
-                    // 2. Create Expense Transaction to reflect in Balance!
+                    // 2. Create Transaction to reflect in Balance!
                     const bill = bills.find(b => b.id === id);
                     if (bill) {
-                        await api.createTransaction({
-                            amount: bill.amount,
-                            type: 'EXPENSE',
-                            category: 'Pago de Factura',
-                            note: `Pago a: ${bill.provider || 'Proveedor'} (${bill.title})`,
-                            date: new Date().toISOString().split('T')[0],
-                            method: 'Transferencia', // Default method
-                            status: 'COMPLETED'
-                        });
+                        if (type === 'PAYABLE') {
+                            await api.createTransaction({
+                                amount: bill.amount,
+                                type: 'EXPENSE',
+                                category: 'Pago de Factura',
+                                note: `Pago a: ${bill.provider || 'Proveedor'} (${bill.title})`,
+                                date: new Date().toISOString().split('T')[0],
+                                method: 'Transferencia', // Default method
+                                status: 'COMPLETED'
+                            });
+                        } else {
+                            await api.createTransaction({
+                                amount: bill.amount,
+                                type: 'INCOME',
+                                category: 'Venta', // Or 'Cobro de Factura'
+                                note: `Cobro a: ${bill.provider || 'Cliente'} (${bill.title})`,
+                                date: new Date().toISOString().split('T')[0],
+                                method: 'Efectivo', // Default method
+                                status: 'COMPLETED'
+                            });
+                        }
                     }
                 }
                 if (onBillUpdate) onBillUpdate();
@@ -71,7 +87,7 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
                 onClose();
             } catch (e) {
                 console.error(e);
-                alert('Error al procesar pagos');
+                alert(type === 'PAYABLE' ? 'Error al procesar pagos' : 'Error al procesar cobros');
             }
         }
     };
@@ -101,10 +117,12 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
     };
 
     return (
-        <div className="bg-white h-full w-full lg:w-[400px] border-l border-gray-100 flex flex-col shadow-xl absolute right-0 top-0 z-10 lg:static">
+        <div className="bg-white h-full w-full border-l border-gray-100 flex flex-col shadow-2xl relative z-10 animate-in slide-in-from-right duration-300">
             <div className="p-6 border-b border-gray-100 flex justify-between items-start">
                 <div>
-                    <h2 className="text-xl font-bold text-secondary">Pagos del {formatDate(date)}</h2>
+                    <h2 className="text-xl font-bold text-navy">
+                        {type === 'PAYABLE' ? 'Pagos del ' : 'Cobros del '}{formatDate(date)}
+                    </h2>
                     <p className="text-sm text-secondary opacity-60 capitalize">{getDayName(date)}</p>
                 </div>
                 <button onClick={onClose} className="text-secondary hover:bg-gray-100 p-2 rounded-full">
@@ -114,35 +132,54 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
 
             <div className="p-6 flex-1 overflow-y-auto">
                 {/* Summary Row */}
-                <div className="flex gap-4 mb-6">
+                <div className="flex gap-4 mb-6 font-bold">
                     <div className="flex-1">
-                        <p className="text-xs font-bold text-secondary opacity-60 uppercase mb-1">Proyectado</p>
-                        <p className="text-lg font-bold text-success">+$0.00</p>
+                        <p className="text-xs font-bold text-secondary opacity-60 uppercase mb-1">
+                            {type === 'PAYABLE' ? 'Proyectado' : 'Por Recibir'}
+                        </p>
+                        <p className="text-lg font-bold text-success">
+                            {type === 'PAYABLE' ? '+$0.00' : `+${formatCurrency(totalAmount)}`}
+                        </p>
                     </div>
                     <div className="flex-1 border-l pl-4 border-gray-100">
-                        <p className="text-xs font-bold text-secondary opacity-60 uppercase mb-1">Por Pagar</p>
-                        <p className="text-lg font-bold text-danger">-{formatCurrency(totalAmount)}</p>
+                        <p className="text-xs font-bold text-secondary opacity-60 uppercase mb-1">
+                            {type === 'PAYABLE' ? 'Por Pagar' : 'Proyectado'}
+                        </p>
+                        <p className={`text-lg font-bold ${type === 'PAYABLE' ? 'text-danger' : 'text-secondary'}`}>
+                            {type === 'PAYABLE' ? `-${formatCurrency(totalAmount)}` : '+$0.00'}
+                        </p>
                     </div>
                 </div>
 
                 {/* Alert (Conditional) */}
                 {totalAmount > 0 && (
-                    <div className="bg-red-50 border border-red-100 rounded-lg p-4 flex gap-3 mb-6">
-                        <AlertCircle size={20} className="text-danger flex-shrink-0" />
+                    <div className={`${type === 'PAYABLE' ? 'bg-red-50 border-red-100 text-danger' : 'bg-teal-50 border-teal-100 text-teal-800'} border rounded-lg p-4 flex gap-3 mb-6`}>
+                        <AlertCircle size={20} className={`${type === 'PAYABLE' ? 'text-danger' : 'text-teal-600'} flex-shrink-0`} />
                         <div>
-                            <p className="text-sm font-bold text-danger mb-1">Aviso de Liquidez</p>
-                            <p className="text-xs text-danger opacity-80">Tienes {bills.length} pagos programados para este día.</p>
+                            <p className="text-sm font-bold mb-1">
+                                {type === 'PAYABLE' ? 'Aviso de Liquidez' : 'Aviso de Cobros'}
+                            </p>
+                            <p className="text-xs opacity-80">
+                                {type === 'PAYABLE'
+                                    ? `Tienes ${bills.length} pagos programados para este día.`
+                                    : `Tienes ${bills.length} cobros programados para este día.`
+                                }
+                            </p>
                         </div>
                     </div>
                 )}
 
                 {/* Invoices List */}
                 <div className="mb-4">
-                    <h3 className="text-xs font-bold text-secondary uppercase mb-4 opacity-60">Facturas Pendientes ({bills.length})</h3>
+                    <h3 className="text-xs font-bold text-secondary uppercase mb-4 opacity-60">
+                        {type === 'PAYABLE' ? 'Facturas Pendientes' : 'Cobros Pendientes'} ({bills.length})
+                    </h3>
 
                     <div className="flex flex-col gap-3">
                         {bills.length === 0 ? (
-                            <p className="text-sm text-secondary opacity-50 italic">No hay pagos programados.</p>
+                            <p className="text-sm text-secondary opacity-50 italic">
+                                {type === 'PAYABLE' ? 'No hay pagos programados.' : 'No hay cobros programados.'}
+                            </p>
                         ) : (
                             bills.map((bill) => (
                                 <div
@@ -158,14 +195,14 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
                                             </div>
 
                                             <div>
-                                                <p className="text-sm font-bold text-secondary">{bill.provider || 'Proveedor'}</p>
+                                                <p className="text-sm font-bold text-secondary">{bill.provider || (type === 'PAYABLE' ? 'Proveedor' : 'Cliente')}</p>
                                                 <p className="text-xs text-secondary opacity-60">{bill.title}</p>
                                             </div>
                                         </div>
                                         <p className="text-sm font-bold text-secondary">{formatCurrency(bill.amount)}</p>
                                     </div>
                                     <div className={`ml-8 px-2 py-1 rounded text-[10px] inline-block font-bold ${bill.status === 'PENDING' ? 'bg-orange-50 text-warning' : 'bg-green-50 text-success'}`}>
-                                        {bill.status === 'PENDING' ? 'Pendiente' : 'Pagado'}
+                                        {bill.status === 'PENDING' ? 'Pendiente' : (type === 'PAYABLE' ? 'Pagado' : 'Cobrado')}
                                     </div>
                                 </div>
                             ))
@@ -198,9 +235,9 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate }) => {
                     <button
                         onClick={handlePaySelected}
                         disabled={selectedIds.length === 0}
-                        className="btn btn-primary bg-teal-700 hover:bg-teal-800 border-none disabled:opacity-50 disabled:cursor-not-allowed"
+                        className={`btn border-none disabled:opacity-50 disabled:cursor-not-allowed ${type === 'PAYABLE' ? 'btn-primary bg-teal-700 hover:bg-teal-800' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}
                     >
-                        Pagar ({formatCurrency(selectedTotal)})
+                        {type === 'PAYABLE' ? 'Pagar' : 'Cobrar'} ({formatCurrency(selectedTotal)})
                     </button>
                 </div>
             </div>

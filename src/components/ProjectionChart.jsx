@@ -18,16 +18,20 @@ const ProjectionChart = ({ balance, bills = [], dailyAverage = 0 }) => {
             // Simpler: Just add the daily average every day
             currentBalance += dailyAverage;
 
-            // Subtract Bills due on this day
-            const billsDue = bills.filter(b => b.status === 'PENDING' && b.dueDate.startsWith(dateStr));
-            const billsTotal = billsDue.reduce((sum, b) => sum + b.amount, 0);
+            // Subtract Payables and Add Receivables due on this day
+            const payablesDue = bills.filter(b => b.type !== 'RECEIVABLE' && b.status === 'PENDING' && b.dueDate.startsWith(dateStr));
+            const receivablesDue = bills.filter(b => b.type === 'RECEIVABLE' && b.status === 'PENDING' && b.dueDate.startsWith(dateStr));
 
-            currentBalance -= billsTotal;
+            const payablesTotal = payablesDue.reduce((sum, b) => sum + b.amount, 0);
+            const receivablesTotal = receivablesDue.reduce((sum, b) => sum + b.amount, 0);
+
+            currentBalance = currentBalance - payablesTotal + receivablesTotal;
 
             result.push({
                 date: date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
                 balance: currentBalance,
-                bills: billsTotal
+                bills: payablesTotal,
+                receivables: receivablesTotal
             });
         }
         return result;

@@ -90,7 +90,7 @@ const Analytics = () => {
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(now.getDate() + 30);
 
-    const pendingBills = bills.filter(b => b.status === 'PENDING' && new Date(b.dueDate) <= thirtyDaysFromNow);
+    const pendingBills = bills.filter(b => b.type !== 'RECEIVABLE' && b.status === 'PENDING' && new Date(b.dueDate) <= thirtyDaysFromNow);
     const scheduledPaymentsTotal = pendingBills.reduce((acc, curr) => acc + curr.amount, 0);
 
     // 2. Projected Incomes (Used from State)
@@ -120,7 +120,7 @@ const Analytics = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     title="Saldo Disponible Hoy"
                     value={loading ? '...' : formatCurrency(balance)}
@@ -162,7 +162,7 @@ const Analytics = () => {
                     <PaymentMixChart transactions={transactions} />
                 </div>
                 <div className="lg:col-span-2">
-                    <DebtList bills={bills} />
+                    <DebtList bills={bills.filter(b => b.type !== 'RECEIVABLE')} />
                 </div>
             </div>
         </div>

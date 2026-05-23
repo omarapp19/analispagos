@@ -124,13 +124,13 @@ const DailySales = () => {
 
                         return (
                             <div key={dateStr} className="card bg-white shadow-sm rounded-2xl overflow-hidden border border-gray-100">
-                                <div className="bg-gray-50/50 p-4 border-b border-gray-100 flex justify-between items-center">
+                                <div className="bg-gray-50/50 p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                                     <div className="flex items-center gap-2">
                                         <Calendar size={18} className="text-primary" />
-                                        <h3 className="font-bold text-navy capitalize">{dateDisplay}</h3>
+                                        <h3 className="font-bold text-navy capitalize text-sm sm:text-base">{dateDisplay}</h3>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="text-sm font-bold text-success bg-green-50 px-3 py-1 rounded-full border border-green-100">
+                                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                                        <div className="text-xs sm:text-sm font-bold text-success bg-green-50 px-3 py-1 rounded-full border border-green-100">
                                             Total: {formatCurrency(dailyTotal)}
                                         </div>
                                         <button

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import AIAssistantBubble from '../components/AIAssistantBubble';
 
 const MainLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,6 +27,9 @@ const MainLayout = () => {
                     <Outlet />
                 </main>
             </div>
+
+            {/* Global AI Assistant Floating Bubble */}
+            <AIAssistantBubble />
         </div>
     );
 };

@@ -40,14 +40,14 @@ const Invoices = () => {
 
     return (
         <div className="flex flex-col h-full gap-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-navy">Facturas</h1>
                     <p className="text-secondary opacity-60">Gestión de gastos y cuentas por pagar</p>
                 </div>
                 <button
                     onClick={() => setShowModal(true)}
-                    className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
+                    className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 w-full sm:w-auto justify-center"
                 >
                     <Plus size={18} />
                     Nueva Factura

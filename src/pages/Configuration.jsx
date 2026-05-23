@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, User } from 'lucide-react';
+import { Save, Building2, User, FileText, Phone, MapPin } from 'lucide-react';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { api } from '../services/api';
@@ -8,6 +8,9 @@ const Configuration = () => {
     const [settings, setSettings] = useState({
         storeName: 'Galpon',
         adminName: 'Omar Pérez',
+        storeTaxId: 'J-12345678-9',
+        storePhone: '0212-5555555',
+        storeAddress: 'Caracas, Venezuela',
         includeDivisas: false // Default: Don't include Divisas in real balance
     });
     const [loading, setLoading] = useState(true);
@@ -174,6 +177,65 @@ const Configuration = () => {
                                 placeholder="Ej: Carlos Ruiz"
                                 required
                             />
+                        </div>
+
+                        <div className="pt-4 border-t border-gray-50">
+                            <h3 className="text-sm font-bold text-navy mb-3">Datos del Comercio (Facturación / POS)</h3>
+                            <p className="text-xs text-secondary opacity-60 mb-4">Esta información aparecerá automáticamente impresa en la parte superior de los tickets del POS.</p>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-navy mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <FileText size={16} className="text-primary" />
+                                            RIF / Identificación Fiscal del Local
+                                        </div>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="storeTaxId"
+                                        value={settings.storeTaxId || ''}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-mono"
+                                        placeholder="Ej: J-12345678-9"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-navy mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <Phone size={16} className="text-primary" />
+                                                Teléfono de Contacto
+                                            </div>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="storePhone"
+                                            value={settings.storePhone || ''}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                                            placeholder="Ej: 0212-5555555"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-navy mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <MapPin size={16} className="text-primary" />
+                                                Dirección Física
+                                            </div>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="storeAddress"
+                                            value={settings.storeAddress || ''}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                                            placeholder="Ej: Caracas, Venezuela"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

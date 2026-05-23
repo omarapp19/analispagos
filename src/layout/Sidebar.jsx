@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot, Calendar } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot, Calendar, Package, Receipt } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -33,7 +33,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             )}
 
             <div className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen
+                fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen flex flex-col
                 ${isOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 {/* Brand */}
@@ -48,13 +48,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" onClick={onClose} />
                     <NavItem to="/analytics" icon={<PieChart size={20} />} label="Estadísticas" onClick={onClose} />
                     <NavItem to="/daily-sales" icon={<DollarSign size={20} />} label="Ventas Diarias" onClick={onClose} />
-                    <NavItem to="/invoices" icon={<FileText size={20} />} label="Facturas" onClick={onClose} />
-                    <NavItem to="/calendar" icon={<Calendar size={20} />} label="Calendario" onClick={onClose} />
+                    <NavItem to="/billing" icon={<Receipt size={20} />} label="POS" onClick={onClose} />
+                    <NavItem to="/inventory" icon={<Package size={20} />} label="Inventario" onClick={onClose} />
+                    <NavItem to="/invoices" icon={<FileText size={20} />} label="Facturas (Gastos)" onClick={onClose} />
+                    <NavItem to="/calendar" icon={<Calendar size={20} />} label="Cuentas por Pagar/Cobrar" onClick={onClose} />
 
                     {/* Divider or Spacer */}
                     <div className="flex-1"></div>
 
-                    <NavItem to="/import-assistant" icon={<Bot size={20} />} label="Asistente IA" onClick={onClose} />
                     <NavItem to="/settings" icon={<Settings size={20} />} label="Configuración" onClick={onClose} />
                 </nav>
 

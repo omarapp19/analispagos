@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 
-const BillFormModal = ({ onClose, onBillAdded }) => {
+const BillFormModal = ({ onClose, onBillAdded, defaultType = 'PAYABLE' }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         provider: '',
         amount: '',
         // Use local date for default value to prevent UTC offset issues
-        dueDate: new Date().toLocaleDateString('en-CA')
+        dueDate: new Date().toLocaleDateString('en-CA'),
+        type: defaultType
     });
 
     const handleChange = (e) => {
@@ -42,15 +43,35 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+                    {/* Selector de Tipo (Gasto/Cobro) */}
+                    <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
+                        <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, type: 'PAYABLE' }))}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.type === 'PAYABLE' ? 'bg-white text-danger shadow-sm border border-red-100/50' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                        >
+                            Gasto (Por Pagar)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, type: 'RECEIVABLE' }))}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.type === 'RECEIVABLE' ? 'bg-white text-teal-600 shadow-sm border border-teal-100/50' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                        >
+                            Cobro (Por Cobrar)
+                        </button>
+                    </div>
+
                     <div>
-                        <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-2 block">Proveedor</label>
+                        <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-2 block">
+                            {formData.type === 'PAYABLE' ? 'Proveedor' : 'Cliente'}
+                        </label>
                         <input
                             type="text"
                             name="provider"
                             value={formData.provider}
                             onChange={handleChange}
                             required
-                            placeholder="Ej. CFE, AWS, Proveedor X"
+                            placeholder={formData.type === 'PAYABLE' ? 'Ej. CFE, AWS, Proveedor X' : 'Ej. Juan Pérez, Cliente Y'}
                             className="w-full p-4 bg-background rounded-xl border-2 border-transparent focus:border-primary outline-none font-bold text-navy"
                         />
                     </div>
@@ -63,7 +84,7 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                             value={formData.title}
                             onChange={handleChange}
                             required
-                            placeholder="Ej. Servicio de Luz Octubre"
+                            placeholder={formData.type === 'PAYABLE' ? 'Ej. Servicio de Luz Octubre' : 'Ej. Venta a Crédito Factura #102'}
                             className="w-full p-4 bg-background rounded-xl border-2 border-transparent focus:border-primary outline-none font-medium text-secondary"
                         />
                     </div>
@@ -98,10 +119,10 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="btn btn-primary w-full py-4 text-base mt-2 rounded-xl shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className={`btn w-full py-4 text-base mt-2 rounded-xl shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${formData.type === 'PAYABLE' ? 'btn-primary shadow-teal-500/30 hover:shadow-teal-500/50' : 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/30 hover:shadow-teal-500/50'}`}
                     >
                         {loading ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
-                        {loading ? 'Guardando...' : 'Programar Factura'}
+                        {loading ? 'Guardando...' : formData.type === 'PAYABLE' ? 'Programar Pago' : 'Programar Cobro'}
                     </button>
                 </form>
             </div>
