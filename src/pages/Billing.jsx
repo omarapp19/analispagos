@@ -61,6 +61,7 @@ const Billing = () => {
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [activeReceipt, setActiveReceipt] = useState(null);
     const [generatedReceiptImage, setGeneratedReceiptImage] = useState(null);
+    const [generatingImage, setGeneratingImage] = useState(false);
 
     // Register Payment Modal States
     const [showPayModal, setShowPayModal] = useState(false);
@@ -364,49 +365,147 @@ const Billing = () => {
         }
     };
 
-    // Share POS Receipt as Image (PNG)
+    // Converts every oklch(...) occurrence in <style> tags of a cloned document
+    // to an rgb() equivalent that html2canvas can parse.
+    // Strategy: ask the browser itself to resolve the color via a temp element.
+    const patchOklchColors = (clonedDoc) => {
+        const cache = new Map();
+
+        const toRgb = (oklchStr) => {
+            if (cache.has(oklchStr)) return cache.get(oklchStr);
+            try {
+                const tmp = document.createElement('span');
+                tmp.style.display = 'none';
+                tmp.style.color = oklchStr;
+                document.body.appendChild(tmp);
+                const rgb = window.getComputedStyle(tmp).color; // browser resolves oklch → rgb
+                document.body.removeChild(tmp);
+                const result = rgb && rgb !== 'rgba(0, 0, 0, 0)' ? rgb : '#000000';
+                cache.set(oklchStr, result);
+                return result;
+            } catch {
+                return '#000000';
+            }
+        };
+
+        clonedDoc.querySelectorAll('style').forEach(styleEl => {
+            if (!styleEl.textContent.includes('oklch')) return;
+            styleEl.textContent = styleEl.textContent.replace(
+                /oklch\([^)]+\)/g,
+                (match) => toRgb(match)
+            );
+        });
+    };
+
+    // Share POS Receipt as Image (PNG) — shows preview modal for share
     const handleShareReceiptAsImage = async () => {
-        if (!activeReceipt) return;
+        if (!activeReceipt || generatingImage) return;
 
-        const element = document.getElementById('invoice-print-area');
-        if (!element) return;
-
+        setGeneratingImage(true);
         try {
-            // Render element to canvas
+            await new Promise(r => setTimeout(r, 80));
+            const element = document.getElementById('invoice-print-area');
+            if (!element) throw new Error('Elemento del comprobante no encontrado en el DOM.');
+            element.scrollIntoView({ block: 'nearest' });
+            await new Promise(r => setTimeout(r, 150));
+
             const canvas = await html2canvas(element, {
-                scale: 2.5, // Ultra-sharp typography & borders
+                scale: 2.5,
                 useCORS: true,
+                allowTaint: true,
                 backgroundColor: '#ffffff',
-                logging: false
+                logging: false,
+                foreignObjectRendering: false,
+                onclone: (clonedDoc, clonedEl) => {
+                    patchOklchColors(clonedDoc);
+                    clonedEl.querySelectorAll('.no-print').forEach(el => el.remove());
+                    clonedEl.style.overflow  = 'visible';
+                    clonedEl.style.maxHeight = 'none';
+                    clonedEl.style.height    = 'auto';
+                }
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            setGeneratedReceiptImage(dataUrl); // opens preview modal
+
+        } catch (error) {
+            console.error('Error generando imagen del comprobante:', error);
+            alert('No se pudo generar la imagen: ' + (error?.message || 'error desconocido'));
+        } finally {
+            setGeneratingImage(false);
+        }
+    };
+
+    // Direct download — generates and downloads immediately, no preview modal
+    const handleDirectDownload = async () => {
+        if (!activeReceipt || generatingImage) return;
+
+        setGeneratingImage(true);
+        try {
+            await new Promise(r => setTimeout(r, 80));
+            const element = document.getElementById('invoice-print-area');
+            if (!element) throw new Error('Elemento del comprobante no encontrado en el DOM.');
+            element.scrollIntoView({ block: 'nearest' });
+            await new Promise(r => setTimeout(r, 150));
+
+            const canvas = await html2canvas(element, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+                foreignObjectRendering: false,
+                onclone: (clonedDoc, clonedEl) => {
+                    patchOklchColors(clonedDoc);
+                    clonedEl.querySelectorAll('.no-print').forEach(el => el.remove());
+                    clonedEl.style.overflow  = 'visible';
+                    clonedEl.style.maxHeight = 'none';
+                    clonedEl.style.height    = 'auto';
+                }
             });
             const dataUrl = canvas.toDataURL('image/png');
 
-            // Open premium preview modal immediately
-            setGeneratedReceiptImage(dataUrl);
+            // Trigger browser download directly
+            const link = document.createElement('a');
+            link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-            // Convert base64 Data URL to Blob
-            const response = await fetch(dataUrl);
-            const blob = await response.blob();
-            const file = new File([blob], `Ticket-${activeReceipt.invoiceNumber}.png`, { type: 'image/png' });
-
-            // Share using Web Share API if possible (mobile/HTTPS)
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: `Ticket ${activeReceipt.invoiceNumber}`,
-                    text: `Comprobante de compra de ${activeReceipt.clientName} - ${globalSettings.storeName}`
-                });
-            } else {
-                // Desktop / Chrome Fallback: Direct Download
-                const link = document.createElement('a');
-                link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
-                link.href = dataUrl;
-                link.click();
-            }
         } catch (error) {
-            console.error('Error generating or sharing ticket image:', error);
-            // Even if direct sharing/downloading fails, the generatedReceiptImage state remains set
-            // so the user is still shown the image and can easily long-press to save or share!
+            console.error('Error descargando imagen:', error);
+            alert('No se pudo descargar la imagen: ' + (error?.message || 'error desconocido'));
+        } finally {
+            setGeneratingImage(false);
+        }
+    };
+
+    // Download the already-generated image
+    const handleDownloadReceiptImage = () => {
+        if (!generatedReceiptImage) return;
+        const link = document.createElement('a');
+        link.download = `Ticket-${activeReceipt?.invoiceNumber || 'comprobante'}.png`;
+        link.href = generatedReceiptImage;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // Share via Web Share API (mobile) — images only
+    const handleNativeShareImage = async () => {
+        if (!generatedReceiptImage) return;
+        try {
+            const response = await fetch(generatedReceiptImage);
+            const blob = await response.blob();
+            const file = new File([blob], `Ticket-${activeReceipt?.invoiceNumber || 'comprobante'}.png`, { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: `Ticket ${activeReceipt?.invoiceNumber}` });
+            } else {
+                handleDownloadReceiptImage();
+            }
+        } catch (err) {
+            console.error('Error al compartir:', err);
+            handleDownloadReceiptImage();
         }
     };
 
@@ -1458,11 +1557,14 @@ ${itemsText}-------------------------------
                                     <Printer size={16} />
                                 </button>
                                 <button 
-                                    onClick={handleShareReceiptAsImage}
-                                    className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600 transition-all duration-200 flex items-center justify-center"
-                                    title="Descargar Imagen (PNG)"
+                                    onClick={handleDirectDownload}
+                                    disabled={generatingImage}
+                                    className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600 transition-all duration-200 flex items-center justify-center disabled:opacity-50"
+                                    title="Descargar como imagen"
                                 >
-                                    <Download size={16} />
+                                    {generatingImage 
+                                        ? <Loader2 size={16} className="animate-spin" /> 
+                                        : <Download size={16} />}
                                 </button>
                                 <button 
                                     onClick={handleShareReceipt}
@@ -1634,35 +1736,45 @@ ${itemsText}-------------------------------
                         </button>
 
                         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-1">
-                            <Download size={22} className="animate-bounce" />
+                            <Download size={22} />
                         </div>
 
                         <h3 className="text-navy font-black text-base">Comprobante Listo</h3>
                         <p className="text-xs text-secondary leading-relaxed max-w-[260px]">
-                            Para guardar o compartir esta imagen en tu dispositivo, **mantén presionada la imagen** abajo y selecciona **"Guardar imagen"** o **"Compartir"**.
+                            Descarga o comparte la imagen directamente.
                         </p>
 
-                        {/* Image Preview Container */}
-                        <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[50vh] shadow-inner bg-slate-50 flex items-center justify-center w-full select-text">
+                        {/* Image Preview */}
+                        <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[45vh] shadow-inner bg-slate-50 flex items-center justify-center w-full select-text">
                             <img 
                                 src={generatedReceiptImage} 
                                 alt="Comprobante Digital" 
-                                className="max-w-full max-h-full object-contain pointer-events-auto cursor-pointer"
+                                className="max-w-full max-h-full object-contain pointer-events-auto"
                             />
                         </div>
 
-                        <button
-                            onClick={() => {
-                                const link = document.createElement('a');
-                                link.download = `Ticket-${activeReceipt?.invoiceNumber || 'comprobante'}.png`;
-                                link.href = generatedReceiptImage;
-                                link.click();
-                            }}
-                            className="btn btn-primary w-full py-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 mt-2"
-                        >
-                            <Download size={15} />
-                            Intentar Descarga Directa
-                        </button>
+                        {/* Action buttons */}
+                        <div className="flex gap-2 w-full mt-1">
+                            {/* Download always works */}
+                            <button
+                                onClick={handleDownloadReceiptImage}
+                                className="flex-1 btn btn-primary py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2"
+                            >
+                                <Download size={14} />
+                                Descargar
+                            </button>
+
+                            {/* Share — only shows if Web Share API is available */}
+                            {navigator.share && (
+                                <button
+                                    onClick={handleNativeShareImage}
+                                    className="flex-1 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white transition-colors"
+                                >
+                                    <Share2 size={14} />
+                                    Compartir
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

@@ -12,6 +12,7 @@ const Inventory = () => {
     // Inventory Data States
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [savingForm, setSavingForm] = useState(false); // separate state for form save
     const [actionLoading, setActionLoading] = useState(null); // id of product being quick updated
 
     // UI States
@@ -25,7 +26,10 @@ const Inventory = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [formData, setFormData] = useState({
+        productType: 'product', // 'product' | 'service'
         name: '',
+        brand: '',
+        code: '',
         description: '',
         quantity: '0',
         costPrice: '0.00',
@@ -130,16 +134,21 @@ const Inventory = () => {
         e.preventDefault();
         if (!formData.name.trim()) return;
 
-        setLoading(true);
+        const isService = formData.productType === 'service';
+
+        setSavingForm(true);
         try {
             const productData = {
-                name: formData.name.trim(),
-                description: formData.description.trim(),
-                quantity: parseInt(formData.quantity) || 0,
-                costPrice: parseFloat(formData.costPrice) || 0,
-                marginPercentage: parseFloat(formData.marginPercentage) || 0,
+                productType: formData.productType || 'product',
+                name: (formData.name || '').trim().toUpperCase(),
+                brand: (formData.brand || '').trim().toUpperCase(),
+                code: (formData.code || '').trim().toUpperCase(),
+                description: (formData.description || '').trim(),
+                quantity: isService ? 0 : (parseInt(formData.quantity) || 0),
+                costPrice: isService ? 0 : (parseFloat(formData.costPrice) || 0),
+                marginPercentage: isService ? 0 : (parseFloat(formData.marginPercentage) || 0),
                 sellingPrice: parseFloat(formData.sellingPrice) || 0,
-                image: formData.image.trim(),
+                image: (formData.image || '').trim(),
                 taxPercentage: parseFloat(formData.taxPercentage) || 0
             };
 
@@ -153,7 +162,10 @@ const Inventory = () => {
             setIsModalOpen(false);
             setEditingProduct(null);
             setFormData({
+                productType: 'product',
                 name: '',
+                brand: '',
+                code: '',
                 description: '',
                 quantity: '0',
                 costPrice: '0.00',
@@ -165,9 +177,9 @@ const Inventory = () => {
             });
         } catch (error) {
             console.error('Error saving product:', error);
-            alert('Ocurrió un error al guardar el producto.');
+            alert('Ocurrió un error al guardar el producto: ' + (error?.message || error));
         } finally {
-            setLoading(false);
+            setSavingForm(false);
         }
     };
 
@@ -191,12 +203,15 @@ const Inventory = () => {
     const handleEditProduct = (product) => {
         setEditingProduct(product);
         setFormData({
+            productType: product.productType || 'product',
             name: product.name,
+            brand: product.brand || '',
+            code: product.code || '',
             description: product.description || '',
-            quantity: product.quantity.toString(),
-            costPrice: product.costPrice.toFixed(2),
-            marginPercentage: product.marginPercentage.toString(),
-            sellingPrice: product.sellingPrice.toFixed(2),
+            quantity: (product.quantity || 0).toString(),
+            costPrice: (product.costPrice || 0).toFixed(2),
+            marginPercentage: (product.marginPercentage || 0).toString(),
+            sellingPrice: (product.sellingPrice || 0).toFixed(2),
             image: product.image || '',
             imageType: product.image?.startsWith('data:') ? 'base64' : 'url',
             taxPercentage: product.taxPercentage !== undefined ? product.taxPercentage.toString() : '16'
@@ -542,9 +557,13 @@ const Inventory = () => {
                                 key={p.id} 
                                 className="card bg-white rounded-2xl shadow-card border border-transparent hover:border-gray-100 flex flex-col h-full relative overflow-hidden transition-all group duration-300"
                             >
-                                {/* Stock Badge */}
+                                {/* Stock / Type Badge */}
                                 <div className="absolute top-4 left-4 z-10">
-                                    {isEmpty ? (
+                                    {p.productType === 'service' ? (
+                                        <span className="bg-indigo-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                                            Servicio
+                                        </span>
+                                    ) : isEmpty ? (
                                         <span className="bg-danger text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
                                             Sin Existencias
                                         </span>
@@ -584,50 +603,29 @@ const Inventory = () => {
                                 {/* Content */}
                                 <div className="p-5 flex flex-col flex-grow justify-between gap-4">
                                     <div>
-                                        <h4 className="font-bold text-navy text-base leading-snug truncate" title={p.name}>
+                                        <h4 className="font-bold text-navy text-base leading-snug truncate uppercase" title={p.name}>
                                             {p.name}
                                         </h4>
                                     </div>
 
-                                    {/* Simple Price & Stock Display */}
+                                    {/* Price & Stock Display */}
                                     <div className="flex items-center justify-between bg-slate-50/70 rounded-xl px-4 py-2.5 border border-slate-100/50">
                                         <div className="text-left">
                                             <span className="text-[10px] uppercase font-extrabold text-secondary opacity-50 block tracking-wider">Precio Venta</span>
                                             <span className="font-black text-primary text-base">{formatCurrency(p.sellingPrice)}</span>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="text-[10px] uppercase font-extrabold text-secondary opacity-50 block tracking-wider">Disponible</span>
-                                            <span className={`text-sm font-black ${isEmpty ? 'text-danger' : isLow ? 'text-warning' : 'text-navy'}`}>
-                                                {p.quantity} und.
-                                            </span>
-                                        </div>
+                                        {p.productType !== 'service' && (
+                                            <div className="text-right">
+                                                <span className="text-[10px] uppercase font-extrabold text-secondary opacity-50 block tracking-wider">Disponible</span>
+                                                <span className={`text-sm font-black ${isEmpty ? 'text-danger' : isLow ? 'text-warning' : 'text-navy'}`}>
+                                                    {p.quantity} und.
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Footer Actions */}
-                                    <div className="flex items-center justify-between pt-2">
-                                        {/* Quick Stock Controls */}
-                                        <div className="flex items-center gap-1.5 bg-background p-1.5 rounded-xl border border-gray-100">
-                                            <button 
-                                                onClick={() => handleQuickStock(p, -1)}
-                                                disabled={actionLoading === p.id}
-                                                className="w-7 h-7 rounded-lg bg-white border border-gray-200 text-secondary hover:text-danger hover:border-red-200 flex items-center justify-center text-sm font-black shadow-sm disabled:opacity-50"
-                                                title="Reducir Existencias"
-                                            >
-                                                -
-                                            </button>
-                                            <span className="w-8 text-center font-extrabold text-navy text-sm">
-                                                {actionLoading === p.id ? '...' : p.quantity}
-                                            </span>
-                                            <button 
-                                                onClick={() => handleQuickStock(p, 1)}
-                                                disabled={actionLoading === p.id}
-                                                className="w-7 h-7 rounded-lg bg-white border border-gray-200 text-secondary hover:text-success hover:border-green-200 flex items-center justify-center text-sm font-black shadow-sm disabled:opacity-50"
-                                                title="Aumentar Existencias"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
-
+                                    <div className="flex items-center justify-end pt-2">
                                         {/* Edit / Delete */}
                                         <div className="flex items-center gap-1">
                                             <button 
@@ -685,29 +683,23 @@ const Inventory = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <span className="font-bold text-navy block max-w-xs truncate" title={p.name}>{p.name}</span>
+                                                    <span className="font-bold text-navy block max-w-xs truncate uppercase" title={p.name}>{p.name}</span>
                                                     <span className="text-xs text-secondary opacity-60 line-clamp-1 max-w-xs">{p.description || 'Sin descripción'}</span>
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex items-center gap-1 bg-background p-1 rounded-lg border border-gray-100 text-xs">
-                                                        <button 
-                                                            onClick={() => handleQuickStock(p, -1)}
-                                                            className="w-5 h-5 rounded hover:bg-gray-200 text-navy font-bold flex items-center justify-center"
-                                                        >-</button>
-                                                        <span className="w-6 text-center font-bold">{p.quantity}</span>
-                                                        <button 
-                                                            onClick={() => handleQuickStock(p, 1)}
-                                                            className="w-5 h-5 rounded hover:bg-gray-200 text-navy font-bold flex items-center justify-center"
-                                                        >+</button>
+                                                {p.productType === 'service' ? (
+                                                    <span className="text-[10px] font-extrabold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase">Servicio</span>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-navy">{p.quantity}</span>
+                                                        {isEmpty ? (
+                                                            <span className="text-[10px] font-extrabold text-danger bg-red-50 px-2 py-0.5 rounded-full uppercase">Agotado</span>
+                                                        ) : isLow ? (
+                                                            <span className="text-[10px] font-extrabold text-warning bg-amber-50 px-2 py-0.5 rounded-full uppercase">Bajo</span>
+                                                        ) : null}
                                                     </div>
-                                                    {isEmpty ? (
-                                                        <span className="text-[10px] font-extrabold text-danger bg-red-50 px-2 py-0.5 rounded-full uppercase">Agotado</span>
-                                                    ) : isLow ? (
-                                                        <span className="text-[10px] font-extrabold text-warning bg-amber-50 px-2 py-0.5 rounded-full uppercase">Bajo</span>
-                                                    ) : null}
-                                                </div>
+                                                )}
                                             </td>
                                             <td className="py-4 px-6 text-right font-semibold text-secondary">{formatCurrency(p.costPrice)}</td>
                                             <td className="py-4 px-6 text-right font-bold text-primary">{formatCurrency(p.sellingPrice)}</td>
@@ -777,17 +769,68 @@ const Inventory = () => {
 
                         {/* Modal Form body */}
                         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+
+                            {/* Product Type Toggle */}
+                            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-full">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, productType: 'product' }))}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                        formData.productType === 'product'
+                                            ? 'bg-white text-primary shadow-sm'
+                                            : 'text-secondary opacity-60 hover:opacity-100'
+                                    }`}
+                                >
+                                    📦 Producto
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, productType: 'service' }))}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                        formData.productType === 'service'
+                                            ? 'bg-white text-primary shadow-sm'
+                                            : 'text-secondary opacity-60 hover:opacity-100'
+                                    }`}
+                                >
+                                    🛠️ Servicio
+                                </button>
+                            </div>
+
                             {/* Product Name */}
                             <div>
-                                <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Nombre del Producto *</label>
+                                <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Nombre *</label>
                                 <input 
                                     type="text" 
                                     required
                                     value={formData.name}
                                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Ej: Camisa Sport Premium"
+                                    placeholder={formData.productType === 'service' ? 'Ej: Instalación, Diseño Web...' : 'Ej: Camisa Sport Premium'}
                                     className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
                                 />
+                            </div>
+
+                            {/* Brand & Code */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Marca</label>
+                                    <input 
+                                        type="text"
+                                        value={formData.brand}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
+                                        placeholder="Ej: Nike, Samsung..."
+                                        className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Código / SKU</label>
+                                    <input 
+                                        type="text"
+                                        value={formData.code}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                                        placeholder="Ej: SKU-001"
+                                        className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                    />
+                                </div>
                             </div>
 
                             {/* Description */}
@@ -796,19 +839,19 @@ const Inventory = () => {
                                 <textarea 
                                     value={formData.description}
                                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Detalles sobre el producto, talle, color, ubicación, etc..."
+                                    placeholder="Detalles adicionales..."
                                     className="w-full p-4 bg-background rounded-xl border border-gray-200 outline-none text-sm font-medium text-secondary h-20 resize-none placeholder:text-gray-300 focus:border-primary transition-all"
                                 />
                             </div>
 
-                            {/* Quantity & Cost */}
+                            {/* Quantity & Cost — only for products */}
+                            {formData.productType === 'product' && (
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cantidad Inicial</label>
                                     <input 
                                         type="number" 
                                         min="0"
-                                        required
                                         value={formData.quantity}
                                         onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
                                         placeholder="0"
@@ -821,7 +864,6 @@ const Inventory = () => {
                                         type="number" 
                                         step="0.01"
                                         min="0"
-                                        required
                                         value={formData.costPrice}
                                         onChange={(e) => handleCostChange(e.target.value)}
                                         placeholder="0.00"
@@ -829,14 +871,18 @@ const Inventory = () => {
                                     />
                                 </div>
                             </div>
+                            )}
 
                             {/* Profit Margin and Selling Price (Calculated interactively!) */}
                             <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-secondary uppercase tracking-wider">Cálculo de Ganancia e IVA</span>
+                                    <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+                                        {formData.productType === 'service' ? 'Precio del Servicio' : 'Cálculo de Ganancia e IVA'}
+                                    </span>
                                     <TrendingUp size={16} className="text-primary" />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className={`grid gap-4 ${formData.productType === 'service' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                                    {formData.productType === 'product' && (
                                     <div>
                                         <label className="text-[10px] font-extrabold text-secondary uppercase tracking-wider mb-1 block">Margen Ganancia %</label>
                                         <div className="relative">
@@ -851,8 +897,9 @@ const Inventory = () => {
                                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-extrabold text-secondary opacity-55">%</span>
                                         </div>
                                     </div>
+                                    )}
                                     <div>
-                                        <label className="text-[10px] font-extrabold text-secondary uppercase tracking-wider mb-1 block">Precio Venta ($) *</label>
+                                        <label className="text-[10px] font-extrabold text-secondary uppercase tracking-wider mb-1 block">Precio Final ($) *</label>
                                         <div className="relative">
                                             <input 
                                                 type="number" 
@@ -867,8 +914,8 @@ const Inventory = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Info Box */}
-                                {parseFloat(formData.costPrice) > 0 && (
+                                {/* Info Box — only for products with cost set */}
+                                {formData.productType === 'product' && parseFloat(formData.costPrice) > 0 && (
                                     <div className="text-xs font-bold text-success flex justify-between items-center bg-white px-3 py-2 rounded-xl border border-green-100 shadow-sm">
                                         <span>Ganancia Neta por unidad:</span>
                                         <span className="text-sm font-extrabold">
@@ -1006,10 +1053,10 @@ const Inventory = () => {
                                 </button>
                                 <button 
                                     type="submit"
-                                    disabled={loading || !formData.name.trim()}
+                                    disabled={savingForm || !formData.name.trim()}
                                     className="bg-primary hover:bg-primary/95 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
                                 >
-                                    {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                                    {savingForm ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                                     {editingProduct ? 'Guardar Cambios' : 'Registrar Producto'}
                                 </button>
                             </div>
