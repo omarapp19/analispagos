@@ -117,11 +117,67 @@ export const api = {
 
     createBill: async (data) => {
         try {
+            const itemsToSave = [];
+
+            // 1. Update/Create items in inventory ONLY if it's PAYABLE and items exist
+            if (data.type === 'PAYABLE' && data.items && data.items.length > 0) {
+                const itemPromises = data.items.map(async (item) => {
+                    if (item.productId && !item.isNew) {
+                        // Existing product: add quantity and update prices
+                        const productRef = doc(db, 'inventory', item.productId);
+                        const productSnap = await getDoc(productRef);
+                        if (productSnap.exists()) {
+                            const currentData = productSnap.data();
+                            const currentQty = parseInt(currentData.quantity) || 0;
+                            const addedQty = parseInt(item.quantity) || 0;
+                            const newQty = currentQty + addedQty;
+                            
+                            const updateData = {
+                                quantity: newQty,
+                                costPrice: parseFloat(item.costPrice) || 0,
+                                marginPercentage: parseFloat(item.marginPercentage) || 0,
+                                sellingPrice: parseFloat(item.sellingPrice) || 0,
+                                updatedAt: new Date()
+                            };
+                            await updateDoc(productRef, updateData);
+                            itemsToSave.push({
+                                ...item,
+                                isNew: false
+                            });
+                        }
+                    } else {
+                        // New product: create it in inventory
+                        const newItem = {
+                            name: item.name.trim(),
+                            description: item.description?.trim() || 'Creado desde factura',
+                            quantity: parseInt(item.quantity) || 0,
+                            costPrice: parseFloat(item.costPrice) || 0,
+                            marginPercentage: parseFloat(item.marginPercentage) || 0,
+                            sellingPrice: parseFloat(item.sellingPrice) || 0,
+                            image: '',
+                            taxPercentage: parseFloat(item.taxPercentage) || 16,
+                            createdAt: new Date()
+                        };
+                        const docRef = await addDoc(collection(db, 'inventory'), newItem);
+                        itemsToSave.push({
+                            ...item,
+                            productId: docRef.id,
+                            isNew: false
+                        });
+                    }
+                });
+                await Promise.all(itemPromises);
+            }
+
+            // 2. Create the bill
             const newBill = {
-                ...data,
+                title: data.title || '',
+                provider: data.provider || '',
                 amount: parseFloat(data.amount),
                 dueDate: data.dueDate, // Save as string "YYYY-MM-DD" directly
                 status: 'PENDING',
+                type: data.type || 'PAYABLE',
+                items: data.type === 'PAYABLE' ? itemsToSave : [],
                 createdAt: new Date()
             };
             const docRef = await addDoc(collection(db, 'bills'), newBill);
