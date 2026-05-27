@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, User } from 'lucide-react';
+import { Save, Building2, User, Landmark, TrendingUp } from 'lucide-react';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { api } from '../services/api';
@@ -8,10 +8,15 @@ const Configuration = () => {
     const [settings, setSettings] = useState({
         storeName: 'Galpon',
         adminName: 'Omar Pérez',
-        includeDivisas: false // Default: Don't include Divisas in real balance
+        includeDivisas: false, // Default: Don't include Divisas in real balance
+        tasaBcv: '40.50',
+        tasaEuro: '44.00',
+        tasaBinance: '41.80',
+        tasaPromedio: '41.50'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [fetchingRates, setFetchingRates] = useState(false);
     const [message, setMessage] = useState(null);
 
     // Referencia al documento único de configuración en Firebase
@@ -25,7 +30,11 @@ const Configuration = () => {
         try {
             const docSnap = await getDoc(settingsRef);
             if (docSnap.exists()) {
-                setSettings(docSnap.data());
+                const data = docSnap.data();
+                setSettings(prev => ({
+                    ...prev,
+                    ...data
+                }));
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -34,12 +43,56 @@ const Configuration = () => {
         }
     };
 
+    const fetchOfficialRates = async () => {
+        setFetchingRates(true);
+        setMessage(null);
+        try {
+            // Fetch USD BCV
+            const usdRes = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+            const usdData = await usdRes.json();
+            
+            // Fetch EUR BCV
+            const eurRes = await fetch('https://ve.dolarapi.com/v1/euros/oficial');
+            const eurData = await eurRes.json();
+
+            setSettings(prev => {
+                const newBcvVal = usdData.promedio ? usdData.promedio.toFixed(2) : prev.tasaBcv;
+                const bcvVal = parseFloat(newBcvVal) || 0;
+                const binanceVal = parseFloat(prev.tasaBinance) || 0;
+                const newPromedioVal = bcvVal > 0 && binanceVal > 0 
+                    ? ((bcvVal + binanceVal) / 2).toFixed(2) 
+                    : prev.tasaPromedio;
+
+                return {
+                    ...prev,
+                    tasaBcv: newBcvVal,
+                    tasaEuro: eurData.promedio ? eurData.promedio.toFixed(2) : prev.tasaEuro,
+                    tasaPromedio: newPromedioVal
+                };
+            });
+
+            setMessage({ type: 'success', text: 'Tasas oficiales del BCV y Euro obtenidas con éxito. La tasa promedio se recalculó automáticamente.' });
+        } catch (err) {
+            console.error("Error fetching rates:", err);
+            setMessage({ type: 'error', text: 'Error al conectar con la API de tasas oficiales. Intenta de nuevo.' });
+        } finally {
+            setFetchingRates(false);
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setSettings(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setSettings(prev => {
+            const next = { ...prev, [name]: value };
+            if (name === 'tasaBcv' || name === 'tasaBinance') {
+                const bcv = parseFloat(name === 'tasaBcv' ? value : prev.tasaBcv) || 0;
+                const binance = parseFloat(name === 'tasaBinance' ? value : prev.tasaBinance) || 0;
+                if (bcv > 0 && binance > 0) {
+                    next.tasaPromedio = ((bcv + binance) / 2).toFixed(2);
+                }
+            }
+            return next;
+        });
     };
 
     const handleSubmit = async (e) => {
@@ -128,13 +181,13 @@ const Configuration = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-navy">Configuración</h1>
-                <p className="text-secondary opacity-60">Gestiona los datos generales de la aplicación</p>
+                <p className="text-secondary opacity-60">Gestiona los datos generales de la aplicación y tasas de cambio</p>
             </div>
 
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-2xl">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {message && (
-                        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        <div className={`p-4 rounded-lg font-bold text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                             {message.text}
                         </div>
                     )}
@@ -177,6 +230,78 @@ const Configuration = () => {
                         </div>
                     </div>
 
+                    {/* Tasas de Cambio del Día con Consulta Automática */}
+                    <div className="pt-6 border-t border-gray-100 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-sm font-bold text-navy flex items-center gap-2">
+                                <TrendingUp size={16} className="text-primary" />
+                                Tasas de Cambio de Referencia
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={fetchOfficialRates}
+                                disabled={fetchingRates}
+                                className="text-xs text-primary bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors disabled:opacity-60 cursor-pointer"
+                            >
+                                {fetchingRates ? 'Consultando...' : 'Obtener Tasas Oficiales (BCV & Euro)'}
+                            </button>
+                        </div>
+                        <p className="text-xs text-secondary opacity-70">Define los valores de conversión de moneda local (Bs.) para el registro exacto de caja.</p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-secondary uppercase mb-2">Tasa BCV (Dólar Oficial) *</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="tasaBcv"
+                                    value={settings.tasaBcv || ''}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-bold text-navy"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-secondary uppercase mb-2">Tasa Euro (Euro Oficial) *</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="tasaEuro"
+                                    value={settings.tasaEuro || ''}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-bold text-navy"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-secondary uppercase mb-2">Tasa Binance (P2P/Cripto)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="tasaBinance"
+                                    value={settings.tasaBinance || ''}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-bold text-navy"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-secondary uppercase mb-2">Tasa Promedio (Paralelo)</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="tasaPromedio"
+                                    value={settings.tasaPromedio || ''}
+                                    readOnly
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-150 bg-gray-50 focus:outline-none font-bold text-secondary cursor-not-allowed"
+                                    title="Tasa auto-calculada: (BCV + Binance) / 2"
+                                />
+                                <span className="text-[10px] text-secondary opacity-60 font-bold block mt-1 pl-1">
+                                    Calculada automáticamente: (BCV + Binance) / 2
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="pt-4 border-t border-gray-50">
                         <h3 className="text-sm font-bold text-navy mb-4">Preferencias de Cálculo</h3>
 
@@ -203,14 +328,14 @@ const Configuration = () => {
                             type="button"
                             onClick={handleBulkImport}
                             disabled={saving}
-                            className="text-primary hover:bg-primary/5 px-4 py-2 rounded-xl font-medium transition-colors text-sm disabled:opacity-50"
+                            className="text-primary hover:bg-primary/5 px-4 py-2 rounded-xl font-medium transition-colors text-sm disabled:opacity-50 cursor-pointer"
                         >
                             Importar Datos Históricos
                         </button>
                         <button
                             type="submit"
                             disabled={saving}
-                            className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                            className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                         >
                             <Save size={18} />
                             {saving ? 'Guardando...' : 'Guardar Cambios'}

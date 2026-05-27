@@ -7,6 +7,7 @@ import Configuration from './pages/Configuration';
 import Invoices from './pages/Invoices';
 import DailySales from './pages/DailySales';
 import ImportAssistant from './pages/ImportAssistant';
+import Inventory from './pages/Inventory';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<DashboardFlow />} />
           <Route path="analytics" element={<Analytics />} />
+          <Route path="inventory" element={<Inventory />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="daily-sales" element={<DailySales />} />
           <Route path="calendar" element={<CalendarPage />} />

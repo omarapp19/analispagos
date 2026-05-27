@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot, Calendar } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot, Calendar, Package } from 'lucide-react';
+import { NavLink, Link } from 'react-router-dom';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, onSnapshot } from 'firebase/firestore';
 
@@ -48,6 +48,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" onClick={onClose} />
                     <NavItem to="/analytics" icon={<PieChart size={20} />} label="Estadísticas" onClick={onClose} />
                     <NavItem to="/daily-sales" icon={<DollarSign size={20} />} label="Ventas Diarias" onClick={onClose} />
+                    <NavItem to="/inventory" icon={<Package size={20} />} label="Inventario" onClick={onClose} />
                     <NavItem to="/invoices" icon={<FileText size={20} />} label="Facturas" onClick={onClose} />
                     <NavItem to="/calendar" icon={<Calendar size={20} />} label="Calendario" onClick={onClose} />
 
@@ -55,22 +56,28 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <div className="flex-1"></div>
 
                     <NavItem to="/import-assistant" icon={<Bot size={20} />} label="Asistente IA" onClick={onClose} />
-                    <NavItem to="/settings" icon={<Settings size={20} />} label="Configuración" onClick={onClose} />
                 </nav>
 
-                {/* User Profile */}
-                <div className="p-4 mx-4 mb-4 rounded-2xl bg-gradient-to-br from-[#868CFF] to-[#4318FF] text-white shadow-2xl shadow-blue-500/30 relative overflow-hidden">
+                {/* User Profile - Clickable link to Settings */}
+                <Link 
+                    to="/settings" 
+                    onClick={onClose} 
+                    className="block mx-4 mb-4 rounded-2xl bg-gradient-to-br from-[#868CFF] to-[#4318FF] text-white shadow-2xl shadow-blue-500/30 relative overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group cursor-pointer"
+                >
                     <div className="absolute top-0 right-0 w-20 h-20 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
-                    <div className="flex items-center gap-3 relative z-10">
-                        <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-bold">
+                    <div className="p-4 flex items-center gap-3 relative z-10">
+                        <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-bold group-hover:bg-white/30 transition-colors">
                             {settings.adminName ? settings.adminName.substring(0, 2).toUpperCase() : 'AD'}
                         </div>
                         <div>
-                            <p className="text-sm font-bold">{settings.adminName}</p>
-                            <p className="text-xs opacity-80">Configuración</p>
+                            <p className="text-sm font-bold leading-tight">{settings.adminName}</p>
+                            <p className="text-[10px] opacity-85 mt-0.5 flex items-center gap-1 font-bold">
+                                <Settings size={10} className="animate-spin-slow group-hover:rotate-45 transition-transform" />
+                                Configuración
+                            </p>
                         </div>
                     </div>
-                </div>
+                </Link>
             </div>
         </>
     );

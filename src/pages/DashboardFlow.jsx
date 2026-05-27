@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Plus, Landmark, DollarSign } from 'lucide-react';
 import { api } from '../services/api';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import StatCard from '../components/StatCard';
 import PerformanceCard from '../components/PerformanceCard';
 import NextPaymentCard from '../components/NextPaymentCard';
@@ -18,6 +18,12 @@ const DashboardFlow = () => {
     const [stats, setStats] = useState({ income: 0, expenses: 0, salePercentage: 0, expensePercentage: 0 });
     const [totalDivisas, setTotalDivisas] = useState(0);
     const [includeDivisas, setIncludeDivisas] = useState(false);
+    const [settings, setSettings] = useState({
+        tasaBcv: '40.50',
+        tasaEuro: '44.00',
+        tasaBinance: '41.80',
+        tasaPromedio: '41.50'
+    });
 
     const fetchData = async () => {
         try {
@@ -27,7 +33,49 @@ const DashboardFlow = () => {
                 const settingsRef = doc(db, 'settings', 'global_settings');
                 const settingsSnap = await getDoc(settingsRef);
                 if (settingsSnap.exists()) {
-                    settingsInclude = settingsSnap.data().includeDivisas || false;
+                    const data = settingsSnap.data();
+                    settingsInclude = data.includeDivisas || false;
+                    
+                    // Check if rates were updated today (YYYY-MM-DD local time)
+                    const todayStr = new Date().toLocaleDateString('en-CA');
+                    let lastUpdateStr = '';
+                    if (data.updatedAt?.toDate) {
+                        lastUpdateStr = data.updatedAt.toDate().toLocaleDateString('en-CA');
+                    } else if (data.updatedAt) {
+                        lastUpdateStr = new Date(data.updatedAt).toLocaleDateString('en-CA');
+                    }
+
+                    // Force fetch if it's a new day OR rates match the default hardcoded settings
+                    if (lastUpdateStr !== todayStr || !data.tasaBcv || data.tasaBcv === '40.50' || data.tasaEuro === '44.00') {
+                        // Silent auto-update of official rates from DolarApi.com
+                        try {
+                            const usdRes = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+                            const usdData = await usdRes.json();
+                            const eurRes = await fetch('https://ve.dolarapi.com/v1/euros/oficial');
+                            const eurData = await eurRes.json();
+
+                            const newTasaBcv = usdData.promedio ? usdData.promedio.toFixed(2) : (data.tasaBcv || '40.50');
+                            const newTasaEuro = eurData.promedio ? eurData.promedio.toFixed(2) : (data.tasaEuro || '44.00');
+
+                            await updateDoc(settingsRef, {
+                                tasaBcv: newTasaBcv,
+                                tasaEuro: newTasaEuro,
+                                updatedAt: new Date()
+                            });
+
+                            setSettings(prev => ({
+                                ...prev,
+                                ...data,
+                                tasaBcv: newTasaBcv,
+                                tasaEuro: newTasaEuro
+                            }));
+                        } catch (apiErr) {
+                            console.warn("Failed to silently auto-fetch rates:", apiErr);
+                            setSettings(prev => ({ ...prev, ...data }));
+                        }
+                    } else {
+                        setSettings(prev => ({ ...prev, ...data }));
+                    }
                 }
             } catch (err) {
                 console.warn("Could not fetch settings", err);
@@ -101,10 +149,10 @@ const DashboardFlow = () => {
     return (
         <div className="flex flex-col gap-8 h-full">
             {/* Header & Toolbar */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-secondary">Dashboard de Flujo</h1>
-                    <p className="text-secondary opacity-60">Resumen financiero y control de liquidez</p>
+                    <p className="text-secondary opacity-60 text-sm">Resumen financiero y control de liquidez</p>
                 </div>
                 <div className="flex gap-3">
                     <button className="btn btn-outline flex items-center gap-2 bg-white">
@@ -118,6 +166,57 @@ const DashboardFlow = () => {
                         <Plus size={18} />
                         Nuevo Ingreso
                     </button>
+                </div>
+            </div>
+
+            {/* Premium Exchange Rates Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full animate-fade-in">
+                {/* BCV Tasa Card */}
+                <div className="card bg-white p-4 rounded-2xl shadow-card border border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-extrabold text-[11px] shadow-sm">BCV</div>
+                        <div>
+                            <p className="text-[10px] text-secondary font-bold opacity-50 uppercase tracking-wider">Dólar BCV</p>
+                            <p className="text-sm font-extrabold text-teal-600">Bs. {settings.tasaBcv}</p>
+                        </div>
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse"></div>
+                </div>
+                
+                {/* Promedio Tasa Card */}
+                <div className="card bg-white p-4 rounded-2xl shadow-card border border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-green-50 text-success flex items-center justify-center font-extrabold text-[11px] shadow-sm">PRO</div>
+                        <div>
+                            <p className="text-[10px] text-secondary font-bold opacity-50 uppercase tracking-wider">Paralelo</p>
+                            <p className="text-sm font-extrabold text-success">Bs. {settings.tasaPromedio}</p>
+                        </div>
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
+                </div>
+
+                {/* Binance Tasa Card */}
+                <div className="card bg-white p-4 rounded-2xl shadow-card border border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center font-extrabold text-[11px] shadow-sm">BIN</div>
+                        <div>
+                            <p className="text-[10px] text-secondary font-bold opacity-50 uppercase tracking-wider">Binance P2P</p>
+                            <p className="text-sm font-extrabold text-amber-600">Bs. {settings.tasaBinance}</p>
+                        </div>
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+                </div>
+
+                {/* Euro Tasa Card */}
+                <div className="card bg-white p-4 rounded-2xl shadow-card border border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center font-extrabold text-[11px] shadow-sm">EUR</div>
+                        <div>
+                            <p className="text-[10px] text-secondary font-bold opacity-50 uppercase tracking-wider">Euro BCV</p>
+                            <p className="text-sm font-extrabold text-blue-600">Bs. {settings.tasaEuro}</p>
+                        </div>
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
                 </div>
             </div>
 

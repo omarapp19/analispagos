@@ -105,6 +105,7 @@ export const api = {
                 return {
                     id: doc.id,
                     ...data,
+                    type: data.type || 'PAYABLE', // Retrocompatible fallback
                     dueDate // Should be "YYYY-MM-DD"
                 };
             });
@@ -121,6 +122,7 @@ export const api = {
                 amount: parseFloat(data.amount),
                 dueDate: data.dueDate, // Save as string "YYYY-MM-DD" directly
                 status: 'PENDING',
+                type: data.type || 'PAYABLE', // Store either PAYABLE or RECEIVABLE
                 createdAt: new Date()
             };
             const docRef = await addDoc(collection(db, 'bills'), newBill);
@@ -183,6 +185,74 @@ export const api = {
 
         await updateDoc(doc(db, 'bills', id), updateData);
         return { id, ...updateData };
+    },
+
+    // Inventory
+    getInventory: async () => {
+        try {
+            const q = query(collection(db, 'inventory'), orderBy('createdAt', 'desc'));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
+                };
+            });
+        } catch (error) {
+            console.error("Error fetching inventory:", error);
+            return [];
+        }
+    },
+
+    createInventoryItem: async (data) => {
+        try {
+            const newItem = {
+                ...data,
+                quantity: parseInt(data.quantity) || 0,
+                costPrice: parseFloat(data.costPrice) || 0,
+                marginPercentage: parseFloat(data.marginPercentage) || 0,
+                sellingPrice: parseFloat(data.sellingPrice) || 0,
+                createdAt: new Date()
+            };
+            const docRef = await addDoc(collection(db, 'inventory'), newItem);
+            return { id: docRef.id, ...newItem };
+        } catch (error) {
+            console.error("Error creating inventory item:", error);
+            throw error;
+        }
+    },
+
+    updateInventoryItem: async (id, data) => {
+        try {
+            const updateData = {
+                ...data,
+                quantity: data.quantity !== undefined ? parseInt(data.quantity) || 0 : undefined,
+                costPrice: data.costPrice !== undefined ? parseFloat(data.costPrice) || 0 : undefined,
+                marginPercentage: data.marginPercentage !== undefined ? parseFloat(data.marginPercentage) || 0 : undefined,
+                sellingPrice: data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) || 0 : undefined,
+                updatedAt: new Date()
+            };
+            // Clean undefined keys
+            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+            await updateDoc(doc(db, 'inventory', id), updateData);
+            return { id, ...updateData };
+        } catch (error) {
+            console.error("Error updating inventory item:", error);
+            throw error;
+        }
+    },
+
+    deleteInventoryItem: async (id) => {
+        try {
+            await deleteDoc(doc(db, 'inventory', id));
+            return { message: 'Deleted' };
+        } catch (error) {
+            console.error("Error deleting inventory item:", error);
+            throw error;
+        }
     },
 };
 
