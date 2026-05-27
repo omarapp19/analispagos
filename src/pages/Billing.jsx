@@ -3,11 +3,12 @@ import {
     Plus, Search, FileText, Check, X, Loader2, DollarSign, 
     User, Calendar, CreditCard, Landmark, Smartphone, Trash2, 
     ArrowUpRight, AlertTriangle, Printer, Users, Receipt, Clock, CheckCircle,
-    Package, ShoppingCart, Minus, Filter, Share2
+    Package, ShoppingCart, Minus, Filter, Share2, Download
 } from 'lucide-react';
 import { api } from '../services/api';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
+import html2canvas from 'html2canvas';
 
 const Billing = () => {
     // Tab State: 'new' (POS) | 'history' | 'receivables' | 'clients'
@@ -65,6 +66,10 @@ const Billing = () => {
     const [payingInvoice, setPayingInvoice] = useState(null);
     const [payMethod, setPayMethod] = useState('Efectivo');
     const [submittingPayment, setSubmittingPayment] = useState(false);
+
+    // History Filter & Search States
+    const [historySearch, setHistorySearch] = useState('');
+    const [historyDateFilter, setHistoryDateFilter] = useState('');
 
     // Real-time subscriptions
     useEffect(() => {
@@ -182,6 +187,19 @@ const Billing = () => {
         dateObj.setDate(dateObj.getDate() + parseInt(creditDays));
         return dateObj.toISOString().split('T')[0];
     }, [invoiceDate, isCredit, creditDays]);
+
+    // Filter Invoices for History Tab by Client Name, Invoice Number, and Date
+    const filteredInvoices = useMemo(() => {
+        return invoices.filter(inv => {
+            const matchesSearch = !historySearch.trim() ||
+                inv.invoiceNumber.toLowerCase().includes(historySearch.toLowerCase()) ||
+                inv.clientName.toLowerCase().includes(historySearch.toLowerCase());
+            
+            const matchesDate = !historyDateFilter || inv.date === historyDateFilter;
+            
+            return matchesSearch && matchesDate;
+        });
+    }, [invoices, historySearch, historyDateFilter]);
 
     // Handle Client Registration
     const handleCreateClient = async (e) => {
@@ -342,6 +360,58 @@ const Billing = () => {
             alert("Error al registrar el cobro.");
         } finally {
             setSubmittingPayment(false);
+        }
+    };
+
+    // Share POS Receipt as Image (PNG)
+    const handleShareReceiptAsImage = async () => {
+        if (!activeReceipt) return;
+
+        const element = document.getElementById('invoice-print-area');
+        if (!element) return;
+
+        try {
+            // Render element to canvas
+            const canvas = await html2canvas(element, {
+                scale: 2.5, // Ultra-sharp typography & borders
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                logging: false
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+
+            // Convert base64 Data URL to Blob
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            const file = new File([blob], `Ticket-${activeReceipt.invoiceNumber}.png`, { type: 'image/png' });
+
+            // Share using Web Share API if possible (mobile/HTTPS)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `Ticket ${activeReceipt.invoiceNumber}`,
+                    text: `Comprobante de compra de ${activeReceipt.clientName} - ${globalSettings.storeName}`
+                });
+            } else {
+                // Desktop / Chrome Fallback: Direct Download
+                const link = document.createElement('a');
+                link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
+                link.href = dataUrl;
+                link.click();
+                alert('¡El ticket se ha descargado como imagen PNG en tu dispositivo!');
+            }
+        } catch (error) {
+            console.error('Error generating or sharing ticket image:', error);
+            alert('No se pudo compartir la imagen. Se iniciará la descarga directa del archivo.');
+            try {
+                const canvas = await html2canvas(element, { scale: 1.5 });
+                const link = document.createElement('a');
+                link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (err2) {
+                console.error('Fallback image generation failed:', err2);
+            }
         }
     };
 
@@ -838,35 +908,77 @@ ${itemsText}-------------------------------
 
             {/* TAB CONTENT: HISTORIAL */}
             {activeTab === 'history' && (
-                <div className="card bg-white p-0 rounded-[20px] shadow-card overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-gray-100 bg-background text-secondary text-xs uppercase font-bold tracking-wider">
-                                    <th className="py-4 px-6">Factura</th>
-                                    <th className="py-4 px-6">Cliente</th>
-                                    <th className="py-4 px-6">Fecha</th>
-                                    <th className="py-4 px-6 text-center">Condición</th>
-                                    <th className="py-4 px-6 text-center">Estado</th>
-                                    <th className="py-4 px-6 text-right">Total</th>
-                                    <th className="py-4 px-6 text-center">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loadingInvoices ? (
-                                    <tr>
-                                        <td colSpan="7" className="py-8 text-center text-secondary opacity-50 text-sm">
-                                            Cargando facturas...
-                                        </td>
+                <div className="flex flex-col gap-4 w-full">
+                    {/* Premium History Filter Toolbar */}
+                    <div className="bg-white rounded-2xl p-4 shadow-card border border-gray-50 flex flex-col md:flex-row gap-4 items-center justify-between no-print">
+                        {/* Search Input */}
+                        <div className="relative w-full md:w-80">
+                            <input 
+                                type="text"
+                                placeholder="Buscar por cliente o número de factura..."
+                                value={historySearch}
+                                onChange={(e) => setHistorySearch(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs font-semibold text-secondary focus:border-primary transition-all"
+                            />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary opacity-40" size={16} />
+                        </div>
+                        
+                        {/* Date Filter & Clear Controls */}
+                        <div className="flex flex-col sm:flex-row gap-3 items-center w-full md:w-auto">
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <span className="text-[10px] font-bold text-secondary uppercase tracking-wider whitespace-nowrap">Filtrar por Fecha:</span>
+                                <input 
+                                    type="date"
+                                    value={historyDateFilter}
+                                    onChange={(e) => setHistoryDateFilter(e.target.value)}
+                                    className="flex-1 sm:flex-none p-2 bg-background rounded-xl border border-gray-200 outline-none text-xs font-bold text-secondary focus:border-primary transition-all"
+                                />
+                            </div>
+                            
+                            {(historySearch || historyDateFilter) && (
+                                <button
+                                    onClick={() => {
+                                        setHistorySearch('');
+                                        setHistoryDateFilter('');
+                                    }}
+                                    className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-danger font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 border border-red-150/30 w-full sm:w-auto select-none cursor-pointer"
+                                >
+                                    <X size={14} />
+                                    Limpiar Filtros
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="card bg-white p-0 rounded-[20px] shadow-card overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-100 bg-background text-secondary text-xs uppercase font-bold tracking-wider">
+                                        <th className="py-4 px-6">Factura</th>
+                                        <th className="py-4 px-6">Cliente</th>
+                                        <th className="py-4 px-6">Fecha</th>
+                                        <th className="py-4 px-6 text-center">Condición</th>
+                                        <th className="py-4 px-6 text-center">Estado</th>
+                                        <th className="py-4 px-6 text-right">Total</th>
+                                        <th className="py-4 px-6 text-center">Acciones</th>
                                     </tr>
-                                ) : invoices.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="7" className="py-12 text-center text-secondary opacity-50 font-medium">
-                                            No se han emitido facturas en este terminal.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    invoices.map((inv) => (
+                                </thead>
+                                <tbody>
+                                    {loadingInvoices ? (
+                                        <tr>
+                                            <td colSpan="7" className="py-8 text-center text-secondary opacity-50 text-sm">
+                                                Cargando facturas...
+                                            </td>
+                                        </tr>
+                                    ) : filteredInvoices.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" className="py-12 text-center text-secondary opacity-50 font-medium">
+                                                {invoices.length === 0 ? 'No se han emitido facturas en este terminal.' : 'No se encontraron facturas con los filtros seleccionados.'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        filteredInvoices.map((inv) => (
                                         <tr key={inv.id} className="border-b border-gray-50 hover:bg-slate-50/50 transition-colors align-middle text-sm">
                                             <td className="py-4 px-6 font-bold text-navy">
                                                 #{inv.invoiceNumber}
@@ -928,7 +1040,8 @@ ${itemsText}-------------------------------
                         </table>
                     </div>
                 </div>
-            )}
+            </div>
+        )}
 
             {/* TAB CONTENT: CUENTAS POR COBRAR */}
             {activeTab === 'receivables' && (
@@ -1324,119 +1437,157 @@ ${itemsText}-------------------------------
 
             {/* MODAL: RECIBO DIGITAL DE FACTURA (TICKET PREMIUM DE IMPRESIÓN) */}
             {showReceiptModal && activeReceipt && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
-                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl relative overflow-hidden animate-in zoom-in duration-200 my-8">
-                        {/* Header Controls */}
-                        <div className="bg-slate-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between no-print">
-                            <span className="text-xs font-bold text-secondary uppercase tracking-wider">Comprobante POS</span>
-                            <div className="flex gap-2">
+                <div 
+                    onClick={() => { setShowReceiptModal(false); setActiveReceipt(null); }}
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-hidden select-none"
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden animate-in zoom-in duration-200 border border-gray-200/50 flex flex-col max-h-[90vh]"
+                    >
+                        {/* Header Controls (Frozen at the Top) */}
+                        <div className="bg-white px-6 py-4 border-b border-gray-150 flex items-center justify-between no-print flex-shrink-0 z-10 shadow-sm">
+                            <span className="text-xs font-extrabold text-navy uppercase tracking-wider flex items-center gap-1.5">
+                                <Receipt size={16} className="text-primary animate-pulse" />
+                                Comprobante Digital
+                            </span>
+                            <div className="flex gap-1.5">
                                 <button 
                                     onClick={() => window.print()}
-                                    className="p-2 hover:bg-gray-200 rounded-lg text-primary transition-all duration-200"
+                                    className="p-2 hover:bg-slate-100 rounded-lg text-primary transition-all duration-200 flex items-center justify-center"
                                     title="Imprimir"
                                 >
                                     <Printer size={16} />
                                 </button>
                                 <button 
+                                    onClick={handleShareReceiptAsImage}
+                                    className="p-2 hover:bg-slate-100 rounded-lg text-indigo-600 transition-all duration-200 flex items-center justify-center"
+                                    title="Descargar Imagen (PNG)"
+                                >
+                                    <Download size={16} />
+                                </button>
+                                <button 
                                     onClick={handleShareReceipt}
-                                    className="p-2 hover:bg-gray-200 rounded-lg text-success transition-all duration-200"
-                                    title="Compartir por WhatsApp / Redes"
+                                    className="p-2 hover:bg-slate-100 rounded-lg text-success transition-all duration-200 flex items-center justify-center"
+                                    title="Compartir Texto (WhatsApp)"
                                 >
                                     <Share2 size={16} />
                                 </button>
+                                <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
                                 <button 
                                     onClick={() => { setShowReceiptModal(false); setActiveReceipt(null); }}
-                                    className="p-2 hover:bg-gray-200 rounded-lg text-secondary transition-all duration-200"
+                                    className="p-2 hover:bg-red-50 hover:text-danger rounded-lg text-secondary transition-all duration-200 flex items-center justify-center"
                                 >
                                     <X size={16} />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Printable Ticket Content */}
-                        <div id="invoice-print-area" className="p-6 text-secondary font-mono text-xs flex flex-col gap-4">
-                            {/* Logo & Company Details */}
-                            <div className="text-center pb-4 border-b border-dashed border-gray-200 flex flex-col gap-1">
-                                <h2 className="text-lg font-black text-navy tracking-tight uppercase">{globalSettings.storeName}</h2>
-                                <p className="text-[10px] opacity-70">{globalSettings.storeTaxId}</p>
-                                <p className="text-[9px] opacity-60">{globalSettings.storeAddress} • Tel: {globalSettings.storePhone}</p>
-                            </div>
+                        {/* Beautiful Ticket Content Scroll Area */}
+                        <div className="bg-slate-50/50 flex-grow overflow-y-auto p-4 flex justify-center custom-scrollbar">
+                            <div 
+                                id="invoice-print-area" 
+                                className="w-[360px] bg-white p-4 text-slate-800 font-sans text-xs flex flex-col gap-3 border border-gray-150 rounded-xl shadow-xs flex-shrink-0 h-fit"
+                            >
+                                {/* Top decorative gradient bar */}
+                                <div className="h-1.5 w-full bg-gradient-to-r from-teal-500 via-primary to-blue-500 rounded-full no-print"></div>
 
-                            {/* Correlative & Date */}
-                            <div className="flex flex-col gap-1 border-b border-dashed border-gray-200 pb-3">
-                                <div className="flex justify-between">
-                                    <span>TICKET NRO:</span>
-                                    <span className="font-bold text-navy">#{activeReceipt.invoiceNumber}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>FECHA:</span>
-                                    <span>{new Date(activeReceipt.date + 'T12:00:00').toLocaleDateString()}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>TIPO:</span>
-                                    <span className="font-bold uppercase">{activeReceipt.isCredit ? 'Crédito' : 'Contado'}</span>
-                                </div>
-                                {activeReceipt.isCredit && (
-                                    <div className="flex justify-between text-[10px] text-danger">
-                                        <span>VENCE:</span>
-                                        <span>{new Date(activeReceipt.dueDate + 'T12:00:00').toLocaleDateString()}</span>
+                                {/* Logo & Company Details */}
+                                <div className="text-center pb-3 border-b border-dashed border-slate-200 flex flex-col items-center gap-0.5">
+                                    <div className="w-10 h-10 bg-green-50 text-success rounded-full flex items-center justify-center border border-green-100 mb-1 shadow-sm shadow-green-50 no-print animate-bounce">
+                                        <CheckCircle size={20} className="text-success" />
                                     </div>
-                                )}
-                            </div>
+                                    <h2 className="text-lg font-extrabold text-navy tracking-tight uppercase leading-none">{globalSettings.storeName}</h2>
+                                    <p className="text-[9px] font-black text-secondary uppercase tracking-widest mt-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{globalSettings.storeTaxId}</p>
+                                    <p className="text-[10px] text-secondary opacity-70 px-4 mt-0.5 leading-snug">{globalSettings.storeAddress} • Tel: {globalSettings.storePhone}</p>
+                                </div>
 
-                            {/* Client Info */}
-                            <div className="flex flex-col gap-1 border-b border-dashed border-gray-200 pb-3">
-                                <div className="flex justify-between">
-                                    <span>CLIENTE:</span>
-                                    <span className="font-bold text-navy max-w-[200px] truncate text-right">{activeReceipt.clientName}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>CÉDULA/RIF:</span>
-                                    <span>{activeReceipt.clientDocument || '-'}</span>
-                                </div>
-                            </div>
-
-                            {/* Items List */}
-                            <div className="flex flex-col gap-2 py-2 border-b border-dashed border-gray-200">
-                                <div className="flex font-bold text-navy pb-1">
-                                    <span className="flex-1 text-left">PRODUCTO</span>
-                                    <span className="w-10 text-center font-bold">CANT</span>
-                                    <span className="w-16 text-right">TOTAL</span>
-                                </div>
-                                {activeReceipt.items.map((item, idx) => (
-                                    <div key={idx} className="flex leading-tight text-[11px]">
-                                        <span className="flex-1 text-left truncate">
-                                            {item.name}
-                                            {item.taxPercentage !== undefined && (
-                                                <span className="text-[9px] text-secondary opacity-65 ml-1">({item.taxPercentage}%)</span>
-                                            )}
+                                {/* Correlative & Date */}
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-150 flex flex-col gap-1.5">
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Comprobante Nro:</span>
+                                        <span className="font-extrabold text-navy">#{activeReceipt.invoiceNumber}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Fecha y Hora:</span>
+                                        <span className="font-extrabold text-navy">{new Date(activeReceipt.date + 'T12:00:00').toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Método de Pago:</span>
+                                        <span className="font-extrabold text-primary bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10 uppercase tracking-wide text-[10px]">
+                                            {activeReceipt.isCredit ? 'Crédito' : `Contado (${activeReceipt.paymentMethod})`}
                                         </span>
-                                        <span className="w-10 text-center">{item.quantity}</span>
-                                        <span className="w-16 text-right font-semibold">{formatCurrency(item.total)}</span>
                                     </div>
-                                ))}
-                            </div>
+                                    {activeReceipt.isCredit && (
+                                        <div className="flex justify-between text-xs font-semibold text-secondary">
+                                            <span>Vencimiento:</span>
+                                            <span className="font-extrabold text-danger bg-red-50 px-2 py-0.5 rounded-md border border-red-100/30 text-[10px]">
+                                                {new Date(activeReceipt.dueDate + 'T12:00:00').toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="h-px bg-slate-200/50 my-0.5"></div>
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Cliente:</span>
+                                        <span className="font-extrabold text-navy text-right max-w-[200px] truncate">{activeReceipt.clientName}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Cédula/RIF:</span>
+                                        <span className="font-bold text-navy">{activeReceipt.clientDocument || '-'}</span>
+                                    </div>
+                                </div>
 
-                            {/* Totals Section */}
-                            <div className="flex flex-col gap-1 pb-4">
-                                <div className="flex justify-between font-medium">
-                                    <span>SUBTOTAL:</span>
-                                    <span>{formatCurrency(activeReceipt.subtotal)}</span>
+                                {/* Items List */}
+                                <div className="py-1">
+                                    <div className="flex text-[10px] font-extrabold text-secondary uppercase tracking-wider pb-1.5 border-b border-slate-100">
+                                        <span className="flex-grow text-left">Producto</span>
+                                        <span className="w-12 text-center">Cant</span>
+                                        <span className="w-20 text-right">Total</span>
+                                    </div>
+                                    <div className="divide-y divide-slate-100/50">
+                                        {activeReceipt.items.map((item, idx) => (
+                                            <div key={idx} className="flex py-1.5 items-center text-xs text-slate-700">
+                                                <div className="flex-grow text-left pr-2 min-w-0">
+                                                    <span className="font-bold text-navy block truncate" title={item.name}>{item.name}</span>
+                                                    {item.taxPercentage !== undefined && (
+                                                        <span className="text-[9px] text-secondary font-medium">IVA: {item.taxPercentage}%</span>
+                                                    )}
+                                                </div>
+                                                <span className="w-12 text-center font-extrabold text-secondary">{item.quantity}</span>
+                                                <span className="w-20 text-right font-black text-navy">{formatCurrency(item.total)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="flex justify-between font-medium">
-                                    <span>IVA:</span>
-                                    <span>{formatCurrency(activeReceipt.tax || 0)}</span>
-                                </div>
-                                <div className="flex justify-between font-black text-navy text-sm pt-2 border-t border-dashed border-gray-200">
-                                    <span>TOTAL NETO:</span>
-                                    <span>{formatCurrency(activeReceipt.total)}</span>
-                                </div>
-                            </div>
 
-                            {/* Footer message */}
-                            <div className="text-center text-[10px] opacity-60 border-t border-dashed border-gray-200 pt-4 flex flex-col gap-1 font-sans">
-                                <p className="font-bold">¡GRACIAS POR SU COMPRA!</p>
-                                <p>Soporte Técnico y Control - POS Terminal</p>
+                                {/* Totals Section */}
+                                <div className="bg-primary/5 rounded-xl p-3 border border-primary/10 flex flex-col gap-1.5">
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Subtotal:</span>
+                                        <span className="font-extrabold text-navy">{formatCurrency(activeReceipt.subtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-semibold text-secondary">
+                                        <span>Impuesto (IVA):</span>
+                                        <span className="font-extrabold text-navy">{formatCurrency(activeReceipt.tax || 0)}</span>
+                                    </div>
+                                    <div className="h-px bg-primary/20 my-0.5"></div>
+                                    <div className="flex justify-between items-baseline">
+                                        <span className="text-xs font-black text-navy uppercase tracking-wider">Total Neto:</span>
+                                        <span className="text-xl font-black text-primary">{formatCurrency(activeReceipt.total)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Footer message */}
+                                <div className="text-center pb-1 pt-1.5 flex flex-col items-center gap-0.5 px-4 border-t border-dashed border-slate-200 mt-1">
+                                    <p className="text-xs font-black text-navy tracking-wide">¡GRACIAS POR SU COMPRA!</p>
+                                    <p className="text-[9px] text-secondary opacity-65">Soporte Técnico y Control - POS Terminal</p>
+                                    {/* Simple aesthetic barcode */}
+                                    <div className="flex items-center gap-0.5 mt-2 opacity-30 h-4" title="Barcode">
+                                        {[1,2,1,3,2,1,1,2,3,1,2,1,3,2,1,2,1,1,2,3,1].map((w, idx) => (
+                                            <div key={idx} className="bg-slate-900 h-full" style={{ width: `${w}px` }}></div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1451,9 +1602,10 @@ ${itemsText}-------------------------------
                                 }
                                 #invoice-print-area {
                                     position: absolute;
-                                    left: 0;
-                                    top: 0;
-                                    width: 100%;
+                                    left: 50% !important;
+                                    top: 50% !important;
+                                    transform: translate(-50%, -50%) !important;
+                                    width: 360px !important;
                                     font-size: 14px;
                                 }
                                 .no-print {

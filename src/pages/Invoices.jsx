@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2 } from 'lucide-react';
+import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark } from 'lucide-react';
 import { api } from '../services/api';
 import BillFormModal from '../components/BillFormModal';
+import AbonoFormModal from '../components/AbonoFormModal';
 
 const Invoices = () => {
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [showAbonoModal, setShowAbonoModal] = useState(false);
+    const [selectedBillForAbono, setSelectedBillForAbono] = useState(null);
 
     const fetchBills = async () => {
         try {
             const data = await api.getBills();
-            setBills(data);
+            // Filter to show only expenses (PAYABLE) on this page
+            setBills(data.filter(b => b.type === 'PAYABLE' || !b.type));
         } catch (error) {
             console.error('Error fetching bills:', error);
         } finally {
@@ -42,8 +46,8 @@ const Invoices = () => {
         <div className="flex flex-col h-full gap-8">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-navy">Facturas</h1>
-                    <p className="text-secondary opacity-60">Gestión de gastos y cuentas por pagar</p>
+                    <h1 className="text-2xl font-bold text-navy">Facturas (Gastos)</h1>
+                    <p className="text-secondary opacity-60">Gestión de gastos, compras a proveedores y cuentas por pagar</p>
                 </div>
                 <button
                     onClick={() => setShowModal(true)}
@@ -83,7 +87,7 @@ const Invoices = () => {
                                 </tr>
                             ) : (
                                 bills.map((bill) => (
-                                    <tr key={bill.id} className="hover:bg-gray-50/30 transition-colors group">
+                                    <tr key={bill.id} className="hover:bg-gray-50/30 transition-colors group align-middle">
                                         <td className="p-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold">
@@ -91,7 +95,7 @@ const Invoices = () => {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-navy text-sm">{bill.title}</p>
-                                                    <p className="text-xs text-secondary opacity-60">ID: #{bill.id}</p>
+                                                    <p className="text-xs text-secondary opacity-60">ID: #{bill.id.substring(0, 8)}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -101,7 +105,7 @@ const Invoices = () => {
                                         <td className="p-6">
                                             <div className="flex items-center gap-2 text-secondary text-sm">
                                                 <CalendarIcon size={16} className="opacity-60" />
-                                                <span>{new Date(bill.dueDate).toLocaleDateString()}</span>
+                                                <span>{new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}</span>
                                             </div>
                                         </td>
                                         <td className="p-6">
@@ -109,6 +113,15 @@ const Invoices = () => {
                                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-success">
                                                     <CheckCircle size={12} /> Pagado
                                                 </span>
+                                            ) : bill.status === 'PARTIAL' ? (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-primary border border-indigo-100/50 w-fit">
+                                                        <Clock size={10} /> Abonado: {formatCurrency(bill.paidAmount || 0)}
+                                                    </span>
+                                                    <span className="text-[10px] text-secondary opacity-60 font-semibold pl-1">
+                                                        Pendiente: {formatCurrency(bill.amount - (bill.paidAmount || 0))}
+                                                    </span>
+                                                </div>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-warning">
                                                     <Clock size={12} /> Pendiente
@@ -119,13 +132,28 @@ const Invoices = () => {
                                             <p className="font-bold text-navy">{formatCurrency(bill.amount)}</p>
                                         </td>
                                         <td className="p-6 text-right">
-                                            <button
-                                                onClick={() => handleDelete(bill.id)}
-                                                className="p-2 text-gray-300 hover:text-danger hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
-                                                title="Eliminar factura"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <div className="flex items-center justify-end gap-3">
+                                                {(bill.status !== 'PAID' && bill.status !== 'COMPLETED') && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedBillForAbono(bill);
+                                                            setShowAbonoModal(true);
+                                                        }}
+                                                        className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer select-none"
+                                                        title="Registrar Pago de Abono"
+                                                    >
+                                                        <Landmark size={12} />
+                                                        Abonar
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDelete(bill.id)}
+                                                    className="p-2 text-gray-300 hover:text-danger hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                    title="Eliminar factura"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -141,6 +169,16 @@ const Invoices = () => {
                     onBillAdded={fetchBills}
                 />
             )}
+
+            <AbonoFormModal
+                isOpen={showAbonoModal}
+                bill={selectedBillForAbono}
+                onClose={() => {
+                    setShowAbonoModal(false);
+                    setSelectedBillForAbono(null);
+                }}
+                onAbonoAdded={fetchBills}
+            />
         </div>
     );
 };

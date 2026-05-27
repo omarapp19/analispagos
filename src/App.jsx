@@ -5,7 +5,6 @@ import Analytics from './pages/Analytics';
 import CalendarPage from './pages/Calendar';
 import Configuration from './pages/Configuration';
 import Invoices from './pages/Invoices';
-import DailySales from './pages/DailySales';
 import Inventory from './pages/Inventory';
 import Billing from './pages/Billing';
 
@@ -19,7 +18,6 @@ function App() {
           <Route path="inventory" element={<Inventory />} />
           <Route path="billing" element={<Billing />} />
           <Route path="invoices" element={<Invoices />} />
-          <Route path="daily-sales" element={<DailySales />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="settings" element={<Configuration />} />
           <Route path="*" element={<Navigate to="/" replace />} />

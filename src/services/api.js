@@ -233,8 +233,37 @@ export const api = {
     },
 
     deleteBill: async (id) => {
-        await deleteDoc(doc(db, 'bills', id));
-        return { message: 'Deleted' };
+        try {
+            // 1. Delete the bill document
+            await deleteDoc(doc(db, 'bills', id));
+
+            // 2. Query and delete all transactions with matching billId
+            const q = query(collection(db, 'transactions'), where('billId', '==', id));
+            const snapshot = await getDocs(q);
+            const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'transactions', docSnap.id)));
+            await Promise.all(deletePromises);
+
+            // 3. Cleanup legacy/existing test transactions whose notes contain the bill ID or short ID
+            const shortId = id.substring(0, 6);
+            const allSnap = await getDocs(collection(db, 'transactions'));
+            const extraDeletePromises = [];
+            
+            allSnap.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.note && typeof data.note === 'string' && (data.note.includes(id) || data.note.includes(shortId))) {
+                    // Avoid duplicate deletion if already deleted above
+                    if (!snapshot.docs.some(d => d.id === docSnap.id)) {
+                        extraDeletePromises.push(deleteDoc(doc(db, 'transactions', docSnap.id)));
+                    }
+                }
+            });
+            await Promise.all(extraDeletePromises);
+
+            return { message: 'Bill and associated transactions deleted successfully' };
+        } catch (error) {
+            console.error("Error in cascading deleteBill:", error);
+            throw error;
+        }
     },
 
     updateBill: async (id, data) => {
@@ -472,6 +501,17 @@ export const api = {
             return { id: invoiceId, status: 'PAID' };
         } catch (error) {
             console.error("Error paying client invoice:", error);
+            throw error;
+        }
+    },
+
+    updateClientInvoice: async (id, data) => {
+        try {
+            const updateData = { ...data, updatedAt: new Date() };
+            await updateDoc(doc(db, 'client_invoices', id), updateData);
+            return { id, ...updateData };
+        } catch (error) {
+            console.error("Error updating client invoice:", error);
             throw error;
         }
     }

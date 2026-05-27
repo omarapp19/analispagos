@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Plus, Landmark, DollarSign } from 'lucide-react';
+import { Landmark, DollarSign } from 'lucide-react';
 import { api } from '../services/api';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import StatCard from '../components/StatCard';
 import PerformanceCard from '../components/PerformanceCard';
 import NextPaymentCard from '../components/NextPaymentCard';
-import SalesForm from '../components/SalesForm';
+import ExchangeRatesCard from '../components/ExchangeRatesCard';
 import RecentActivity from '../components/RecentActivity';
 
 const DashboardFlow = () => {
@@ -106,19 +106,6 @@ const DashboardFlow = () => {
                     <h1 className="text-2xl font-bold text-secondary">Dashboard de Flujo</h1>
                     <p className="text-secondary opacity-60">Resumen financiero y control de liquidez</p>
                 </div>
-                <div className="flex gap-3">
-                    <button className="btn btn-outline flex items-center gap-2 bg-white">
-                        <Download size={18} />
-                        Exportar
-                    </button>
-                    <button
-                        className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
-                        onClick={() => document.getElementById('sales-form-input')?.focus()} // Optional UX hint
-                    >
-                        <Plus size={18} />
-                        Nuevo Ingreso
-                    </button>
-                </div>
             </div>
 
             {/* Top Cards Row */}
@@ -150,9 +137,9 @@ const DashboardFlow = () => {
 
             {/* Main Content Area */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
-                {/* Left Column: Form */}
+                {/* Left Column: Exchange Rates */}
                 <div className="lg:col-span-4 h-full">
-                    <SalesForm onSaleAdded={fetchData} />
+                    <ExchangeRatesCard />
                 </div>
 
                 {/* Right Column: Activity List */}

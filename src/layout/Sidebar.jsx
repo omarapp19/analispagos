@@ -47,31 +47,47 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <nav className="flex-1 px-4 py-4 flex flex-col gap-2 overflow-y-auto">
                     <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" onClick={onClose} />
                     <NavItem to="/analytics" icon={<PieChart size={20} />} label="Estadísticas" onClick={onClose} />
-                    <NavItem to="/daily-sales" icon={<DollarSign size={20} />} label="Ventas Diarias" onClick={onClose} />
                     <NavItem to="/billing" icon={<Receipt size={20} />} label="POS" onClick={onClose} />
                     <NavItem to="/inventory" icon={<Package size={20} />} label="Inventario" onClick={onClose} />
                     <NavItem to="/invoices" icon={<FileText size={20} />} label="Facturas (Gastos)" onClick={onClose} />
-                    <NavItem to="/calendar" icon={<Calendar size={20} />} label="Cuentas por Pagar/Cobrar" onClick={onClose} />
+                    <NavItem to="/calendar" icon={<Calendar size={20} />} label="Calendario" onClick={onClose} />
 
                     {/* Divider or Spacer */}
                     <div className="flex-1"></div>
-
-                    <NavItem to="/settings" icon={<Settings size={20} />} label="Configuración" onClick={onClose} />
                 </nav>
 
-                {/* User Profile */}
-                <div className="p-4 mx-4 mb-4 rounded-2xl bg-gradient-to-br from-[#868CFF] to-[#4318FF] text-white shadow-2xl shadow-blue-500/30 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-white opacity-10 rounded-full -mr-10 -mt-10"></div>
-                    <div className="flex items-center gap-3 relative z-10">
-                        <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-bold">
-                            {settings.adminName ? settings.adminName.substring(0, 2).toUpperCase() : 'AD'}
+                {/* User Profile / Settings Button */}
+                <NavLink 
+                    to="/settings"
+                    onClick={onClose}
+                    className="p-4 mx-4 mb-4 rounded-2xl bg-gradient-to-br from-[#868CFF] to-[#4318FF] text-white shadow-2xl shadow-blue-500/30 relative overflow-hidden block hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer group"
+                >
+                    {/* Subtle background glow */}
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-white opacity-[0.08] rounded-full -mr-6 -mt-6 group-hover:scale-110 transition-transform duration-350"></div>
+                    
+                    <div className="flex items-center justify-between relative z-10 gap-3">
+                        {/* Left: Avatar & Text */}
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-black text-sm shadow-inner flex-shrink-0">
+                                {settings.adminName ? settings.adminName.substring(0, 2).toUpperCase() : 'AD'}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold text-white leading-tight truncate">{settings.adminName}</p>
+                                <p className="text-[10px] text-white/80 font-medium tracking-wide mt-0.5 flex items-center gap-1 uppercase">
+                                    Administrador
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-bold">{settings.adminName}</p>
-                            <p className="text-xs opacity-80">Configuración</p>
+
+                        {/* Right: Floating Settings Action Icon */}
+                        <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white group-hover:bg-white/20 transition-all duration-300 flex-shrink-0 shadow-sm">
+                            <Settings 
+                                size={15} 
+                                className="transition-transform duration-500 ease-out group-hover:rotate-90 text-white" 
+                            />
                         </div>
                     </div>
-                </div>
+                </NavLink>
             </div>
         </>
     );
