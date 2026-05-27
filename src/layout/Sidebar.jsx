@@ -56,6 +56,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <div className="flex-1"></div>
                 </nav>
 
+
+
                 {/* User Profile / Settings Button */}
                 <NavLink 
                     to="/settings"

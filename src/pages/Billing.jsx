@@ -60,6 +60,7 @@ const Billing = () => {
     // Receipt Modal States
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [activeReceipt, setActiveReceipt] = useState(null);
+    const [generatedReceiptImage, setGeneratedReceiptImage] = useState(null);
 
     // Register Payment Modal States
     const [showPayModal, setShowPayModal] = useState(false);
@@ -380,6 +381,9 @@ const Billing = () => {
             });
             const dataUrl = canvas.toDataURL('image/png');
 
+            // Open premium preview modal immediately
+            setGeneratedReceiptImage(dataUrl);
+
             // Convert base64 Data URL to Blob
             const response = await fetch(dataUrl);
             const blob = await response.blob();
@@ -398,20 +402,11 @@ const Billing = () => {
                 link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
                 link.href = dataUrl;
                 link.click();
-                alert('¡El ticket se ha descargado como imagen PNG en tu dispositivo!');
             }
         } catch (error) {
             console.error('Error generating or sharing ticket image:', error);
-            alert('No se pudo compartir la imagen. Se iniciará la descarga directa del archivo.');
-            try {
-                const canvas = await html2canvas(element, { scale: 1.5 });
-                const link = document.createElement('a');
-                link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            } catch (err2) {
-                console.error('Fallback image generation failed:', err2);
-            }
+            // Even if direct sharing/downloading fails, the generatedReceiptImage state remains set
+            // so the user is still shown the image and can easily long-press to save or share!
         }
     };
 
@@ -524,24 +519,24 @@ ${itemsText}-------------------------------
                     <p className="text-secondary opacity-60">Terminal de Punto de Venta y Control de Caja Registradora</p>
                 </div>
                 {/* Modern Navigation Tabs */}
-                <div className="bg-white p-1 rounded-xl shadow-card border border-gray-100 flex gap-1 w-full lg:w-auto">
+                <div className="bg-white p-1 rounded-xl shadow-card border border-gray-100 flex overflow-x-auto gap-1 w-full lg:w-auto custom-scrollbar whitespace-nowrap">
                     <button 
                         onClick={() => setActiveTab('new')}
-                        className={`flex-1 lg:flex-none px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'new' ? 'bg-primary text-white shadow-md shadow-teal-500/20' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'new' ? 'bg-primary text-white shadow-md shadow-teal-500/20' : 'text-secondary opacity-60 hover:opacity-100'}`}
                     >
                         <Receipt size={16} />
                         Punto de Venta (POS)
                     </button>
                     <button 
                         onClick={() => setActiveTab('history')}
-                        className={`flex-1 lg:flex-none px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
                     >
                         <FileText size={16} />
                         Historial Facturas
                     </button>
                     <button 
                         onClick={() => setActiveTab('receivables')}
-                        className={`flex-1 lg:flex-none px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 relative ${activeTab === 'receivables' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 relative ${activeTab === 'receivables' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
                     >
                         <Clock size={16} />
                         Cuentas por Cobrar
@@ -553,7 +548,7 @@ ${itemsText}-------------------------------
                     </button>
                     <button 
                         onClick={() => setActiveTab('clients')}
-                        className={`flex-1 lg:flex-none px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'clients' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'clients' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
                     >
                         <Users size={16} />
                         Clientes
@@ -565,7 +560,7 @@ ${itemsText}-------------------------------
             {activeTab === 'new' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
                     {/* Left Column (8/12): VISUAL PRODUCT CATALOG GRID */}
-                    <div className="lg:col-span-7 flex flex-col gap-4">
+                    <div className="lg:col-span-7 flex flex-col gap-4 order-2 lg:order-1">
                         {/* Catalog Toolbar */}
                         <div className="bg-white rounded-2xl p-4 shadow-card border border-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between">
                             <div className="relative w-full sm:flex-1">
@@ -663,7 +658,7 @@ ${itemsText}-------------------------------
                     </div>
 
                     {/* Right Column (5/12): CLIENT SELECTOR & CART CHECKOUT */}
-                    <div className="lg:col-span-5 flex flex-col gap-4">
+                    <div className="lg:col-span-5 flex flex-col gap-4 order-1 lg:order-2">
                         <div className="card bg-white p-5 rounded-[20px] shadow-card flex flex-col gap-4 h-full">
                             <h3 className="text-sm font-bold text-navy uppercase tracking-wider flex items-center gap-2 border-b border-gray-50 pb-3">
                                 <ShoppingCart size={16} className="text-primary" />
@@ -759,106 +754,109 @@ ${itemsText}-------------------------------
                                     invoiceItems.map((item, idx) => {
                                         const prod = products.find(p => p.id === item.productId);
                                         return (
-                                            <div key={idx} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-gray-100/50 shadow-xs relative">
-                                                <div className="flex-1 min-w-0 pr-2">
-                                                    <p className="font-bold text-navy text-xs truncate" title={item.name}>{item.name}</p>
+                                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3 rounded-xl border border-gray-100/50 shadow-xs relative gap-2.5">
+                                                <div className="flex-1 min-w-0 pr-1">
+                                                    <p className="font-bold text-navy text-xs line-clamp-1" title={item.name}>{item.name}</p>
                                                     <p className="text-[10px] text-primary font-black mt-0.5">{formatCurrency(item.price)}</p>
                                                 </div>
                                                 
-                                                {/* Cart Item Quantity Controls */}
-                                                <div className="flex items-center gap-1.5 bg-background p-1 rounded-lg border border-gray-100/30 text-xs">
-                                                    <button 
-                                                        onClick={() => handleMinusProduct(item.productId)}
-                                                        className="w-5.5 h-5.5 rounded bg-white hover:bg-slate-100 font-black text-navy flex items-center justify-center shadow-xs text-xs"
-                                                    >-</button>
-                                                    <span className="w-5 text-center font-extrabold text-navy text-xs">{item.quantity}</span>
-                                                    <button 
-                                                        onClick={() => {
-                                                            if (prod) handleAddProduct(prod);
-                                                        }}
-                                                        className="w-5.5 h-5.5 rounded bg-white hover:bg-slate-100 font-black text-navy flex items-center justify-center shadow-xs text-xs"
-                                                    >+</button>
-                                                </div>
+                                                <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
+                                                    {/* Cart Item Quantity Controls */}
+                                                    <div className="flex items-center gap-1.5 bg-background p-1 rounded-lg border border-gray-100/30 text-xs">
+                                                        <button 
+                                                            onClick={() => handleMinusProduct(item.productId)}
+                                                            className="w-5.5 h-5.5 rounded bg-white hover:bg-slate-100 font-black text-navy flex items-center justify-center shadow-xs text-xs cursor-pointer select-none"
+                                                        >-</button>
+                                                        <span className="w-5 text-center font-extrabold text-navy text-xs">{item.quantity}</span>
+                                                        <button 
+                                                            onClick={() => {
+                                                                if (prod) handleAddProduct(prod);
+                                                            }}
+                                                            className="w-5.5 h-5.5 rounded bg-white hover:bg-slate-100 font-black text-navy flex items-center justify-center shadow-xs text-xs cursor-pointer select-none"
+                                                        >+</button>
+                                                    </div>
 
-                                                <div className="text-right w-16 pl-2">
-                                                    <span className="font-bold text-navy text-xs">{formatCurrency(item.total)}</span>
-                                                </div>
+                                                    <div className="text-right w-16">
+                                                        <span className="font-bold text-navy text-xs">{formatCurrency(item.total)}</span>
+                                                    </div>
 
-                                                <button 
-                                                    onClick={() => handleRemoveItem(idx)}
-                                                    className="p-1 hover:text-danger text-gray-300 ml-1.5 rounded transition-all"
-                                                >
-                                                    <X size={14} />
-                                                </button>
+                                                    <button 
+                                                        onClick={() => handleRemoveItem(idx)}
+                                                        className="p-1.5 text-gray-300 hover:text-danger hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })
                                 )}
                             </div>
-
-                            {/* Credit & Terms Checkout Details */}
-                            <div className="bg-background rounded-xl p-3 border border-gray-100 flex flex-col gap-2.5 text-xs">
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="text-[11px] font-bold text-navy">¿Venta a Crédito?</p>
-                                        <p className="text-[9px] text-secondary opacity-60">Fecha de cobro aplazada</p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={isCredit}
-                                            onChange={(e) => setIsCredit(e.target.checked)}
-                                            className="sr-only peer" 
-                                        />
-                                        <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                                    </label>
-                                </div>
-
-                                {isCredit ? (
-                                    <div className="pt-2 border-t border-gray-200/50 flex flex-col gap-2 animate-in slide-in-from-top-1 duration-150">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[9px] font-bold text-secondary uppercase tracking-wider block flex-shrink-0">Plazo:</span>
-                                            <select 
-                                                value={creditDays}
-                                                onChange={(e) => setCreditDays(e.target.value)}
-                                                className="flex-1 p-1 bg-white rounded border border-gray-200 outline-none text-[11px] font-bold text-navy"
-                                            >
-                                                <option value="7">7 Días</option>
-                                                <option value="15">15 Días</option>
-                                                <option value="30">30 Días</option>
-                                                <option value="45">45 Días</option>
-                                                <option value="60">60 Días</option>
-                                            </select>
-                                        </div>
-                                        <div className="flex justify-between items-center text-[10px] font-bold text-secondary bg-red-50/50 px-2 py-1 rounded border border-red-100/50">
-                                            <span>Vence:</span>
-                                            <span className="text-danger">
-                                                {new Date(calculatedDueDate + 'T12:00:00').toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    /* Payment Method Selector */
-                                    <div className="flex flex-col gap-1.5 border-t border-gray-200/50 pt-2">
-                                        <span className="text-[9px] font-bold text-secondary uppercase">Método Pago</span>
-                                        <div className="grid grid-cols-3 gap-1">
-                                            {['Efectivo', 'Tarjeta', 'Divisas', 'Pago Móvil', 'Transferencia'].map((m) => {
-                                                const active = paymentMethod === m;
-                                                return (
-                                                    <button
-                                                        key={m}
-                                                        type="button"
-                                                        onClick={() => setPaymentMethod(m)}
-                                                        className={`py-1.5 px-1 rounded-lg border text-[10px] font-bold text-center transition-all ${active ? 'bg-primary border-primary text-white shadow-xs' : 'border-gray-200 bg-white text-secondary hover:bg-slate-50'}`}
-                                                    >
-                                                        {m}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+ 
+                             {/* Credit & Terms Checkout Details */}
+                             <div className="bg-background rounded-xl p-3 border border-gray-100 flex flex-col gap-2.5 text-xs">
+                                 <div className="flex justify-between items-center">
+                                     <div>
+                                         <p className="text-[11px] font-bold text-navy">¿Venta a Crédito?</p>
+                                         <p className="text-[9px] text-secondary opacity-60">Fecha de cobro aplazada</p>
+                                     </div>
+                                     <label className="relative inline-flex items-center cursor-pointer">
+                                         <input 
+                                             type="checkbox" 
+                                             checked={isCredit}
+                                             onChange={(e) => setIsCredit(e.target.checked)}
+                                             className="sr-only peer" 
+                                         />
+                                         <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                                     </label>
+                                 </div>
+ 
+                                 {isCredit ? (
+                                     <div className="pt-2 border-t border-gray-200/50 flex flex-col gap-2 animate-in slide-in-from-top-1 duration-150">
+                                         <div className="flex items-center gap-2">
+                                             <span className="text-[9px] font-bold text-secondary uppercase tracking-wider block flex-shrink-0">Plazo:</span>
+                                             <select 
+                                                 value={creditDays}
+                                                 onChange={(e) => setCreditDays(e.target.value)}
+                                                 className="flex-1 p-1 bg-white rounded border border-gray-200 outline-none text-[11px] font-bold text-navy"
+                                             >
+                                                 <option value="7">7 Días</option>
+                                                 <option value="15">15 Días</option>
+                                                 <option value="30">30 Días</option>
+                                                 <option value="45">45 Días</option>
+                                                 <option value="60">60 Días</option>
+                                             </select>
+                                         </div>
+                                         <div className="flex justify-between items-center text-[10px] font-bold text-secondary bg-red-50/50 px-2 py-1 rounded border border-red-100/50">
+                                             <span>Vence:</span>
+                                             <span className="text-danger">
+                                                 {new Date(calculatedDueDate + 'T12:00:00').toLocaleDateString()}
+                                             </span>
+                                         </div>
+                                     </div>
+                                 ) : (
+                                     /* Payment Method Selector */
+                                     <div className="flex flex-col gap-1.5 border-t border-gray-200/50 pt-2">
+                                         <span className="text-[9px] font-bold text-secondary uppercase">Método Pago</span>
+                                         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-1.5">
+                                             {['Efectivo', 'Tarjeta', 'Divisas', 'Pago Móvil', 'Transferencia'].map((m) => {
+                                                 const active = paymentMethod === m;
+                                                 const isLast = m === 'Transferencia';
+                                                 return (
+                                                     <button
+                                                         key={m}
+                                                         type="button"
+                                                         onClick={() => setPaymentMethod(m)}
+                                                         className={`py-2 px-1 rounded-lg border text-[10px] font-bold text-center transition-all ${isLast ? 'col-span-2 sm:col-span-1 xl:col-span-1' : ''} ${active ? 'bg-primary border-primary text-white shadow-xs' : 'border-gray-200 bg-white text-secondary hover:bg-slate-50'}`}
+                                                     >
+                                                         {m}
+                                                     </button>
+                                                 );
+                                             })}
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
 
                             {/* Taxes Checkbox Toggle */}
                             <div className="flex justify-between items-center text-[10px] font-bold text-secondary py-1.5 border-t border-b border-gray-100">
@@ -1613,6 +1611,58 @@ ${itemsText}-------------------------------
                                 }
                             }
                         `}} />
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: IMAGE PREVIEW FOR EASY SAVING/SHARING ON MOBILE */}
+            {generatedReceiptImage && (
+                <div 
+                    onClick={() => setGeneratedReceiptImage(null)}
+                    className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-black/85 p-4 backdrop-blur-md select-none animate-in fade-in duration-200"
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl flex flex-col items-center gap-4 relative animate-in zoom-in-95 duration-200 text-center"
+                    >
+                        {/* Close button */}
+                        <button 
+                            onClick={() => setGeneratedReceiptImage(null)}
+                            className="absolute top-4 right-4 p-1.5 hover:bg-slate-100 rounded-full text-secondary cursor-pointer"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-1">
+                            <Download size={22} className="animate-bounce" />
+                        </div>
+
+                        <h3 className="text-navy font-black text-base">Comprobante Listo</h3>
+                        <p className="text-xs text-secondary leading-relaxed max-w-[260px]">
+                            Para guardar o compartir esta imagen en tu dispositivo, **mantén presionada la imagen** abajo y selecciona **"Guardar imagen"** o **"Compartir"**.
+                        </p>
+
+                        {/* Image Preview Container */}
+                        <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[50vh] shadow-inner bg-slate-50 flex items-center justify-center w-full select-text">
+                            <img 
+                                src={generatedReceiptImage} 
+                                alt="Comprobante Digital" 
+                                className="max-w-full max-h-full object-contain pointer-events-auto cursor-pointer"
+                            />
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                const link = document.createElement('a');
+                                link.download = `Ticket-${activeReceipt?.invoiceNumber || 'comprobante'}.png`;
+                                link.href = generatedReceiptImage;
+                                link.click();
+                            }}
+                            className="btn btn-primary w-full py-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 mt-2"
+                        >
+                            <Download size={15} />
+                            Intentar Descarga Directa
+                        </button>
                     </div>
                 </div>
             )}

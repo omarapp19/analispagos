@@ -583,29 +583,22 @@ const Inventory = () => {
 
                                 {/* Content */}
                                 <div className="p-5 flex flex-col flex-grow justify-between gap-4">
-                                    <div className="space-y-1">
+                                    <div>
                                         <h4 className="font-bold text-navy text-base leading-snug truncate" title={p.name}>
                                             {p.name}
                                         </h4>
-                                        <p className="text-xs text-secondary font-medium line-clamp-2 h-8">
-                                            {p.description || 'Sin descripción'}
-                                        </p>
                                     </div>
 
-                                    {/* Financial Breakdown */}
-                                    <div className="bg-background rounded-xl p-3 grid grid-cols-2 gap-2 text-center text-xs">
-                                        <div>
-                                            <span className="text-[10px] uppercase font-bold text-secondary opacity-50 block">Precio Costo</span>
-                                            <span className="font-bold text-secondary text-sm">{formatCurrency(p.costPrice)}</span>
+                                    {/* Simple Price & Stock Display */}
+                                    <div className="flex items-center justify-between bg-slate-50/70 rounded-xl px-4 py-2.5 border border-slate-100/50">
+                                        <div className="text-left">
+                                            <span className="text-[10px] uppercase font-extrabold text-secondary opacity-50 block tracking-wider">Precio Venta</span>
+                                            <span className="font-black text-primary text-base">{formatCurrency(p.sellingPrice)}</span>
                                         </div>
-                                        <div>
-                                            <span className="text-[10px] uppercase font-bold text-secondary opacity-50 block">Precio Venta</span>
-                                            <span className="font-extrabold text-primary text-sm">{formatCurrency(p.sellingPrice)}</span>
-                                        </div>
-                                        <div className="col-span-2 pt-1 border-t border-gray-200/50 flex justify-between px-1">
-                                            <span className="text-[10px] text-secondary opacity-60 font-medium">Margen / IVA:</span>
-                                            <span className="font-extrabold text-success text-[11px]">
-                                                {p.marginPercentage.toFixed(1)}% ({p.taxPercentage !== undefined ? p.taxPercentage : 16}% IVA)
+                                        <div className="text-right">
+                                            <span className="text-[10px] uppercase font-extrabold text-secondary opacity-50 block tracking-wider">Disponible</span>
+                                            <span className={`text-sm font-black ${isEmpty ? 'text-danger' : isLow ? 'text-warning' : 'text-navy'}`}>
+                                                {p.quantity} und.
                                             </span>
                                         </div>
                                     </div>

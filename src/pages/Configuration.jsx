@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, User, FileText, Phone, MapPin } from 'lucide-react';
+import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut } from 'lucide-react';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { api } from '../services/api';
@@ -19,10 +19,34 @@ const Configuration = () => {
 
     // Referencia al documento único de configuración en Firebase
     const settingsRef = doc(db, 'settings', 'global_settings');
+    const authRef = doc(db, 'settings', 'auth_credentials');
+
+    const [authSettings, setAuthSettings] = useState({ username: '', password: '' });
+    const [loadingAuth, setLoadingAuth] = useState(true);
+    const [savingAuth, setSavingAuth] = useState(false);
+    const [authMessage, setAuthMessage] = useState(null);
 
     useEffect(() => {
         fetchSettings();
+        fetchAuthCredentials();
     }, []);
+
+    const fetchAuthCredentials = async () => {
+        try {
+            const docSnap = await getDoc(authRef);
+            if (docSnap.exists()) {
+                setAuthSettings(docSnap.data());
+            } else {
+                const defaultCreds = { username: 'omar', password: 'omar123' };
+                await setDoc(authRef, defaultCreds);
+                setAuthSettings(defaultCreds);
+            }
+        } catch (error) {
+            console.error('Error fetching auth credentials:', error);
+        } finally {
+            setLoadingAuth(false);
+        }
+    };
 
     const fetchSettings = async () => {
         try {
@@ -123,15 +147,55 @@ const Configuration = () => {
         }
     };
 
-    if (loading) {
+    const handleAuthSubmit = async (e) => {
+        e.preventDefault();
+        setSavingAuth(true);
+        setAuthMessage(null);
+
+        try {
+            await setDoc(authRef, {
+                username: authSettings.username.trim(),
+                password: authSettings.password
+            });
+            setAuthMessage({ type: 'success', text: 'Credenciales de acceso actualizadas exitosamente.' });
+            
+            // Sync current session item if user changed their own username
+            if (localStorage.getItem('adminUser')) {
+                localStorage.setItem('adminUser', authSettings.username.trim().toLowerCase());
+            }
+        } catch (error) {
+            console.error('Error saving auth credentials:', error);
+            setAuthMessage({ type: 'error', text: 'Error al guardar credenciales en Firebase.' });
+        } finally {
+            setSavingAuth(false);
+        }
+    };
+
+    if (loading || loadingAuth) {
         return <div className="p-8 text-center">Cargando configuración...</div>;
     }
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-navy">Configuración</h1>
-                <p className="text-secondary opacity-60">Gestiona los datos generales de la aplicación</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-navy">Configuración</h1>
+                    <p className="text-secondary opacity-60">Gestiona los datos generales de la aplicación</p>
+                </div>
+                
+                <button
+                    onClick={() => {
+                        if (window.confirm('¿Cerrar sesión en el sistema?')) {
+                            localStorage.removeItem('isAuthenticated');
+                            localStorage.removeItem('adminUser');
+                            window.location.href = '/login';
+                        }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100/80 text-rose-600 border border-rose-100 hover:border-rose-200 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer self-start sm:self-auto select-none"
+                >
+                    <LogOut size={16} />
+                    <span>Cerrar Sesión</span>
+                </button>
             </div>
 
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-2xl">
@@ -276,6 +340,61 @@ const Configuration = () => {
                         >
                             <Save size={18} />
                             {saving ? 'Guardando...' : 'Guardar Cambios'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* CREDENCIALES DE ACCESO SEGURIDAD CARD */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-2xl mt-6">
+                <div className="flex items-center gap-2 mb-2">
+                    <Lock size={18} className="text-primary" />
+                    <h2 className="text-lg font-bold text-navy">Credenciales de Acceso (Seguridad)</h2>
+                </div>
+                <p className="text-xs text-secondary opacity-60 mb-6">
+                    Define el nombre de usuario y contraseña para ingresar al sistema de control de caja.
+                </p>
+
+                <form onSubmit={handleAuthSubmit} className="space-y-4">
+                    {authMessage && (
+                        <div className={`p-4 rounded-xl text-sm font-semibold ${authMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
+                            {authMessage.text}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Usuario *</label>
+                            <input
+                                type="text"
+                                value={authSettings.username}
+                                onChange={(e) => setAuthSettings(prev => ({ ...prev, username: e.target.value }))}
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm font-bold"
+                                placeholder="Ingresa el usuario..."
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Contraseña *</label>
+                            <input
+                                type="text"
+                                value={authSettings.password}
+                                onChange={(e) => setAuthSettings(prev => ({ ...prev, password: e.target.value }))}
+                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm font-mono font-bold"
+                                placeholder="Ingresa la contraseña..."
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-50 flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={savingAuth}
+                            className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50 text-sm cursor-pointer"
+                        >
+                            <Save size={16} />
+                            {savingAuth ? 'Guardando...' : 'Actualizar Credenciales'}
                         </button>
                     </div>
                 </form>
