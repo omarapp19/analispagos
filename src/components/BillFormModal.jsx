@@ -8,10 +8,13 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
     const [productsLoading, setProductsLoading] = useState(true);
     const [focusedRow, setFocusedRow] = useState(null);
 
+    const [supportFile, setSupportFile] = useState(null);
+    const [supportFileName, setSupportFileName] = useState('');
+
     const [formData, setFormData] = useState({
         provider: '',
-        // Use local date for default value to prevent UTC offset issues
         dueDate: new Date().toLocaleDateString('en-CA'),
+        invoiceDate: '',
         type: 'PAYABLE'
     });
 
@@ -47,6 +50,29 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Size limit of 1MB (1,048,576 bytes)
+        if (file.size > 1024 * 1024) {
+            alert('El archivo es demasiado grande. El límite es de 1MB para almacenamiento en la base de datos.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setSupportFile(reader.result);
+            setSupportFileName(file.name);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveFile = () => {
+        setSupportFile(null);
+        setSupportFileName('');
     };
 
     // Synchronize price/margin for items
@@ -153,8 +179,11 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                 provider: formData.provider.trim(),
                 amount: calculatedTotal,
                 dueDate: formData.dueDate,
+                invoiceDate: formData.invoiceDate || null,
                 type: 'PAYABLE',
                 title: generatedTitle,
+                supportFile: supportFile,
+                supportFileName: supportFileName,
                 items: items.map(item => ({
                     productId: item.productId,
                     name: item.name.trim(),
@@ -202,7 +231,7 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
                     
                     {/* Basic Info Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-shrink-0">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-shrink-0">
                         <div>
                             <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-2 block">
                                 Proveedor *
@@ -218,6 +247,18 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                             />
                         </div>
                         <div>
+                            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-2 block">
+                                Fecha de Factura (Opcional)
+                            </label>
+                            <input
+                                type="date"
+                                name="invoiceDate"
+                                value={formData.invoiceDate}
+                                onChange={handleChange}
+                                className="w-full p-3 bg-background rounded-xl border-2 border-transparent focus:border-primary outline-none font-bold text-secondary text-sm transition-all"
+                            />
+                        </div>
+                        <div>
                             <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-2 block">Fecha de Vencimiento *</label>
                             <input
                                 type="date"
@@ -228,6 +269,59 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                                 className="w-full p-3 bg-background rounded-xl border-2 border-transparent focus:border-primary outline-none font-bold text-secondary text-sm transition-all"
                             />
                         </div>
+                    </div>
+
+                    {/* Support Document Upload */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-200/60 flex-shrink-0">
+                        <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 block flex items-center gap-1.5">
+                            📎 Documento de Soporte (Opcional)
+                        </label>
+                        <p className="text-[11px] text-secondary opacity-65 mb-2.5">
+                            Sube una foto (PNG, JPG) o un archivo PDF de la factura física como respaldo (Máx. 1MB).
+                        </p>
+                        
+                        {!supportFile ? (
+                            <div className="relative border-2 border-dashed border-gray-300 rounded-xl p-4 bg-white flex flex-col items-center justify-center hover:border-primary transition-all cursor-pointer group">
+                                <input 
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    onChange={handleFileChange}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                />
+                                <div className="flex flex-col items-center gap-1 text-center">
+                                    <span className="text-xs font-bold text-primary hover:underline">
+                                        Seleccionar foto o PDF de soporte
+                                    </span>
+                                    <span className="text-[10px] text-secondary opacity-50">
+                                        PDF, PNG, JPG, JPEG (Máx. 1MB)
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between bg-white px-4 py-3 border border-gray-200 rounded-xl shadow-sm">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center text-primary flex-shrink-0 font-bold text-xs uppercase">
+                                        {supportFileName.split('.').pop()}
+                                    </div>
+                                    <div className="min-w-0 font-sans">
+                                        <p className="text-xs font-bold text-navy truncate" title={supportFileName}>
+                                            {supportFileName}
+                                        </p>
+                                        <p className="text-[10px] text-success font-semibold">
+                                            Documento cargado correctamente
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveFile}
+                                    className="text-xs font-extrabold text-secondary hover:text-danger hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                    <X size={12} />
+                                    Eliminar
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* PRODUCTS SYSTEM */}

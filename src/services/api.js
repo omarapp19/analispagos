@@ -175,9 +175,12 @@ export const api = {
                 provider: data.provider || '',
                 amount: parseFloat(data.amount),
                 dueDate: data.dueDate, // Save as string "YYYY-MM-DD" directly
+                invoiceDate: data.invoiceDate || null,
                 status: 'PENDING',
                 type: data.type || 'PAYABLE',
                 items: data.type === 'PAYABLE' ? itemsToSave : [],
+                supportFile: data.supportFile || null,
+                supportFileName: data.supportFileName || null,
                 createdAt: new Date()
             };
             const docRef = await addDoc(collection(db, 'bills'), newBill);

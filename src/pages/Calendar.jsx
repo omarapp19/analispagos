@@ -24,7 +24,7 @@ const CalendarPage = () => {
 
             // Map pending credit client invoices as RECEIVABLE commitments
             const mappedClientInvoices = clientInvoicesData
-                .filter(inv => inv.isCredit && inv.status !== 'PAID')
+                .filter(inv => inv.isCredit && inv.status !== 'PAID' && inv.status !== 'COMPLETED')
                 .map(inv => ({
                     id: inv.id,
                     title: `Factura Crédito #${inv.invoiceNumber}`,
@@ -37,7 +37,10 @@ const CalendarPage = () => {
                     isClientInvoice: true
                 }));
 
-            setBills([...billsData, ...mappedClientInvoices]);
+            // Filter payable bills to exclude PAID or COMPLETED
+            const pendingBillsData = billsData.filter(b => b.status !== 'PAID' && b.status !== 'COMPLETED');
+
+            setBills([...pendingBillsData, ...mappedClientInvoices]);
             setTransactions(transactionsData);
         } catch (error) {
             console.error('Error fetching data:', error);

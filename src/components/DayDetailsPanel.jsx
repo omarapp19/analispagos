@@ -4,6 +4,21 @@ import { api } from '../services/api';
 
 const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, onAbonoClick }) => {
     const [selectedIds, setSelectedIds] = React.useState([]);
+    const [showSupportModal, setShowSupportModal] = React.useState(false);
+    const [activeSupportFile, setActiveSupportFile] = React.useState(null);
+    const [activeSupportFileName, setActiveSupportFileName] = React.useState('');
+
+    const openSupportModal = (file, name) => {
+        setActiveSupportFile(file);
+        setActiveSupportFileName(name);
+        setShowSupportModal(true);
+    };
+
+    const closeSupportModal = () => {
+        setShowSupportModal(false);
+        setActiveSupportFile(null);
+        setActiveSupportFileName('');
+    };
 
     // Split bills
     const payables = bills.filter(b => b.type === 'PAYABLE' || !b.type);
@@ -190,9 +205,24 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, onAbonoClick
                                                 )}
                                                 
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-navy truncate" title={bill.title}>
-                                                        {bill.title}
-                                                    </p>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <p className="text-sm font-bold text-navy truncate" title={bill.title}>
+                                                            {bill.title}
+                                                        </p>
+                                                        {bill.supportFile && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openSupportModal(bill.supportFile, bill.supportFileName);
+                                                                }}
+                                                                className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-[9px] font-bold border border-blue-100 cursor-pointer select-none"
+                                                                title="Ver documento de soporte"
+                                                            >
+                                                                📎 Soporte
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                     <p className="text-xs text-secondary opacity-60 mt-0.5 truncate">
                                                         {isPayable ? `Proveedor: ${bill.provider || '-'}` : `Cliente: ${bill.provider || '-'}`}
                                                     </p>
@@ -288,6 +318,66 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, onAbonoClick
                     </button>
                 </div>
             </div>
+
+            {/* Support Document Modal */}
+            {showSupportModal && activeSupportFile && (
+                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
+                            <div>
+                                <h3 className="text-lg font-bold text-navy flex items-center gap-2">
+                                    📎 Documento de Soporte
+                                </h3>
+                                <p className="text-xs text-secondary opacity-60 mt-0.5 truncate max-w-lg">
+                                    {activeSupportFileName}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        const link = document.createElement('a');
+                                        link.href = activeSupportFile;
+                                        link.download = activeSupportFileName || 'soporte_factura';
+                                        link.click();
+                                    }}
+                                    className="px-3 py-1.5 bg-primary text-white hover:bg-primary-dark rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    Descargar
+                                </button>
+                                <button 
+                                    onClick={closeSupportModal} 
+                                    className="p-2 rounded-full text-secondary hover:bg-gray-100 transition-colors"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Body (Preview) */}
+                        <div className="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center">
+                            {activeSupportFile.startsWith('data:application/pdf') ? (
+                                <iframe 
+                                    src={activeSupportFile} 
+                                    className="w-full h-[65vh] rounded-xl border border-gray-200 bg-white" 
+                                    title="Soporte PDF"
+                                />
+                            ) : (
+                                <img 
+                                    src={activeSupportFile} 
+                                    alt="Documento Soporte" 
+                                    className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md bg-white border border-gray-100"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.style.display = 'none';
+                                        alert('No se pudo previsualizar la imagen.');
+                                    }}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
