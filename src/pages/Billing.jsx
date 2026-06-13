@@ -45,6 +45,7 @@ const Billing = () => {
     const [creditDays, setCreditDays] = useState('30');
     const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [applyTax, setApplyTax] = useState(true); // 16% IVA toggle
+    const [customInvoiceNumber, setCustomInvoiceNumber] = useState('');
     
     // Action States
     const [submittingInvoice, setSubmittingInvoice] = useState(false);
@@ -326,7 +327,8 @@ const Billing = () => {
                 isCredit,
                 creditDays: isCredit ? parseInt(creditDays) : 0,
                 dueDate: isCredit ? calculatedDueDate : invoiceDate,
-                tax: invoiceTotals.tax
+                tax: invoiceTotals.tax,
+                invoiceNumber: customInvoiceNumber.trim() || undefined
             };
 
             const createdInvoice = await api.createClientInvoice(invoiceData);
@@ -341,6 +343,7 @@ const Billing = () => {
             setInvoiceItems([]);
             setIsCredit(false);
             setPaymentMethod('Efectivo');
+            setCustomInvoiceNumber('');
         } catch (err) {
             console.error("Error generating invoice:", err);
             alert("Ocurrió un error al emitir la factura.");
@@ -956,6 +959,18 @@ ${itemsText}-------------------------------
                                      </div>
                                  )}
                              </div>
+
+                            {/* Custom Invoice Number Input */}
+                            <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-2.5 px-1">
+                                <label className="text-[9px] font-bold text-secondary uppercase">Número de Factura (Opcional)</label>
+                                <input 
+                                    type="text"
+                                    placeholder="Escribe el nro de factura o deja vacío"
+                                    value={customInvoiceNumber}
+                                    onChange={(e) => setCustomInvoiceNumber(e.target.value)}
+                                    className="w-full p-2 bg-background rounded-lg border border-transparent focus:border-primary outline-none font-bold text-navy text-[11px] transition-all"
+                                />
+                            </div>
 
                             {/* Taxes Checkbox Toggle */}
                             <div className="flex justify-between items-center text-[10px] font-bold text-secondary py-1.5 border-t border-b border-gray-100">

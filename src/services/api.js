@@ -176,6 +176,7 @@ export const api = {
                 amount: parseFloat(data.amount),
                 dueDate: data.dueDate, // Save as string "YYYY-MM-DD" directly
                 invoiceDate: data.invoiceDate || null,
+                invoiceNumber: data.invoiceNumber || null,
                 status: 'PENDING',
                 type: data.type || 'PAYABLE',
                 items: data.type === 'PAYABLE' ? itemsToSave : [],
@@ -442,7 +443,7 @@ export const api = {
             await Promise.all(itemPromises);
 
             // 2. Registrar la factura
-            const invoiceNumber = `FAC-${String(Math.floor(1000 + Math.random() * 9000))}`; // Simple unique sequential-looking number
+            const invoiceNumber = data.invoiceNumber?.trim() || `FAC-${String(Math.floor(1000 + Math.random() * 9000))}`; // Simple unique sequential-looking number
             const newInvoice = {
                 ...data,
                 invoiceNumber,
@@ -515,6 +516,120 @@ export const api = {
             return { id, ...updateData };
         } catch (error) {
             console.error("Error updating client invoice:", error);
+            throw error;
+        }
+    },
+
+    // Investments
+    getInvestments: async () => {
+        try {
+            const q = query(collection(db, 'investments'), orderBy('date', 'desc'));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
+                };
+            });
+        } catch (error) {
+            console.error("Error fetching investments:", error);
+            return [];
+        }
+    },
+
+    createInvestment: async (data) => {
+        try {
+            // 1. Registrar el movimiento en caja (transacciones)
+            const transactionNote = `Inyección de capital - Inversionista: ${data.investor} ${data.note ? `(${data.note})` : ''}`;
+            const newTx = await api.createTransaction({
+                amount: parseFloat(data.amount),
+                method: data.method,
+                date: data.date,
+                note: transactionNote,
+                type: 'INCOME',
+                category: 'Inversión',
+                status: 'COMPLETED'
+            });
+
+            // 2. Registrar el documento de inversión con la referencia a la transacción
+            const newInvestment = {
+                investor: data.investor.trim(),
+                amount: parseFloat(data.amount),
+                method: data.method,
+                date: data.date,
+                note: data.note?.trim() || '',
+                transactionId: newTx.id,
+                createdAt: new Date()
+            };
+            const docRef = await addDoc(collection(db, 'investments'), newInvestment);
+            return { id: docRef.id, ...newInvestment };
+        } catch (error) {
+            console.error("Error creating investment:", error);
+            throw error;
+        }
+    },
+
+    deleteInvestment: async (id) => {
+        try {
+            const investmentRef = doc(db, 'investments', id);
+            const investmentSnap = await getDoc(investmentRef);
+            if (!investmentSnap.exists()) throw new Error("Inversión no encontrada");
+
+            const investmentData = investmentSnap.data();
+
+            // 1. Eliminar la inversión de la colección
+            await deleteDoc(investmentRef);
+
+            // 2. Eliminar el movimiento de caja asociado
+            if (investmentData.transactionId) {
+                await deleteDoc(doc(db, 'transactions', investmentData.transactionId));
+            }
+
+            return { message: 'Investment and associated transaction deleted successfully' };
+        } catch (error) {
+            console.error("Error deleting investment:", error);
+            throw error;
+        }
+    },
+
+    createDirectExpense: async (data) => {
+        try {
+            // 1. Registrar el egreso en la colección de facturas (bills) como ya pagado (PAID)
+            const newBill = {
+                title: data.concept.trim(),
+                provider: data.beneficiary.trim(),
+                amount: parseFloat(data.amount),
+                dueDate: data.date, // Se paga hoy
+                invoiceDate: data.date,
+                invoiceNumber: data.invoiceNumber || null,
+                status: 'PAID',
+                type: 'PAYABLE',
+                category: data.category, // e.g., 'Nómina / Sueldos', etc.
+                items: [], // Sin ítems de inventario
+                supportFile: data.supportFile || null,
+                supportFileName: data.supportFileName || null,
+                createdAt: new Date()
+            };
+            const docRef = await addDoc(collection(db, 'bills'), newBill);
+
+            // 2. Registrar el egreso en caja (transacciones) inmediatamente
+            const txNote = `Gasto (${data.category}) - Beneficiario: ${data.beneficiary} | Concepto: ${data.concept}`;
+            await api.createTransaction({
+                amount: parseFloat(data.amount),
+                method: data.method,
+                date: data.date,
+                note: txNote,
+                type: 'EXPENSE',
+                category: data.category,
+                status: 'COMPLETED',
+                billId: docRef.id // Relacionados
+            });
+
+            return { id: docRef.id, ...newBill };
+        } catch (error) {
+            console.error("Error creating direct expense:", error);
             throw error;
         }
     }

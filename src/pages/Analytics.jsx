@@ -31,7 +31,7 @@ const Analytics = () => {
                 console.warn("Could not fetch settings", err);
             }
 
-            const [balanceRes, txData, billsRes] = await Promise.all([
+            const [, txData, billsRes] = await Promise.all([
                 api.getBalance(),
                 api.getTransactions(),
                 api.getBills()
@@ -149,12 +149,59 @@ const Analytics = () => {
     }, [now]);
 
     const pendingBills = useMemo(() => {
-        return bills.filter(b => b.type !== 'RECEIVABLE' && b.status === 'PENDING' && new Date(b.dueDate) <= thirtyDaysFromNow);
+        return bills.filter(b => b.type !== 'RECEIVABLE' && b.status !== 'PAID' && b.status !== 'COMPLETED' && new Date(b.dueDate) <= thirtyDaysFromNow);
     }, [bills, thirtyDaysFromNow]);
 
     const scheduledPaymentsTotal = useMemo(() => {
-        return pendingBills.reduce((acc, curr) => acc + curr.amount, 0);
+        return pendingBills.reduce((acc, curr) => {
+            const outstanding = curr.amount - (curr.paidAmount || 0);
+            return acc + (outstanding > 0 ? outstanding : 0);
+        }, 0);
     }, [pendingBills]);
+
+    // --- Provider & Debt Analytics Calculations ---
+    const providerStats = useMemo(() => {
+        const stats = {}; // key: lowercase name
+        bills.forEach(bill => {
+            if (bill.type === 'RECEIVABLE') return;
+            const originalName = bill.provider ? bill.provider.trim() : 'Sin Proveedor';
+            const key = originalName.toLowerCase();
+            if (!stats[key]) {
+                stats[key] = {
+                    providerName: originalName,
+                    billsCount: 0,
+                    totalInvoiced: 0,
+                    totalPaid: 0,
+                    totalOwed: 0,
+                };
+            }
+            const isFullyPaid = bill.status === 'PAID' || bill.status === 'COMPLETED';
+            const paid = isFullyPaid ? bill.amount : (bill.paidAmount || 0);
+            const owed = isFullyPaid ? 0 : Math.max(0, bill.amount - (bill.paidAmount || 0));
+
+            stats[key].billsCount += 1;
+            stats[key].totalInvoiced += bill.amount;
+            stats[key].totalPaid += paid;
+            stats[key].totalOwed += owed;
+        });
+
+        return Object.values(stats).sort((a, b) => {
+            if (b.totalOwed !== a.totalOwed) {
+                return b.totalOwed - a.totalOwed;
+            }
+            return b.totalPaid - a.totalPaid;
+        });
+    }, [bills]);
+
+    const { totalProviderOwed, totalProviderPaid } = useMemo(() => {
+        let owed = 0;
+        let paid = 0;
+        providerStats.forEach(p => {
+            owed += p.totalOwed;
+            paid += p.totalPaid;
+        });
+        return { totalProviderOwed: owed, totalProviderPaid: paid };
+    }, [providerStats]);
 
     // Dynamic Display Metrics
     const displayBalance = timeRange === 'next30' ? balance : lastMonthBalance;
@@ -303,6 +350,117 @@ const Analytics = () => {
                 </div>
                 <div className="lg:col-span-2">
                     <DebtList bills={bills.filter(b => b.type !== 'RECEIVABLE')} />
+                </div>
+            </div>
+
+            {/* Provider and Accounts Payable Summary Section */}
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-1 border-t border-slate-250/30 pt-6">
+                    <h2 className="text-xl font-black text-navy">Resumen de Proveedores y Cuentas por Pagar</h2>
+                    <p className="text-xs text-secondary opacity-60">Visualización detallada de deudas pendientes y totales cancelados a cada proveedor.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <StatCard
+                        title="Total Deuda Pendiente (¿Cuánto debo?)"
+                        value={loading ? '...' : formatCurrency(totalProviderOwed)}
+                        trend={totalProviderOwed > 0 ? 'down' : 'info'}
+                        trendValue={totalProviderOwed > 0 ? "Saldo pendiente por liquidar" : "Sin deudas pendientes"}
+                        icon={<AlertCircle size={20} className="text-danger" />}
+                    />
+                    <StatCard
+                        title="Total Pagado a Proveedores"
+                        value={loading ? '...' : formatCurrency(totalProviderPaid)}
+                        trend="up"
+                        trendValue="Monto histórico abonado"
+                        icon={<Banknote size={20} className="text-success" />}
+                    />
+                </div>
+
+                <div className="card bg-white shadow-card rounded-[20px] overflow-hidden flex flex-col p-0 border border-gray-100/50">
+                    <div className="p-6 border-b border-gray-100">
+                        <h3 className="text-lg font-bold text-navy">Desglose por Proveedor</h3>
+                        <p className="text-xs text-secondary opacity-60">Resumen consolidado de facturación, abonos y progreso de pago.</p>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50/50 border-b border-gray-100">
+                                <tr>
+                                    <th className="p-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider">Proveedor</th>
+                                    <th className="p-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider text-center">Facturas</th>
+                                    <th className="p-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider text-right">Total Facturado</th>
+                                    <th className="p-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider text-right">Total Pagado</th>
+                                    <th className="p-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider text-right">Deuda Pendiente</th>
+                                    <th className="p-6 py-4 text-xs font-bold text-secondary uppercase tracking-wider" style={{ width: '200px' }}>Progreso de Pago</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan="6" className="p-8 text-center text-secondary opacity-50 font-semibold">Cargando proveedores...</td>
+                                    </tr>
+                                ) : providerStats.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="6" className="p-12 text-center text-secondary opacity-50 font-semibold">
+                                            No hay datos de proveedores registrados
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    providerStats.map((p, idx) => {
+                                        const progressPercent = p.totalInvoiced > 0 
+                                            ? Math.min(100, Math.max(0, (p.totalPaid / p.totalInvoiced) * 100))
+                                            : 0;
+
+                                        return (
+                                            <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
+                                                <td className="p-6 py-4">
+                                                    <p className="font-bold text-navy text-sm">{p.providerName}</p>
+                                                </td>
+                                                <td className="p-6 py-4 text-center">
+                                                    <span className="inline-flex items-center justify-center bg-slate-100 text-secondary font-bold text-xs px-2.5 py-1 rounded-lg">
+                                                        {p.billsCount}
+                                                    </span>
+                                                </td>
+                                                <td className="p-6 py-4 text-right">
+                                                    <p className="font-semibold text-secondary text-sm">{formatCurrency(p.totalInvoiced)}</p>
+                                                </td>
+                                                <td className="p-6 py-4 text-right">
+                                                    <p className="font-bold text-success text-sm">{formatCurrency(p.totalPaid)}</p>
+                                                </td>
+                                                <td className="p-6 py-4 text-right">
+                                                    <p className={`font-black text-sm ${p.totalOwed > 0 ? 'text-danger' : 'text-secondary opacity-50'}`}>
+                                                        {formatCurrency(p.totalOwed)}
+                                                    </p>
+                                                </td>
+                                                <td className="p-6 py-4">
+                                                    <div className="flex flex-col gap-1.5 w-full">
+                                                        <div className="flex justify-between items-center text-[10px] font-bold text-secondary">
+                                                            <span>{progressPercent.toFixed(0)}% pagado</span>
+                                                        </div>
+                                                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className={`h-full rounded-full transition-all duration-500 ${
+                                                                    progressPercent === 100 
+                                                                        ? 'bg-success' 
+                                                                        : progressPercent > 50 
+                                                                            ? 'bg-primary' 
+                                                                            : progressPercent > 0 
+                                                                                ? 'bg-warning' 
+                                                                                : 'bg-slate-200'
+                                                                }`}
+                                                                style={{ width: `${progressPercent}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

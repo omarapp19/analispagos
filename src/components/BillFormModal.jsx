@@ -11,10 +11,14 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
     const [supportFile, setSupportFile] = useState(null);
     const [supportFileName, setSupportFileName] = useState('');
 
+    const [hasDiscount, setHasDiscount] = useState(false);
+    const [discountType, setDiscountType] = useState('percent'); // 'percent' | 'fixed'
+    const [discountValue, setDiscountValue] = useState('');
+
     const [formData, setFormData] = useState({
         provider: '',
         dueDate: new Date().toLocaleDateString('en-CA'),
-        invoiceDate: '',
+        invoiceNumber: '',
         type: 'PAYABLE'
     });
 
@@ -138,14 +142,30 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
         setItems(items.filter((_, idx) => idx !== index));
     };
 
-    // Calculate sum of items
-    const calculatedTotal = React.useMemo(() => {
+    // Calculate subtotal of items (sum of quantity * costPrice)
+    const subtotal = React.useMemo(() => {
         return items.reduce((sum, item) => {
             const qty = parseInt(item.quantity) || 0;
             const cost = parseFloat(item.costPrice) || 0;
             return sum + qty * cost;
         }, 0);
     }, [items]);
+
+    // Calculate discount amount in USD
+    const discountAmount = React.useMemo(() => {
+        if (!hasDiscount) return 0;
+        const val = parseFloat(discountValue) || 0;
+        if (discountType === 'percent') {
+            return subtotal * (val / 100);
+        } else {
+            return val;
+        }
+    }, [hasDiscount, discountType, discountValue, subtotal]);
+
+    // Calculate final total amount
+    const totalAmount = React.useMemo(() => {
+        return Math.max(0, subtotal - discountAmount);
+    }, [subtotal, discountAmount]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -168,6 +188,21 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                 return;
             }
 
+            // Validation: Discount
+            if (hasDiscount) {
+                const discVal = parseFloat(discountValue) || 0;
+                if (discVal < 0) {
+                    alert('Por favor ingrese un valor de descuento válido mayor o igual a cero.');
+                    setLoading(false);
+                    return;
+                }
+                if (discountAmount > subtotal + 0.01) {
+                    alert('El descuento no puede ser mayor al subtotal de la factura.');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             // Generate automatic title
             const firstItemName = items[0].name.trim();
             const otherItemsCount = items.length - 1;
@@ -177,9 +212,12 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
 
             const payload = {
                 provider: formData.provider.trim(),
-                amount: calculatedTotal,
+                amount: totalAmount,
+                subtotal: subtotal,
+                discount: hasDiscount ? (parseFloat(discountValue) || 0) : 0,
+                discountType: hasDiscount ? discountType : null,
                 dueDate: formData.dueDate,
-                invoiceDate: formData.invoiceDate || null,
+                invoiceNumber: formData.invoiceNumber.trim() || null,
                 type: 'PAYABLE',
                 title: generatedTitle,
                 supportFile: supportFile,
@@ -248,14 +286,15 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                         </div>
                         <div>
                             <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-2 block">
-                                Fecha de Factura (Opcional)
+                                Número de Factura (Opcional)
                             </label>
                             <input
-                                type="date"
-                                name="invoiceDate"
-                                value={formData.invoiceDate}
+                                type="text"
+                                name="invoiceNumber"
+                                value={formData.invoiceNumber}
                                 onChange={handleChange}
-                                className="w-full p-3 bg-background rounded-xl border-2 border-transparent focus:border-primary outline-none font-bold text-secondary text-sm transition-all"
+                                placeholder="Ej: FAC-12345"
+                                className="w-full p-3 bg-background rounded-xl border-2 border-transparent focus:border-primary outline-none font-bold text-navy text-sm transition-all"
                             />
                         </div>
                         <div>
@@ -584,14 +623,81 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                             })}
                         </div>
 
+                        {/* Discount section */}
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-gray-200/60 mt-3 flex flex-col gap-3 flex-shrink-0 text-xs">
+                            <label className="flex items-center gap-2 font-bold text-navy cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={hasDiscount}
+                                    onChange={(e) => {
+                                        setHasDiscount(e.target.checked);
+                                        if (!e.target.checked) setDiscountValue('');
+                                    }}
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary border-gray-300"
+                                />
+                                <span>¿Esta factura tiene algún descuento?</span>
+                            </label>
+
+                            {hasDiscount && (
+                                <div className="grid grid-cols-2 gap-3 mt-1 animate-in slide-in-from-top-1 duration-150">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-secondary uppercase block mb-1">Tipo de Descuento</label>
+                                        <select
+                                            value={discountType}
+                                            onChange={(e) => {
+                                                setDiscountType(e.target.value);
+                                                setDiscountValue('');
+                                            }}
+                                            className="w-full p-2.5 bg-white border border-gray-200 rounded-lg outline-none font-bold text-navy cursor-pointer"
+                                        >
+                                            <option value="percent">Porcentaje (%)</option>
+                                            <option value="fixed">Monto Fijo ($)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-secondary uppercase block mb-1">
+                                            {discountType === 'percent' ? 'Descuento (%)' : 'Descuento ($)'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step={discountType === 'percent' ? '1' : '0.01'}
+                                            min="0"
+                                            max={discountType === 'percent' ? '100' : undefined}
+                                            value={discountValue}
+                                            onChange={(e) => setDiscountValue(e.target.value)}
+                                            placeholder={discountType === 'percent' ? 'Ej: 10' : '0.00'}
+                                            className="w-full p-2 bg-white border border-gray-200 rounded-lg outline-none font-bold text-navy"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Automated total display banner */}
-                        <div className="bg-primary/5 rounded-2xl p-4 flex justify-between items-center border border-primary/10 mt-2 flex-shrink-0">
-                            <div>
-                                <span className="text-xs font-bold text-secondary block uppercase tracking-wider">Monto Total de Factura</span>
-                                <span className="text-[10px] text-secondary opacity-60">Calculado automáticamente a partir de los precios de costo</span>
-                            </div>
-                            <div className="text-right">
-                                <span className="text-2xl font-black text-primary">${calculatedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <div className="bg-primary/5 rounded-2xl p-4 flex flex-col gap-2 border border-primary/10 mt-3 flex-shrink-0">
+                            {hasDiscount && discountAmount > 0 && (
+                                <>
+                                    <div className="flex justify-between items-center text-xs font-bold text-secondary">
+                                        <span>Subtotal:</span>
+                                        <span>${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs font-bold text-danger">
+                                        <span>Descuento {discountType === 'percent' ? `(${parseFloat(discountValue) || 0}%)` : ''}:</span>
+                                        <span>-${discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="h-px bg-primary/10 my-1"></div>
+                                </>
+                            )}
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <span className="text-xs font-bold text-secondary block uppercase tracking-wider">Monto Total de Factura</span>
+                                    <span className="text-[10px] text-secondary opacity-60">
+                                        {hasDiscount && discountAmount > 0 ? 'Total neto con descuento aplicado' : 'Calculado automáticamente a partir de los precios de costo'}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-2xl font-black text-primary">${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
                             </div>
                         </div>
                     </div>

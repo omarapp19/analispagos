@@ -93,7 +93,7 @@ const AbonoFormModal = ({ isOpen, onClose, bill, onAbonoAdded }) => {
             const txType = isPayable ? 'EXPENSE' : 'INCOME';
             const txCategory = isPayable ? 'Pago de Factura' : 'Cobro de Factura';
             
-            let txNote = `Abono de ${formatCurrency(usdVal)} a Factura #${bill.id.substring(0, 6)} (${bill.provider || 'Proveedor'}) - Ref: ${bill.title}`;
+            let txNote = `Abono de ${formatCurrency(usdVal)} a Factura #${bill.invoiceNumber || bill.id.substring(0, 6)} (${bill.provider || 'Proveedor'}) - Ref: ${bill.title}`;
             if (isBsMethod) {
                 txNote += ` | Cancelado en Bs. a tasa ${exchangeRate} Bs/$ (Total: ${formatBs(calculatedBsAmount)})`;
             }
@@ -162,6 +162,12 @@ const AbonoFormModal = ({ isOpen, onClose, bill, onAbonoAdded }) => {
                             <span>Factura / Gasto:</span>
                             <span className="font-bold text-navy max-w-[200px] truncate text-right">{bill.title}</span>
                         </div>
+                        {bill.invoiceNumber && (
+                            <div className="flex justify-between text-xs text-secondary font-semibold">
+                                <span>Nro Factura:</span>
+                                <span className="font-bold text-navy">#{bill.invoiceNumber}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-xs text-secondary font-semibold">
                             <span>{isPayable ? 'Proveedor:' : 'Cliente:'}</span>
                             <span className="font-bold text-navy">{bill.provider || '-'}</span>

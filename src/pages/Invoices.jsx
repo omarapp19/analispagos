@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark, Filter, Search } from 'lucide-react';
 import { api } from '../services/api';
 import BillFormModal from '../components/BillFormModal';
+import ExpenseFormModal from '../components/ExpenseFormModal';
 import AbonoFormModal from '../components/AbonoFormModal';
 
 const Invoices = () => {
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [showAbonoModal, setShowAbonoModal] = useState(false);
     const [selectedBillForAbono, setSelectedBillForAbono] = useState(null);
     const [filter, setFilter] = useState('ALL'); // 'ALL' | 'PENDING_DESC' | 'PAID'
@@ -66,7 +68,8 @@ const Invoices = () => {
             if (!term) return true;
             return (
                 (b.provider || '').toLowerCase().includes(term) ||
-                (b.title || '').toLowerCase().includes(term)
+                (b.title || '').toLowerCase().includes(term) ||
+                (b.invoiceNumber || '').toLowerCase().includes(term)
             );
         });
 
@@ -95,13 +98,22 @@ const Invoices = () => {
                     <h1 className="text-2xl font-bold text-navy">Facturas (Gastos)</h1>
                     <p className="text-secondary opacity-60">Gestión de gastos, compras a proveedores y cuentas por pagar</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 w-full sm:w-auto justify-center"
-                >
-                    <Plus size={18} />
-                    Nueva Factura
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
+                    >
+                        <Plus size={16} />
+                        Nueva Compra (Inventario)
+                    </button>
+                    <button
+                        onClick={() => setShowExpenseModal(true)}
+                        className="btn bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 shadow-lg justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                    >
+                        <Plus size={16} />
+                        Registrar Gasto (Nómina/Servicios)
+                    </button>
+                </div>
             </div>
 
             <div className="card flex-1 overflow-hidden flex flex-col p-0 bg-white shadow-card rounded-3xl">
@@ -178,6 +190,11 @@ const Invoices = () => {
                                                 <div>
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <p className="font-bold text-navy text-sm">{bill.title}</p>
+                                                        {bill.category && (
+                                                            <span className="bg-slate-100 text-secondary border border-gray-200 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                                                                {bill.category}
+                                                            </span>
+                                                        )}
                                                         {bill.supportFile && (
                                                             <button
                                                                 onClick={() => openSupportModal(bill.supportFile, bill.supportFileName)}
@@ -188,7 +205,9 @@ const Invoices = () => {
                                                             </button>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-secondary opacity-60">ID: #{bill.id.substring(0, 8)}</p>
+                                                     <p className="text-xs text-secondary opacity-60">
+                                                         {bill.invoiceNumber ? `Factura: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
+                                                     </p>
                                                 </div>
                                             </div>
                                         </td>
@@ -265,6 +284,13 @@ const Invoices = () => {
                 <BillFormModal
                     onClose={() => setShowModal(false)}
                     onBillAdded={fetchBills}
+                />
+            )}
+
+            {showExpenseModal && (
+                <ExpenseFormModal
+                    onClose={() => setShowExpenseModal(false)}
+                    onExpenseAdded={fetchBills}
                 />
             )}
 

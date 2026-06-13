@@ -9,6 +9,7 @@ import Invoices from './pages/Invoices';
 import Inventory from './pages/Inventory';
 import Billing from './pages/Billing';
 import Login from './pages/Login'; // Standalone login page
+import Investments from './pages/Investments';
 
 // Safe route protector component
 const ProtectedRoute = () => {
@@ -36,6 +37,7 @@ function App() {
             <Route path="invoices" element={<Invoices />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<Configuration />} />
+            <Route path="investments" element={<Investments />} />
           </Route>
         </Route>
 

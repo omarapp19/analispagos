@@ -3,11 +3,14 @@ import React, { useMemo } from 'react';
 const DebtList = ({ bills = [] }) => {
 
     const providers = useMemo(() => {
-        // Aggregate pending bills by provider
+        // Aggregate pending/partial bills by provider
         const grouped = bills.reduce((acc, bill) => {
-            if (bill.status === 'PENDING') {
+            if (bill.status !== 'PAID' && bill.status !== 'COMPLETED') {
                 const name = bill.provider || 'Sin Proveedor';
-                acc[name] = (acc[name] || 0) + bill.amount;
+                const outstanding = bill.amount - (bill.paidAmount || 0);
+                if (outstanding > 0) {
+                    acc[name] = (acc[name] || 0) + outstanding;
+                }
             }
             return acc;
         }, {});

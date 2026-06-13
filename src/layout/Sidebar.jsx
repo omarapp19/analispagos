@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot, Calendar, Package, Receipt } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, FileText, PieChart, Settings, LogOut, DollarSign, Bot, Calendar, Package, Receipt, TrendingUp } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { db } from '../firebase'; // Importamos la base de datos de Firebase
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -51,6 +51,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <NavItem to="/inventory" icon={<Package size={20} />} label="Inventario" onClick={onClose} />
                     <NavItem to="/invoices" icon={<FileText size={20} />} label="Facturas (Gastos)" onClick={onClose} />
                     <NavItem to="/calendar" icon={<Calendar size={20} />} label="Calendario" onClick={onClose} />
+                    <NavItem to="/investments" icon={<TrendingUp size={20} />} label="Inversiones" onClick={onClose} />
 
                     {/* Divider or Spacer */}
                     <div className="flex-1"></div>
