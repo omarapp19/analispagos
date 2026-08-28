@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark, Filter, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark, Filter, Search, X } from 'lucide-react';
 import { api } from '../services/api';
 import BillFormModal from '../components/BillFormModal';
 import ExpenseFormModal from '../components/ExpenseFormModal';
 import AbonoFormModal from '../components/AbonoFormModal';
+import RecurringExpensesModal from '../components/RecurringExpensesModal';
 
 const Invoices = () => {
+    const navigate = useNavigate();
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [showAbonoModal, setShowAbonoModal] = useState(false);
+    const [showRecurringModal, setShowRecurringModal] = useState(false);
     const [selectedBillForAbono, setSelectedBillForAbono] = useState(null);
     const [filter, setFilter] = useState('ALL'); // 'ALL' | 'PENDING_DESC' | 'PAID'
     const [searchTerm, setSearchTerm] = useState('');
@@ -100,7 +104,7 @@ const Invoices = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={() => navigate('/compras/nueva')}
                         className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
                     >
                         <Plus size={16} />
@@ -108,10 +112,17 @@ const Invoices = () => {
                     </button>
                     <button
                         onClick={() => setShowExpenseModal(true)}
-                        className="btn bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 shadow-lg justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+                        className="btn bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 shadow-lg justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border-none"
                     >
                         <Plus size={16} />
                         Registrar Gasto (Nómina/Servicios)
+                    </button>
+                    <button
+                        onClick={() => setShowRecurringModal(true)}
+                        className="btn bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-2 shadow-lg justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border-none"
+                    >
+                        <CalendarIcon size={16} />
+                        Gastos Fijos Programados
                     </button>
                 </div>
             </div>
@@ -362,6 +373,14 @@ const Invoices = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showRecurringModal && (
+                <RecurringExpensesModal
+                    onClose={() => setShowRecurringModal(false)}
+                    onExpenseAdded={fetchBills}
+                    existingBills={bills}
+                />
             )}
         </div>
     );

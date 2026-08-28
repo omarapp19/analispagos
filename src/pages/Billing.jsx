@@ -620,49 +620,13 @@ ${itemsText}-------------------------------
                     </h1>
                     <p className="text-secondary opacity-60">Terminal de Punto de Venta y Control de Caja Registradora</p>
                 </div>
-                {/* Modern Navigation Tabs */}
-                <div className="bg-white p-1 rounded-xl shadow-card border border-gray-100 flex overflow-x-auto gap-1 w-full lg:w-auto custom-scrollbar whitespace-nowrap">
-                    <button 
-                        onClick={() => setActiveTab('new')}
-                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'new' ? 'bg-primary text-white shadow-md shadow-teal-500/20' : 'text-secondary opacity-60 hover:opacity-100'}`}
-                    >
-                        <Receipt size={16} />
-                        Punto de Venta (POS)
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('history')}
-                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
-                    >
-                        <FileText size={16} />
-                        Historial Facturas
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('receivables')}
-                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 relative ${activeTab === 'receivables' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
-                    >
-                        <Clock size={16} />
-                        Cuentas por Cobrar
-                        {receivableStats.pendingInvoicesCount > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-danger text-white text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center font-black animate-pulse">
-                                {receivableStats.pendingInvoicesCount}
-                            </span>
-                        )}
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('clients')}
-                        className={`flex-1 lg:flex-none flex-shrink-0 px-4 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'clients' ? 'bg-primary text-white shadow-md' : 'text-secondary opacity-60 hover:opacity-100'}`}
-                    >
-                        <Users size={16} />
-                        Clientes
-                    </button>
-                </div>
             </div>
 
             {/* TAB CONTENT: PUNTO DE VENTA (POS) */}
             {activeTab === 'new' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
-                    {/* Left Column (8/12): VISUAL PRODUCT CATALOG GRID */}
-                    <div className="lg:col-span-7 flex flex-col gap-4 order-2 lg:order-1">
+                    {/* Catalog Column (5/12): VISUAL PRODUCT CATALOG GRID */}
+                    <div className="lg:col-span-5 flex flex-col gap-4 order-2 lg:order-2">
                         {/* Catalog Toolbar */}
                         <div className="bg-white rounded-2xl p-4 shadow-card border border-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between">
                             <div className="relative w-full sm:flex-1">
@@ -701,7 +665,7 @@ ${itemsText}-------------------------------
                                     <p className="text-xs text-secondary opacity-60">Agrega productos en el catálogo de inventario primero.</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3">
                                     {posProducts.map(p => {
                                         const outOfStock = p.quantity <= 0;
                                         const itemInCart = invoiceItems.find(item => item.productId === p.id);
@@ -759,8 +723,8 @@ ${itemsText}-------------------------------
                         </div>
                     </div>
 
-                    {/* Right Column (5/12): CLIENT SELECTOR & CART CHECKOUT */}
-                    <div className="lg:col-span-5 flex flex-col gap-4 order-1 lg:order-2">
+                    {/* Billing Column (7/12): CLIENT SELECTOR & CART CHECKOUT */}
+                    <div className="lg:col-span-7 flex flex-col gap-4 order-1 lg:order-1">
                         <div className="card bg-white p-5 rounded-[20px] shadow-card flex flex-col gap-4 h-full">
                             <h3 className="text-sm font-bold text-navy uppercase tracking-wider flex items-center gap-2 border-b border-gray-50 pb-3">
                                 <ShoppingCart size={16} className="text-primary" />
@@ -1716,18 +1680,39 @@ ${itemsText}-------------------------------
                                     visibility: visible;
                                 }
                                 #invoice-print-area {
-                                    position: absolute;
-                                    left: 50% !important;
-                                    top: 50% !important;
-                                    transform: translate(-50%, -50%) !important;
-                                    width: 360px !important;
-                                    font-size: 14px;
-                                }
-                                .no-print {
-                                    display: none !important;
-                                }
-                            }
-                        `}} />
+                                     position: absolute;
+                                     left: 50% !important;
+                                     top: 50% !important;
+                                     transform: translate(-50%, -50%) !important;
+                                     width: 360px !important;
+                                     font-size: 14px;
+                                 }
+                                 .no-print {
+                                     display: none !important;
+                                 }
+                             }
+                         `}} />
+
+                        {/* Action Buttons Footer (Frozen at the Bottom) */}
+                        <div className="bg-white p-4 border-t border-gray-100 flex gap-3 no-print flex-shrink-0 z-10 shadow-sm rounded-b-2xl">
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-navy font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 border-none"
+                            >
+                                <Printer size={14} />
+                                Imprimir
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDirectDownload}
+                                disabled={generatingImage}
+                                className="flex-1 py-3 bg-gradient-to-r from-primary to-teal-500 hover:from-teal-500 hover:to-primary text-white font-extrabold text-xs rounded-xl shadow-lg shadow-teal-500/10 hover:shadow-teal-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 border-none"
+                            >
+                                {generatingImage ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                {generatingImage ? 'Generando Imagen...' : 'Descargar Ticket (PNG)'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

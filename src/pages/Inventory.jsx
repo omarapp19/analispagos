@@ -9,6 +9,9 @@ import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 const Inventory = () => {
+    const userRole = localStorage.getItem('userRole') || 'cajero';
+    const username = localStorage.getItem('adminUser') || '';
+
     // Inventory Data States
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -149,7 +152,9 @@ const Inventory = () => {
                 marginPercentage: isService ? 0 : (parseFloat(formData.marginPercentage) || 0),
                 sellingPrice: parseFloat(formData.sellingPrice) || 0,
                 image: (formData.image || '').trim(),
-                taxPercentage: parseFloat(formData.taxPercentage) || 0
+                taxPercentage: parseFloat(formData.taxPercentage) || 0,
+                username: username,
+                unitsPerPackage: isService ? 1 : (parseInt(formData.unitsPerPackage) || 1)
             };
 
             if (editingProduct) {
@@ -169,11 +174,14 @@ const Inventory = () => {
                 description: '',
                 quantity: '0',
                 costPrice: '0.00',
-                marginPercentage: '0',
+                marginPercentage: '30',
                 sellingPrice: '0.00',
                 image: '',
                 imageType: 'url',
-                taxPercentage: '16'
+                taxPercentage: '16',
+                unitsPerPackage: '1',
+                packageQty: '0',
+                looseQty: '0'
             });
         } catch (error) {
             console.error('Error saving product:', error);
@@ -214,7 +222,10 @@ const Inventory = () => {
             sellingPrice: (product.sellingPrice || 0).toFixed(2),
             image: product.image || '',
             imageType: product.image?.startsWith('data:') ? 'base64' : 'url',
-            taxPercentage: product.taxPercentage !== undefined ? product.taxPercentage.toString() : '16'
+            taxPercentage: product.taxPercentage !== undefined ? product.taxPercentage.toString() : '16',
+            unitsPerPackage: product.unitsPerPackage ? product.unitsPerPackage.toString() : '1',
+            packageQty: '0',
+            looseQty: '0'
         });
         setIsModalOpen(true);
     };
@@ -316,29 +327,37 @@ const Inventory = () => {
                     <h1 className="text-2xl font-bold text-secondary">Control de Inventario</h1>
                     <p className="text-secondary opacity-60">Supervisa tus existencias, márgenes de ganancia y valor del almacén</p>
                 </div>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={() => {
-                            setEditingProduct(null);
-                            setFormData({
-                                name: '',
-                                description: '',
-                                quantity: '0',
-                                costPrice: '0.00',
-                                marginPercentage: '30', // nice default
-                                sellingPrice: '0.00',
-                                image: '',
-                                imageType: 'url',
-                                taxPercentage: '16'
-                            });
-                            setIsModalOpen(true);
-                        }}
-                        className="btn btn-primary shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
-                    >
-                        <Plus size={18} />
-                        Crear Producto
-                    </button>
-                </div>
+                {userRole !== 'cajero' && (
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => {
+                                setEditingProduct(null);
+                                setFormData({
+                                    productType: 'product',
+                                    name: '',
+                                    brand: '',
+                                    code: '',
+                                    description: '',
+                                    quantity: '0',
+                                    costPrice: '0.00',
+                                    marginPercentage: '30', 
+                                    sellingPrice: '0.00',
+                                    image: '',
+                                    imageType: 'url',
+                                    taxPercentage: '16',
+                                    unitsPerPackage: '1',
+                                    packageQty: '0',
+                                    looseQty: '0'
+                                });
+                                setIsModalOpen(true);
+                            }}
+                            className="btn btn-primary shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
+                        >
+                            <Plus size={18} />
+                            Crear Producto
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* KPI Cards Row */}
@@ -522,19 +541,25 @@ const Inventory = () => {
                             : 'Aún no has registrado ningún producto. Empieza por crear un nuevo producto para controlar sus existencias y calcular márgenes.'
                         }
                     </p>
-                    {!(searchTerm || statusFilter !== 'all') && (
+                    {!(searchTerm || statusFilter !== 'all') && userRole !== 'cajero' && (
                         <button 
                             onClick={() => {
                                 setEditingProduct(null);
                                 setFormData({
+                                    productType: 'product',
                                     name: '',
+                                    brand: '',
+                                    code: '',
                                     description: '',
                                     quantity: '0',
                                     costPrice: '0.00',
                                     marginPercentage: '30',
                                     sellingPrice: '0.00',
                                     image: '',
-                                    imageType: 'url'
+                                    imageType: 'url',
+                                    unitsPerPackage: '1',
+                                    packageQty: '0',
+                                    looseQty: '0'
                                 });
                                 setIsModalOpen(true);
                             }}
@@ -625,25 +650,27 @@ const Inventory = () => {
                                     </div>
 
                                     {/* Footer Actions */}
-                                    <div className="flex items-center justify-end pt-2">
-                                        {/* Edit / Delete */}
-                                        <div className="flex items-center gap-1">
-                                            <button 
-                                                onClick={() => handleEditProduct(p)}
-                                                className="p-2 rounded-xl text-secondary hover:bg-slate-50 hover:text-primary transition-colors"
-                                                title="Editar Producto"
-                                            >
-                                                <Edit size={16} />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteProduct(p)}
-                                                className="p-2 rounded-xl text-secondary hover:bg-red-50 hover:text-danger transition-colors"
-                                                title="Eliminar Producto"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                    {userRole !== 'cajero' && (
+                                        <div className="flex items-center justify-end pt-2">
+                                            {/* Edit / Delete */}
+                                            <div className="flex items-center gap-1">
+                                                <button 
+                                                    onClick={() => handleEditProduct(p)}
+                                                    className="p-2 rounded-xl text-secondary hover:bg-slate-50 hover:text-primary transition-colors"
+                                                    title="Editar Producto"
+                                                >
+                                                    <Edit size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteProduct(p)}
+                                                    className="p-2 rounded-xl text-secondary hover:bg-red-50 hover:text-danger transition-colors"
+                                                    title="Eliminar Producto"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -716,22 +743,26 @@ const Inventory = () => {
                                             <td className="py-4 px-6 text-right font-semibold text-secondary">{formatCurrency(p.costPrice * p.quantity)}</td>
                                             <td className="py-4 px-6 text-right font-bold text-navy">{formatCurrency(p.sellingPrice * p.quantity)}</td>
                                             <td className="py-4 px-6 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <button 
-                                                        onClick={() => handleEditProduct(p)}
-                                                        className="p-1.5 rounded-lg text-secondary hover:bg-gray-100 hover:text-primary transition-colors"
-                                                        title="Editar"
-                                                    >
-                                                        <Edit size={14} />
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteProduct(p)}
-                                                        className="p-1.5 rounded-lg text-secondary hover:bg-red-50 hover:text-danger transition-colors"
-                                                        title="Eliminar"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
+                                                {userRole !== 'cajero' ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button 
+                                                            onClick={() => handleEditProduct(p)}
+                                                            className="p-1.5 rounded-lg text-secondary hover:bg-gray-100 hover:text-primary transition-colors"
+                                                            title="Editar"
+                                                        >
+                                                            <Edit size={14} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteProduct(p)}
+                                                            className="p-1.5 rounded-lg text-secondary hover:bg-red-50 hover:text-danger transition-colors"
+                                                            title="Eliminar"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-secondary opacity-40">-</span>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -825,10 +856,10 @@ const Inventory = () => {
                                     <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Código / SKU</label>
                                     <input 
                                         type="text"
-                                        value={formData.code}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                                        placeholder="Ej: SKU-001"
-                                        className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                        disabled
+                                        value={editingProduct ? formData.code : 'Autogenerado'}
+                                        placeholder="Autogenerado"
+                                        className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all opacity-75 font-mono"
                                     />
                                 </div>
                             </div>
@@ -846,30 +877,121 @@ const Inventory = () => {
 
                             {/* Quantity & Cost — only for products */}
                             {formData.productType === 'product' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cantidad Inicial</label>
-                                    <input 
-                                        type="number" 
-                                        min="0"
-                                        value={formData.quantity}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
-                                        placeholder="0"
-                                        className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
-                                    />
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Uni. x Empaque</label>
+                                        <input 
+                                            type="number" 
+                                            min="1"
+                                            value={formData.unitsPerPackage || '1'}
+                                            onChange={(e) => {
+                                                const upe = Math.max(1, parseInt(e.target.value) || 1);
+                                                setFormData(prev => {
+                                                    const pQty = parseInt(prev.packageQty) || 0;
+                                                    const lQty = parseInt(prev.looseQty) || 0;
+                                                    return {
+                                                        ...prev,
+                                                        unitsPerPackage: upe.toString(),
+                                                        quantity: ((pQty * upe) + lQty).toString()
+                                                    };
+                                                });
+                                            }}
+                                            placeholder="1"
+                                            className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                        />
+                                    </div>
+                                    {!editingProduct ? (
+                                        <>
+                                            <div>
+                                                <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cant. Empaques</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={formData.packageQty || '0'}
+                                                    onChange={(e) => {
+                                                        const pQty = Math.max(0, parseInt(e.target.value) || 0);
+                                                        setFormData(prev => {
+                                                            const upe = parseInt(prev.unitsPerPackage) || 1;
+                                                            const lQty = parseInt(prev.looseQty) || 0;
+                                                            return {
+                                                                ...prev,
+                                                                packageQty: pQty.toString(),
+                                                                quantity: ((pQty * upe) + lQty).toString()
+                                                            };
+                                                        });
+                                                    }}
+                                                    placeholder="0"
+                                                    className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cant. Unidades</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={formData.looseQty || '0'}
+                                                    onChange={(e) => {
+                                                        const lQty = Math.max(0, parseInt(e.target.value) || 0);
+                                                        setFormData(prev => {
+                                                            const upe = parseInt(prev.unitsPerPackage) || 1;
+                                                            const pQty = parseInt(prev.packageQty) || 0;
+                                                            return {
+                                                                ...prev,
+                                                                looseQty: lQty.toString(),
+                                                                quantity: ((pQty * upe) + lQty).toString()
+                                                            };
+                                                        });
+                                                    }}
+                                                    placeholder="0"
+                                                    className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="col-span-2">
+                                            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cant. Disponible (Und)</label>
+                                            <input 
+                                                type="number" 
+                                                disabled
+                                                value={formData.quantity}
+                                                className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold opacity-60"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Precio Costo ($) *</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01"
-                                        min="0"
-                                        value={formData.costPrice}
-                                        onChange={(e) => handleCostChange(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
-                                    />
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    {!editingProduct && (
+                                        <div>
+                                            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Total Unidades</label>
+                                            <input 
+                                                type="number" 
+                                                disabled
+                                                value={formData.quantity}
+                                                className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold opacity-75 font-mono"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className={editingProduct ? 'col-span-2' : ''}>
+                                        <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Precio Costo ($) *</label>
+                                        <input 
+                                            type="number" 
+                                            step="0.01"
+                                            min="0"
+                                            value={formData.costPrice}
+                                            onChange={(e) => handleCostChange(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                        />
+                                    </div>
                                 </div>
+
+                                {editingProduct && (
+                                    <p className="text-[9px] text-amber-600 font-bold leading-tight">
+                                        Para cargar o descargar inventario, debe hacerlo a través de un ajuste.
+                                    </p>
+                                )}
                             </div>
                             )}
 

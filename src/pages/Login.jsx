@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, Eye, EyeOff, Loader2, Landmark } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -27,32 +27,53 @@ const Login = () => {
         const inputUser = username.trim().toLowerCase();
 
         try {
-            // Live query to Firestore document settings/auth_credentials
-            const authRef = doc(db, 'settings', 'auth_credentials');
-            const docSnap = await getDoc(authRef);
+            // Check if users collection is empty
+            const usersColl = collection(db, 'users');
+            const usersSnap = await getDocs(usersColl);
             
-            let credentials;
-            if (docSnap.exists()) {
-                credentials = docSnap.data();
-            } else {
-                // Initialize default single-user auth credentials if they don't exist yet
-                const defaultCreds = {
+            if (usersSnap.empty) {
+                // Seed default users
+                await setDoc(doc(db, 'users', 'omar'), {
                     username: 'omar',
-                    password: 'omar123'
-                };
-                await setDoc(authRef, defaultCreds);
-                credentials = defaultCreds;
+                    password: 'omar123',
+                    name: 'Omar Pérez',
+                    role: 'administrador',
+                    createdAt: new Date()
+                });
+                await setDoc(doc(db, 'users', 'supervisor'), {
+                    username: 'supervisor',
+                    password: 'super123',
+                    name: 'Supervisor General',
+                    role: 'supervisor',
+                    createdAt: new Date()
+                });
+                await setDoc(doc(db, 'users', 'cajero'), {
+                    username: 'cajero',
+                    password: 'cajero123',
+                    name: 'Cajero Principal',
+                    role: 'cajero',
+                    createdAt: new Date()
+                });
             }
 
-            const dbUser = credentials.username.trim().toLowerCase();
+            // Verify login credentials
+            const userDocRef = doc(db, 'users', inputUser);
+            const userDocSnap = await getDoc(userDocRef);
 
-            if (inputUser === dbUser && password === credentials.password) {
-                // Simulated latency for premium UX feel
-                await new Promise(resolve => setTimeout(resolve, 800));
-                
-                localStorage.setItem('isAuthenticated', 'true');
-                localStorage.setItem('adminUser', dbUser);
-                navigate('/', { replace: true });
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                if (userData.password === password) {
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    
+                    localStorage.setItem('isAuthenticated', 'true');
+                    localStorage.setItem('userRole', userData.role);
+                    localStorage.setItem('adminUser', userData.username);
+                    localStorage.setItem('userDisplayName', userData.name);
+                    
+                    navigate('/', { replace: true });
+                } else {
+                    setError('Usuario o contraseña incorrectos. Intente de nuevo.');
+                }
             } else {
                 setError('Usuario o contraseña incorrectos. Intente de nuevo.');
             }

@@ -7,6 +7,7 @@ import {
     deleteDoc,
     doc,
     updateDoc,
+    setDoc,
     query,
     orderBy,
     where,
@@ -137,32 +138,56 @@ export const api = {
                                 costPrice: parseFloat(item.costPrice) || 0,
                                 marginPercentage: parseFloat(item.marginPercentage) || 0,
                                 sellingPrice: parseFloat(item.sellingPrice) || 0,
-                                updatedAt: new Date()
+                                updatedAt: new Date(),
+                                unitsPerPackage: parseInt(item.unitsPerPackage) || 1
                             };
                             await updateDoc(productRef, updateData);
                             itemsToSave.push({
                                 ...item,
                                 isNew: false
                             });
+
+                            // Register Kardex ENTRADA
+                            await api.registerKardexEntry({
+                                productId: item.productId,
+                                productName: currentData.name,
+                                type: 'ENTRADA',
+                                quantity: addedQty,
+                                concept: `Compra - Factura #${data.invoiceNumber || data.title || 'S/N'}`,
+                                user: data.username || 'Sistema'
+                            });
                         }
                     } else {
                         // New product: create it in inventory
+                        const autoCode = await api.getNextProductCode();
                         const newItem = {
-                            name: item.name.trim(),
-                            description: item.description?.trim() || 'Creado desde factura',
+                            code: autoCode,
+                            name: item.name.trim().toUpperCase(),
+                            description: item.description?.trim() || 'Creado desde factura de compra',
                             quantity: parseInt(item.quantity) || 0,
                             costPrice: parseFloat(item.costPrice) || 0,
                             marginPercentage: parseFloat(item.marginPercentage) || 0,
                             sellingPrice: parseFloat(item.sellingPrice) || 0,
                             image: '',
                             taxPercentage: parseFloat(item.taxPercentage) || 16,
-                            createdAt: new Date()
+                            createdAt: new Date(),
+                            unitsPerPackage: parseInt(item.unitsPerPackage) || 1
                         };
                         const docRef = await addDoc(collection(db, 'inventory'), newItem);
                         itemsToSave.push({
                             ...item,
                             productId: docRef.id,
                             isNew: false
+                        });
+
+                        // Register Kardex ENTRADA for new product
+                        await api.registerKardexEntry({
+                            productId: docRef.id,
+                            productName: newItem.name,
+                            type: 'ENTRADA',
+                            quantity: newItem.quantity,
+                            concept: `Compra (Nuevo Producto) - Factura #${data.invoiceNumber || data.title || 'S/N'}`,
+                            user: data.username || 'Sistema'
                         });
                     }
                 });
@@ -299,15 +324,33 @@ export const api = {
 
     createInventoryItem: async (data) => {
         try {
+            const autoCode = await api.getNextProductCode();
             const newItem = {
                 ...data,
+                code: autoCode,
+                name: (data.name || '').trim().toUpperCase(),
+                brand: (data.brand || '').trim().toUpperCase(),
                 quantity: parseInt(data.quantity) || 0,
                 costPrice: parseFloat(data.costPrice) || 0,
                 marginPercentage: parseFloat(data.marginPercentage) || 0,
                 sellingPrice: parseFloat(data.sellingPrice) || 0,
-                createdAt: new Date()
+                createdAt: new Date(),
+                unitsPerPackage: parseInt(data.unitsPerPackage) || 1
             };
             const docRef = await addDoc(collection(db, 'inventory'), newItem);
+            
+            // Register Kardex ENTRADA if quantity > 0
+            if (newItem.quantity > 0) {
+                await api.registerKardexEntry({
+                    productId: docRef.id,
+                    productName: newItem.name,
+                    type: 'ENTRADA',
+                    quantity: newItem.quantity,
+                    concept: 'Inventario Inicial',
+                    user: data.username || 'Sistema'
+                });
+            }
+            
             return { id: docRef.id, ...newItem };
         } catch (error) {
             console.error("Error creating inventory item:", error);
@@ -430,20 +473,32 @@ export const api = {
 
     createClientInvoice: async (data) => {
         try {
-            // 1. Descontar existencias del inventario (Quantity reduction)
+            const invoiceNumber = data.invoiceNumber?.trim() || `FAC-${String(Math.floor(1000 + Math.random() * 9000))}`;
+            
+            // 1. Descontar existencias del inventario (Quantity reduction) & Kardex
             const itemPromises = data.items.map(async (item) => {
                 const productRef = doc(db, 'inventory', item.productId);
                 const productSnap = await getDoc(productRef);
                 if (productSnap.exists()) {
-                    const currentQty = productSnap.data().quantity || 0;
+                    const currentData = productSnap.data();
+                    const currentQty = currentData.quantity || 0;
                     const newQty = Math.max(0, currentQty - item.quantity);
                     await updateDoc(productRef, { quantity: newQty });
+
+                    // Register Kardex SALIDA
+                    await api.registerKardexEntry({
+                        productId: item.productId,
+                        productName: currentData.name,
+                        type: 'SALIDA',
+                        quantity: item.quantity,
+                        concept: `Venta - Factura #${invoiceNumber}`,
+                        user: data.username || 'Sistema'
+                    });
                 }
             });
             await Promise.all(itemPromises);
 
             // 2. Registrar la factura
-            const invoiceNumber = data.invoiceNumber?.trim() || `FAC-${String(Math.floor(1000 + Math.random() * 9000))}`; // Simple unique sequential-looking number
             const newInvoice = {
                 ...data,
                 invoiceNumber,
@@ -610,6 +665,8 @@ export const api = {
                 items: [], // Sin ítems de inventario
                 supportFile: data.supportFile || null,
                 supportFileName: data.supportFileName || null,
+                recurringId: data.recurringId || null,
+                recurringPeriod: data.recurringPeriod || null,
                 createdAt: new Date()
             };
             const docRef = await addDoc(collection(db, 'bills'), newBill);
@@ -630,6 +687,259 @@ export const api = {
             return { id: docRef.id, ...newBill };
         } catch (error) {
             console.error("Error creating direct expense:", error);
+            throw error;
+        }
+    },
+
+    getNextProductCode: async () => {
+        try {
+            const q = query(collection(db, 'inventory'));
+            const snapshot = await getDocs(q);
+            let nextCodeNum = 1;
+            snapshot.forEach(docSnap => {
+                const codeStr = docSnap.data().code;
+                if (codeStr) {
+                    const parsed = parseInt(codeStr, 10);
+                    if (!isNaN(parsed) && parsed >= nextCodeNum) {
+                        nextCodeNum = parsed + 1;
+                    }
+                }
+            });
+            return String(nextCodeNum).padStart(4, '0');
+        } catch (error) {
+            console.error("Error generating product code:", error);
+            return '0001';
+        }
+    },
+
+    // Kardex
+    registerKardexEntry: async (entry) => {
+        try {
+            const newEntry = {
+                ...entry,
+                date: new Date()
+            };
+            await addDoc(collection(db, 'kardex'), newEntry);
+        } catch (error) {
+            console.error("Error registering Kardex entry:", error);
+        }
+    },
+
+    getKardex: async () => {
+        try {
+            const q = query(collection(db, 'kardex'), orderBy('date', 'desc'));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    date: data.date?.toDate ? data.date.toDate().toISOString() : new Date().toISOString()
+                };
+            });
+        } catch (error) {
+            console.error("Error fetching Kardex:", error);
+            return [];
+        }
+    },
+
+    adjustInventory: async (productId, changeQty, concept, username) => {
+        try {
+            const productRef = doc(db, 'inventory', productId);
+            const productSnap = await getDoc(productRef);
+            if (!productSnap.exists()) throw new Error("Producto no encontrado");
+
+            const currentData = productSnap.data();
+            const currentQty = parseInt(currentData.quantity) || 0;
+            const newQty = Math.max(0, currentQty + changeQty);
+
+            await updateDoc(productRef, {
+                quantity: newQty,
+                updatedAt: new Date()
+            });
+
+            // Register Kardex
+            await api.registerKardexEntry({
+                productId,
+                productName: currentData.name,
+                type: changeQty > 0 ? 'ENTRADA' : 'SALIDA',
+                quantity: Math.abs(changeQty),
+                concept,
+                user: username || 'Sistema'
+            });
+
+            return { id: productId, quantity: newQty };
+        } catch (error) {
+            console.error("Error adjusting inventory:", error);
+            throw error;
+        }
+    },
+
+    // Providers CRUD
+    getProviders: async () => {
+        try {
+            const q = query(collection(db, 'providers'), orderBy('name', 'asc'));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
+            }));
+        } catch (error) {
+            console.error("Error fetching providers:", error);
+            return [];
+        }
+    },
+
+    createProvider: async (data) => {
+        try {
+            const newProvider = {
+                name: data.name.trim().toUpperCase(),
+                rif: (data.rif || '').trim().toUpperCase(),
+                phone: (data.phone || '').trim(),
+                email: (data.email || '').trim(),
+                address: (data.address || '').trim(),
+                info: (data.info || '').trim(),
+                createdAt: new Date()
+            };
+            const docRef = await addDoc(collection(db, 'providers'), newProvider);
+            return { id: docRef.id, ...newProvider };
+        } catch (error) {
+            console.error("Error creating provider:", error);
+            throw error;
+        }
+    },
+
+    updateProvider: async (id, data) => {
+        try {
+            const updateData = {
+                name: data.name?.trim().toUpperCase(),
+                rif: data.rif?.trim().toUpperCase(),
+                phone: data.phone?.trim(),
+                email: data.email?.trim(),
+                address: data.address?.trim(),
+                info: data.info?.trim(),
+                updatedAt: new Date()
+            };
+            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+            await updateDoc(doc(db, 'providers', id), updateData);
+            return { id, ...updateData };
+        } catch (error) {
+            console.error("Error updating provider:", error);
+            throw error;
+        }
+    },
+
+    deleteProvider: async (id) => {
+        try {
+            await deleteDoc(doc(db, 'providers', id));
+            return { message: 'Provider deleted' };
+        } catch (error) {
+            console.error("Error deleting provider:", error);
+            throw error;
+        }
+    },
+
+    // Users CRUD
+    getUsers: async () => {
+        try {
+            const q = query(collection(db, 'users'), orderBy('name', 'asc'));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
+            }));
+        } catch (error) {
+            console.error("Error fetching users:", error);
+            return [];
+        }
+    },
+
+    createUser: async (data) => {
+        try {
+            const usernameLower = data.username.trim().toLowerCase();
+            const newUser = {
+                username: usernameLower,
+                name: data.name.trim(),
+                password: data.password.trim(),
+                role: data.role,
+                createdAt: new Date()
+            };
+            const userRef = doc(db, 'users', usernameLower);
+            await setDoc(userRef, newUser);
+            return { id: usernameLower, ...newUser };
+        } catch (error) {
+            console.error("Error creating user:", error);
+            throw error;
+        }
+    },
+
+    updateUser: async (id, data) => {
+        try {
+            const updateData = {
+                name: data.name?.trim(),
+                password: data.password?.trim(),
+                role: data.role,
+                updatedAt: new Date()
+            };
+            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+            await updateDoc(doc(db, 'users', id), updateData);
+            return { id, ...updateData };
+        } catch (error) {
+            console.error("Error updating user:", error);
+            throw error;
+        }
+    },
+
+    deleteUser: async (id) => {
+        try {
+            await deleteDoc(doc(db, 'users', id));
+            return { message: 'User deleted' };
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            throw error;
+        }
+    },
+
+    // Recurring Expenses Templates
+    getRecurringExpenses: async () => {
+        try {
+            const snapshot = await getDocs(collection(db, 'recurring_expenses'));
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        } catch (error) {
+            console.error("Error fetching recurring expenses:", error);
+            return [];
+        }
+    },
+
+    createRecurringExpense: async (data) => {
+        try {
+            const docRef = await addDoc(collection(db, 'recurring_expenses'), {
+                beneficiary: data.beneficiary.trim(),
+                category: data.category,
+                concept: data.concept.trim(),
+                amount: parseFloat(data.amount),
+                method: data.method,
+                scheduledDay: parseInt(data.scheduledDay) || 1,
+                createdAt: new Date()
+            });
+            return { id: docRef.id, ...data };
+        } catch (error) {
+            console.error("Error creating recurring expense:", error);
+            throw error;
+        }
+    },
+
+    deleteRecurringExpense: async (id) => {
+        try {
+            await deleteDoc(doc(db, 'recurring_expenses', id));
+            return { message: 'Recurring expense template deleted' };
+        } catch (error) {
+            console.error("Error deleting recurring expense:", error);
             throw error;
         }
     }

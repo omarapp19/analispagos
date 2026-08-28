@@ -157,10 +157,7 @@ const DashboardFlow = () => {
                         </div>
                     </div>
                     <div className="text-[9px] font-extrabold text-secondary opacity-60 flex items-center justify-between pt-2 border-t border-gray-50">
-                        <div className="flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${includeDivisas ? 'bg-success animate-pulse' : 'bg-primary'}`}></span>
-                            <span>{includeDivisas ? "Inc. Divisas" : "Excluye Divisas"}</span>
-                        </div>
+                        <span>Ver detalle de finanzas</span>
                         <ArrowRight size={12} className="opacity-0 group-hover:opacity-100 transition-all text-primary" />
                     </div>
                 </Link>
@@ -209,7 +206,7 @@ const DashboardFlow = () => {
 
                 {/* Card 4: Próximo Vencimiento */}
                 <Link 
-                    to={nextBill ? "/calendar" : "/invoices"}
+                    to={nextBill ? "/calendar" : "/compras/facturas"}
                     className="card bg-white p-5 rounded-2xl shadow-card border border-gray-100 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 flex flex-col justify-between h-[140px] group cursor-pointer relative overflow-hidden"
                 >
                     {/* Urgency border indicator */}

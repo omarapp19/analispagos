@@ -1,52 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut } from 'lucide-react';
-import { db } from '../firebase'; // Importamos la base de datos de Firebase
+import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Trash2, Edit2, Shield, Eye, EyeOff } from 'lucide-react';
+import { db } from '../firebase'; 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { api } from '../services/api';
 
 const Configuration = () => {
+    const [activeTab, setActiveTab] = useState('general'); // 'general' | 'users'
+    
+    // Check role
+    const currentUserRole = localStorage.getItem('userRole') || 'cajero';
+    const currentUsername = localStorage.getItem('adminUser') || '';
+
+    // Settings State
     const [settings, setSettings] = useState({
         storeName: 'Galpon',
         adminName: 'Omar Pérez',
         storeTaxId: 'J-12345678-9',
         storePhone: '0212-5555555',
         storeAddress: 'Caracas, Venezuela',
-        includeDivisas: false // Default: Don't include Divisas in real balance
+        includeDivisas: false 
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
 
-    // Referencia al documento único de configuración en Firebase
-    const settingsRef = doc(db, 'settings', 'global_settings');
-    const authRef = doc(db, 'settings', 'auth_credentials');
+    // Users Management State
+    const [users, setUsers] = useState([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [showUserModal, setShowUserModal] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
+    const [userForm, setUserForm] = useState({
+        username: '',
+        name: '',
+        password: '',
+        role: 'cajero'
+    });
+    const [savingUser, setSavingUser] = useState(false);
+    const [userError, setUserError] = useState(null);
+    const [showPasswordMap, setShowPasswordMap] = useState({});
 
-    const [authSettings, setAuthSettings] = useState({ username: '', password: '' });
-    const [loadingAuth, setLoadingAuth] = useState(true);
-    const [savingAuth, setSavingAuth] = useState(false);
-    const [authMessage, setAuthMessage] = useState(null);
+    // Referencias
+    const settingsRef = doc(db, 'settings', 'global_settings');
 
     useEffect(() => {
         fetchSettings();
-        fetchAuthCredentials();
-    }, []);
-
-    const fetchAuthCredentials = async () => {
-        try {
-            const docSnap = await getDoc(authRef);
-            if (docSnap.exists()) {
-                setAuthSettings(docSnap.data());
-            } else {
-                const defaultCreds = { username: 'omar', password: 'omar123' };
-                await setDoc(authRef, defaultCreds);
-                setAuthSettings(defaultCreds);
-            }
-        } catch (error) {
-            console.error('Error fetching auth credentials:', error);
-        } finally {
-            setLoadingAuth(false);
+        if (currentUserRole === 'administrador') {
+            fetchUsers();
         }
-    };
+    }, [currentUserRole]);
 
     const fetchSettings = async () => {
         try {
@@ -58,6 +59,18 @@ const Configuration = () => {
             console.error('Error fetching settings:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchUsers = async () => {
+        setLoadingUsers(true);
+        try {
+            const data = await api.getUsers();
+            setUsers(data);
+        } catch (err) {
+            console.error("Error fetching users:", err);
+        } finally {
+            setLoadingUsers(false);
         }
     };
 
@@ -75,15 +88,11 @@ const Configuration = () => {
         setMessage(null);
 
         try {
-            // Guardamos directamente en Firestore
             await setDoc(settingsRef, {
                 ...settings,
                 updatedAt: new Date()
             });
-
             setMessage({ type: 'success', text: 'Configuración guardada exitosamente' });
-
-            // Recarga suave para actualizar el nombre en el sidebar si es necesario
             setTimeout(() => window.location.reload(), 1500);
         } catch (error) {
             console.error('Error saving settings:', error);
@@ -147,47 +156,119 @@ const Configuration = () => {
         }
     };
 
-    const handleAuthSubmit = async (e) => {
+    // User CRUD actions
+    const handleOpenCreateUser = () => {
+        setEditingUser(null);
+        setUserForm({
+            username: '',
+            name: '',
+            password: '',
+            role: 'cajero'
+        });
+        setUserError(null);
+        setShowUserModal(true);
+    };
+
+    const handleOpenEditUser = (u) => {
+        setEditingUser(u);
+        setUserForm({
+            username: u.username,
+            name: u.name,
+            password: u.password,
+            role: u.role
+        });
+        setUserError(null);
+        setShowUserModal(true);
+    };
+
+    const handleSaveUser = async (e) => {
         e.preventDefault();
-        setSavingAuth(true);
-        setAuthMessage(null);
+        setSavingUser(true);
+        setUserError(null);
 
         try {
-            await setDoc(authRef, {
-                username: authSettings.username.trim(),
-                password: authSettings.password
-            });
-            setAuthMessage({ type: 'success', text: 'Credenciales de acceso actualizadas exitosamente.' });
-            
-            // Sync current session item if user changed their own username
-            if (localStorage.getItem('adminUser')) {
-                localStorage.setItem('adminUser', authSettings.username.trim().toLowerCase());
+            if (!userForm.username.trim() || !userForm.name.trim() || !userForm.password.trim()) {
+                throw new Error("Por favor completa todos los campos.");
             }
-        } catch (error) {
-            console.error('Error saving auth credentials:', error);
-            setAuthMessage({ type: 'error', text: 'Error al guardar credenciales en Firebase.' });
+
+            if (editingUser) {
+                await api.updateUser(editingUser.id, {
+                    name: userForm.name,
+                    password: userForm.password,
+                    role: userForm.role
+                });
+            } else {
+                // Check if username already exists
+                const userExists = users.some(u => u.username.toLowerCase() === userForm.username.trim().toLowerCase());
+                if (userExists) {
+                    throw new Error("El nombre de usuario ya existe en el sistema.");
+                }
+                await api.createUser(userForm);
+            }
+            await fetchUsers();
+            setShowUserModal(false);
+        } catch (err) {
+            console.error(err);
+            setUserError(err.message || "No se pudo guardar el usuario.");
         } finally {
-            setSavingAuth(false);
+            setSavingUser(false);
         }
     };
 
-    if (loading || loadingAuth) {
-        return <div className="p-8 text-center">Cargando configuración...</div>;
+    const handleDeleteUser = async (userToDelete) => {
+        if (userToDelete.username.toLowerCase() === currentUsername.toLowerCase()) {
+            alert("No puedes eliminar tu propio usuario.");
+            return;
+        }
+        if (!window.confirm(`¿Estás seguro de eliminar al usuario "${userToDelete.name}"?`)) return;
+
+        try {
+            await api.deleteUser(userToDelete.id);
+            await fetchUsers();
+        } catch (err) {
+            console.error(err);
+            alert("No se pudo eliminar el usuario.");
+        }
+    };
+
+    const togglePasswordVisibility = (username) => {
+        setShowPasswordMap(prev => ({
+            ...prev,
+            [username]: !prev[username]
+        }));
+    };
+
+    if (loading) {
+        return <div className="p-8 text-center text-secondary">Cargando configuración...</div>;
+    }
+
+    // Block non-admins from view
+    if (currentUserRole !== 'administrador') {
+        return (
+            <div className="p-8 bg-white border border-gray-100 rounded-3xl text-center max-w-md mx-auto mt-12">
+                <Shield size={48} className="text-rose-500 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-navy">Acceso Denegado</h2>
+                <p className="text-sm text-secondary mt-2">Sólo los administradores del sistema tienen permiso para ingresar a esta sección.</p>
+            </div>
+        );
     }
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-navy">Configuración</h1>
-                    <p className="text-secondary opacity-60">Gestiona los datos generales de la aplicación</p>
+                    <p className="text-secondary opacity-60">Gestiona los datos del comercio y control de usuarios</p>
                 </div>
                 
                 <button
                     onClick={() => {
                         if (window.confirm('¿Cerrar sesión en el sistema?')) {
                             localStorage.removeItem('isAuthenticated');
+                            localStorage.removeItem('userRole');
                             localStorage.removeItem('adminUser');
+                            localStorage.removeItem('userDisplayName');
                             window.location.href = '/login';
                         }
                     }}
@@ -198,207 +279,346 @@ const Configuration = () => {
                 </button>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-2xl">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {message && (
-                        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                            {message.text}
-                        </div>
+            {/* Sub Tabs Navigation */}
+            <div className="flex border-b border-gray-200 gap-6">
+                <button
+                    onClick={() => setActiveTab('general')}
+                    className={`pb-3 font-bold text-sm transition-all relative ${
+                        activeTab === 'general' ? 'text-primary' : 'text-secondary opacity-60 hover:opacity-100'
+                    }`}
+                >
+                    Datos del Comercio
+                    {activeTab === 'general' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
                     )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('users')}
+                    className={`pb-3 font-bold text-sm transition-all relative ${
+                        activeTab === 'users' ? 'text-primary' : 'text-secondary opacity-60 hover:opacity-100'
+                    }`}
+                >
+                    Gestión de Usuarios y Roles
+                    {activeTab === 'users' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
+                    )}
+                </button>
+            </div>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-navy mb-2">
-                                <div className="flex items-center gap-2">
-                                    <Building2 size={16} className="text-primary" />
-                                    Nombre del Local
-                                </div>
-                            </label>
-                            <input
-                                type="text"
-                                name="storeName"
-                                value={settings.storeName}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                                placeholder="Ej: Mi Negocio"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-navy mb-2">
-                                <div className="flex items-center gap-2">
-                                    <User size={16} className="text-primary" />
-                                    Usuario Administrador
-                                </div>
-                            </label>
-                            <input
-                                type="text"
-                                name="adminName"
-                                value={settings.adminName}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                                placeholder="Ej: Carlos Ruiz"
-                                required
-                            />
-                        </div>
-
-                        <div className="pt-4 border-t border-gray-50">
-                            <h3 className="text-sm font-bold text-navy mb-3">Datos del Comercio (Facturación / POS)</h3>
-                            <p className="text-xs text-secondary opacity-60 mb-4">Esta información aparecerá automáticamente impresa en la parte superior de los tickets del POS.</p>
-                            
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-navy mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <FileText size={16} className="text-primary" />
-                                            RIF / Identificación Fiscal del Local
-                                        </div>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="storeTaxId"
-                                        value={settings.storeTaxId || ''}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-mono"
-                                        placeholder="Ej: J-12345678-9"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-navy mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <Phone size={16} className="text-primary" />
-                                                Teléfono de Contacto
-                                            </div>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="storePhone"
-                                            value={settings.storePhone || ''}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                                            placeholder="Ej: 0212-5555555"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-navy mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <MapPin size={16} className="text-primary" />
-                                                Dirección Física
-                                            </div>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="storeAddress"
-                                            value={settings.storeAddress || ''}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                                            placeholder="Ej: Caracas, Venezuela"
-                                        />
-                                    </div>
-                                </div>
+            {/* General Tab */}
+            {activeTab === 'general' && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-2xl animate-in fade-in duration-200">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {message && (
+                            <div className={`p-4 rounded-xl text-sm font-semibold border ${
+                                message.type === 'success' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'
+                            }`}>
+                                {message.text}
                             </div>
-                        </div>
-                    </div>
+                        )}
 
-                    <div className="pt-4 border-t border-gray-50">
-                        <h3 className="text-sm font-bold text-navy mb-4">Preferencias de Cálculo</h3>
-
-                        <label className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer group">
+                        <div className="space-y-4">
                             <div>
-                                <div className="font-bold text-navy text-sm mb-1 group-hover:text-primary transition-colors">Incluir Divisas en Balance Real</div>
-                                <p className="text-xs text-secondary opacity-60">Si se activa, las ventas en Divisas sumarán al saldo total disponible.</p>
-                            </div>
-                            <div className="relative inline-flex items-center cursor-pointer">
+                                <label className="block text-sm font-bold text-navy mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <Building2 size={16} className="text-primary" />
+                                        Nombre del Local
+                                    </div>
+                                </label>
                                 <input
-                                    type="checkbox"
-                                    name="includeDivisas"
-                                    checked={settings.includeDivisas || false}
-                                    onChange={(e) => setSettings(prev => ({ ...prev, includeDivisas: e.target.checked }))}
-                                    className="sr-only peer"
+                                    type="text"
+                                    name="storeName"
+                                    value={settings.storeName}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm font-bold"
+                                    placeholder="Ej: Mi Negocio"
+                                    required
                                 />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                             </div>
-                        </label>
-                    </div>
 
-                    <div className="pt-4 border-t border-gray-50 flex justify-between">
-                        <button
-                            type="button"
-                            onClick={handleBulkImport}
-                            disabled={saving}
-                            className="text-primary hover:bg-primary/5 px-4 py-2 rounded-xl font-medium transition-colors text-sm disabled:opacity-50"
-                        >
-                            Importar Datos Históricos
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-                        >
-                            <Save size={18} />
-                            {saving ? 'Guardando...' : 'Guardar Cambios'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-navy mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <User size={16} className="text-primary" />
+                                        Nombre del Administrador Principal
+                                    </div>
+                                </label>
+                                <input
+                                    type="text"
+                                    name="adminName"
+                                    value={settings.adminName}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm font-bold"
+                                    placeholder="Ej: Omar Pérez"
+                                    required
+                                />
+                            </div>
 
-            {/* CREDENCIALES DE ACCESO SEGURIDAD CARD */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 max-w-2xl mt-6">
-                <div className="flex items-center gap-2 mb-2">
-                    <Lock size={18} className="text-primary" />
-                    <h2 className="text-lg font-bold text-navy">Credenciales de Acceso (Seguridad)</h2>
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-sm font-bold text-navy mb-3">Datos del Comercio (Facturación / POS)</h3>
+                                <p className="text-xs text-secondary opacity-60 mb-4">Esta información aparecerá automáticamente impresa en la parte superior de los tickets del POS.</p>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">RIF / Identificación Fiscal</label>
+                                        <input
+                                            type="text"
+                                            name="storeTaxId"
+                                            value={settings.storeTaxId || ''}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-mono text-sm"
+                                            placeholder="Ej: J-12345678-9"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Teléfono de Contacto</label>
+                                            <input
+                                                type="text"
+                                                name="storePhone"
+                                                value={settings.storePhone || ''}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm"
+                                                placeholder="Ej: 0212-5555555"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Dirección Física</label>
+                                            <input
+                                                type="text"
+                                                name="storeAddress"
+                                                value={settings.storeAddress || ''}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm"
+                                                placeholder="Ej: Caracas, Venezuela"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <div className="pt-4 border-t border-gray-100 flex justify-between gap-4">
+                            <button
+                                type="button"
+                                onClick={handleBulkImport}
+                                disabled={saving}
+                                className="text-primary hover:bg-primary/5 px-4 py-2.5 rounded-xl font-bold transition-colors text-xs disabled:opacity-50 cursor-pointer"
+                            >
+                                Importar Datos Históricos
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2 disabled:opacity-50 text-xs shadow-md shadow-teal-500/20 cursor-pointer"
+                            >
+                                <Save size={16} />
+                                {saving ? 'Guardando...' : 'Guardar Cambios'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <p className="text-xs text-secondary opacity-60 mb-6">
-                    Define el nombre de usuario y contraseña para ingresar al sistema de control de caja.
-                </p>
+            )}
 
-                <form onSubmit={handleAuthSubmit} className="space-y-4">
-                    {authMessage && (
-                        <div className={`p-4 rounded-xl text-sm font-semibold ${authMessage.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                            {authMessage.text}
+            {/* Users Tab */}
+            {activeTab === 'users' && (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                    <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                        <div className="text-sm font-bold text-navy">
+                            Usuarios Registrados: {users.length}
                         </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Usuario *</label>
-                            <input
-                                type="text"
-                                value={authSettings.username}
-                                onChange={(e) => setAuthSettings(prev => ({ ...prev, username: e.target.value }))}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm font-bold"
-                                placeholder="Ingresa el usuario..."
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Contraseña *</label>
-                            <input
-                                type="text"
-                                value={authSettings.password}
-                                onChange={(e) => setAuthSettings(prev => ({ ...prev, password: e.target.value }))}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm font-mono font-bold"
-                                placeholder="Ingresa la contraseña..."
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-gray-50 flex justify-end">
                         <button
-                            type="submit"
-                            disabled={savingAuth}
-                            className="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2 disabled:opacity-50 text-sm cursor-pointer"
+                            onClick={handleOpenCreateUser}
+                            className="bg-primary hover:bg-primary/95 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md shadow-teal-500/10 cursor-pointer transition-all hover:scale-[1.01]"
                         >
-                            <Save size={16} />
-                            {savingAuth ? 'Guardando...' : 'Actualizar Credenciales'}
+                            <Plus size={16} />
+                            Agregar Usuario
                         </button>
                     </div>
-                </form>
-            </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-gray-100 bg-background text-secondary text-xs uppercase font-bold tracking-wider">
+                                        <th className="py-4 px-6">Nombre de Usuario</th>
+                                        <th className="py-4 px-6">Nombre Completo</th>
+                                        <th className="py-4 px-6">Rol</th>
+                                        <th className="py-4 px-6">Contraseña</th>
+                                        <th className="py-4 px-6 text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingUsers ? (
+                                        <tr>
+                                            <td colSpan="5" className="py-8 text-center text-secondary opacity-50 text-sm">
+                                                Cargando usuarios...
+                                            </td>
+                                        </tr>
+                                    ) : users.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="py-12 text-center text-secondary opacity-50 font-medium">
+                                                No hay usuarios registrados.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        users.map((u) => (
+                                            <tr key={u.id} className="border-b border-gray-50 hover:bg-slate-50/50 transition-colors text-sm">
+                                                <td className="py-4 px-6 font-bold text-navy">
+                                                    @{u.username}
+                                                </td>
+                                                <td className="py-4 px-6 font-medium text-secondary">
+                                                    {u.name}
+                                                </td>
+                                                <td className="py-4 px-6 font-medium text-secondary">
+                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                                        u.role === 'administrador'
+                                                            ? 'bg-purple-50 text-purple-600 border border-purple-100'
+                                                            : u.role === 'supervisor'
+                                                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                            : 'bg-green-50 text-green-600 border border-green-100'
+                                                    }`}>
+                                                        {u.role.toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-6 font-mono text-xs font-bold text-secondary">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{showPasswordMap[u.username] ? u.password : '••••••••'}</span>
+                                                        <button 
+                                                            onClick={() => togglePasswordVisibility(u.username)}
+                                                            className="p-1 hover:bg-gray-100 rounded text-secondary"
+                                                        >
+                                                            {showPasswordMap[u.username] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="py-4 px-6">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleOpenEditUser(u)}
+                                                            className="p-2 text-secondary hover:text-primary hover:bg-blue-50 rounded-xl transition-all cursor-pointer"
+                                                            title="Editar Usuario"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(u)}
+                                                            className="p-2 text-secondary hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                                                            title="Eliminar Usuario"
+                                                            disabled={u.username.toLowerCase() === currentUsername.toLowerCase()}
+                                                        >
+                                                            <Trash2 size={16} className={u.username.toLowerCase() === currentUsername.toLowerCase() ? 'opacity-40' : ''} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Crear / Editar Usuario */}
+            {showUserModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden animate-in zoom-in duration-200">
+                        {/* Header */}
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="text-navy text-lg font-black flex items-center gap-2">
+                                <User size={20} className="text-primary" />
+                                {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+                            </h3>
+                            <button 
+                                onClick={() => setShowUserModal(false)} 
+                                className="p-1.5 hover:bg-slate-100 rounded-full text-secondary"
+                            >
+                                <Lock size={20} className="opacity-0" />
+                                <span className="font-bold text-lg leading-none cursor-pointer">×</span>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveUser} className="p-6 space-y-4">
+                            {userError && (
+                                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-xs font-bold text-center">
+                                    {userError}
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Nombre de Usuario *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    disabled={!!editingUser}
+                                    value={userForm.username}
+                                    onChange={(e) => setUserForm(prev => ({ ...prev, username: e.target.value }))}
+                                    placeholder="ej: carlos.r"
+                                    className="w-full p-3 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary disabled:opacity-50 transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Nombre Completo *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={userForm.name}
+                                    onChange={(e) => setUserForm(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder="ej: Carlos Ruiz"
+                                    className="w-full p-3 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Contraseña *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={userForm.password}
+                                    onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                                    placeholder="ej: contrasena123"
+                                    className="w-full p-3 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all font-mono"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Rol del Usuario *</label>
+                                <select
+                                    value={userForm.role}
+                                    onChange={(e) => setUserForm(prev => ({ ...prev, role: e.target.value }))}
+                                    className="w-full p-3 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all cursor-pointer"
+                                >
+                                    <option value="administrador">Administrador</option>
+                                    <option value="supervisor">Supervisor</option>
+                                    <option value="cajero">Cajero</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-50 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUserModal(false)}
+                                    className="px-4 py-2.5 bg-gray-50 hover:bg-gray-100 text-secondary border border-gray-200 rounded-xl text-xs font-bold cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingUser}
+                                    className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md shadow-teal-500/20 cursor-pointer disabled:opacity-50"
+                                >
+                                    {savingUser ? 'Guardando...' : 'Guardar Usuario'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
