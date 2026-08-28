@@ -10,7 +10,7 @@ service cloud.firestore {
     }
     
     // Colección de Productos de Inventario
-    match /products/{productId} {
+    match /inventory/{itemId} {
       allow read, write: if true;
     }
     
@@ -19,11 +19,18 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
-    // Colección de Facturas de Venta e Invoices de Compra
+    // Colección de Facturas de Venta
+    match /client_invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Egresos y Cuentas por Pagar (Compras)
     match /bills/{billId} {
       allow read, write: if true;
     }
-    match /invoices/{invoiceId} {
+    
+    // Colección de Proveedores
+    match /providers/{providerId} {
       allow read, write: if true;
     }
     
@@ -32,8 +39,8 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
-    // Colección de Ajustes de Inventario manuales
-    match /adjustments/{adjustmentId} {
+    // Colección de Inversiones / Capital inicial
+    match /investments/{investmentId} {
       allow read, write: if true;
     }
     

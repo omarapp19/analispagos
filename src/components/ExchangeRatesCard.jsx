@@ -228,8 +228,9 @@ const ExchangeRatesCard = () => {
                             </div>
                             <span className="text-[10px] font-black text-teal-600 uppercase tracking-widest block">Tasa Promedio</span>
                             <span className="text-xl font-black text-navy">{rates.promedio.toFixed(2)} Bs.</span>
-                            <span className="text-[10px] text-teal-700 font-black flex items-center gap-1">
-                                <span>(Binance + BCV) / 2</span>
+                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-teal-500 inline-block animate-pulse"></span>
+                                Promedio Comercial
                             </span>
                         </div>
                     </div>
