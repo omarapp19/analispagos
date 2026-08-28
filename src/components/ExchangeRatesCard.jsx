@@ -133,7 +133,7 @@ const ExchangeRatesCard = () => {
 
     if (loading) {
         return (
-            <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-center items-center gap-3 h-[420px]">
+            <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-center items-center gap-3 min-h-[420px] h-fit">
                 <Loader2 className="animate-spin text-primary" size={28} />
                 <p className="text-xs font-bold text-secondary opacity-60">Cargando tasas de cambio...</p>
             </div>
@@ -141,24 +141,24 @@ const ExchangeRatesCard = () => {
     }
 
     return (
-        <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between h-[420px] relative overflow-hidden transition-all duration-350">
+        <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between min-h-[420px] h-fit relative overflow-hidden transition-all duration-350 pb-6">
             {/* Top decorative gradient glow */}
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-primary to-teal-500"></div>
 
             <div className="flex flex-col justify-between h-full animate-in fade-in duration-200">
                 <div className="space-y-4">
-                    <div className="flex justify-between items-start pb-2 border-b border-gray-100">
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-150/70 gap-2">
                         <div>
-                            <h3 className="text-base font-bold text-navy flex items-center gap-1.5">
+                            <h3 className="text-[15px] font-bold text-navy flex items-center gap-2">
                                 <ArrowRightLeft className="text-primary" size={18} />
                                 Tasas de Cambio
                             </h3>
-                            <p className="text-[10px] text-secondary opacity-60">Sincronizado automáticamente todos los días</p>
+                            <p className="text-[11px] text-slate-500 font-medium">Sincronizado automáticamente todos los días</p>
                         </div>
-                        <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
                             {rates.lastUpdated && (
-                                <span className="text-[8px] font-extrabold text-secondary opacity-50 bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <Calendar size={8} />
+                                <span className="text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-100/80 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-sm">
+                                    <Calendar size={13} className="text-slate-400" />
                                     Act: {new Date(rates.lastUpdated + 'T12:00:00').toLocaleDateString()}
                                 </span>
                             )}
@@ -172,7 +172,7 @@ const ExchangeRatesCard = () => {
                                         });
                                         setIsEditing(true);
                                     }}
-                                    className="text-[9px] font-black text-primary hover:underline bg-primary/5 px-2 py-0.5 rounded border-none cursor-pointer"
+                                    className="px-2.5 py-1.5 text-xs font-bold bg-primary/5 hover:bg-primary/10 border border-primary/20 text-primary rounded-xl cursor-pointer flex items-center gap-1 transition-all border-none"
                                 >
                                     Editar tasas
                                 </button>
@@ -183,52 +183,52 @@ const ExchangeRatesCard = () => {
                     {/* Currency Rates Grid */}
                     <div className="grid grid-cols-2 gap-4">
                         {/* BCV Card */}
-                        <div className="p-3 bg-blue-50/40 border border-blue-100/50 rounded-xl flex flex-col gap-1.5 relative overflow-hidden group hover:bg-blue-50/70 transition-colors">
-                            <div className="absolute top-1 right-2 opacity-5 text-blue-500 group-hover:scale-110 transition-transform">
-                                <TrendingUp size={40} />
+                        <div className="p-4 bg-gradient-to-br from-blue-50/60 to-blue-100/30 border border-blue-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                                <TrendingUp size={64} />
                             </div>
-                            <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest block">Tasa BCV</span>
-                            <span className="text-lg font-black text-navy">{rates.bcv.toFixed(2)} Bs.</span>
-                            <span className="text-[8px] text-secondary opacity-50 font-bold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse"></span>
-                                Actualizado automático
+                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">Tasa BCV</span>
+                            <span className="text-xl font-black text-navy">{rates.bcv.toFixed(2)} Bs.</span>
+                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block animate-pulse"></span>
+                                Oficial (BCV)
                             </span>
                         </div>
 
                         {/* Euro Card */}
-                        <div className="p-3 bg-purple-50/40 border border-purple-100/50 rounded-xl flex flex-col gap-1.5 relative overflow-hidden group hover:bg-purple-50/70 transition-colors">
-                            <div className="absolute top-1 right-2 opacity-5 text-purple-500 group-hover:scale-110 transition-transform">
-                                <TrendingUp size={40} />
+                        <div className="p-4 bg-gradient-to-br from-purple-50/60 to-purple-100/30 border border-purple-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-purple-600 group-hover:scale-110 transition-transform duration-300">
+                                <TrendingUp size={64} />
                             </div>
-                            <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest block">Tasa Euro</span>
-                            <span className="text-lg font-black text-navy">{rates.euro.toFixed(2)} Bs.</span>
-                            <span className="text-[8px] text-secondary opacity-50 font-bold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block animate-pulse"></span>
-                                Actualizado automático
+                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest block">Tasa Euro</span>
+                            <span className="text-xl font-black text-navy">{rates.euro.toFixed(2)} Bs.</span>
+                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-purple-500 inline-block animate-pulse"></span>
+                                Oficial (Euro)
                             </span>
                         </div>
 
                         {/* Binance Card */}
-                        <div className="p-3 bg-amber-50/30 border border-amber-100/40 rounded-xl flex flex-col gap-1.5 relative overflow-hidden group hover:bg-amber-50/50 transition-colors">
-                            <div className="absolute top-1 right-2 opacity-5 text-amber-500 group-hover:scale-110 transition-transform">
-                                <DollarSign size={40} />
+                        <div className="p-4 bg-gradient-to-br from-amber-50/60 to-amber-100/30 border border-amber-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                                <DollarSign size={64} />
                             </div>
-                            <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest block">Binance P2P</span>
-                            <span className="text-lg font-black text-navy">{rates.binance.toFixed(2)} Bs.</span>
-                            <span className="text-[8px] text-secondary opacity-50 font-bold flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
-                                Actualizado automático
+                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest block">Binance P2P</span>
+                            <span className="text-xl font-black text-navy">{rates.binance.toFixed(2)} Bs.</span>
+                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+                                Mercado Paralelo
                             </span>
                         </div>
 
                         {/* Promedio Card */}
-                        <div className="p-3 bg-emerald-50/40 border border-emerald-100/50 rounded-xl flex flex-col gap-1.5 relative overflow-hidden group hover:bg-emerald-50/70 transition-colors">
-                            <div className="absolute top-1 right-2 opacity-5 text-emerald-500 group-hover:scale-110 transition-transform">
-                                <TrendingUp size={40} />
+                        <div className="p-4 bg-gradient-to-br from-teal-50/60 to-teal-100/30 border border-teal-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
+                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-teal-600 group-hover:scale-110 transition-transform duration-300">
+                                <TrendingUp size={64} />
                             </div>
-                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">Tasa Promedio</span>
-                            <span className="text-lg font-black text-navy">{rates.promedio.toFixed(2)} Bs.</span>
-                            <span className="text-[8px] text-secondary opacity-50 font-bold flex items-center gap-1">
+                            <span className="text-[10px] font-black text-teal-600 uppercase tracking-widest block">Tasa Promedio</span>
+                            <span className="text-xl font-black text-navy">{rates.promedio.toFixed(2)} Bs.</span>
+                            <span className="text-[10px] text-teal-700 font-black flex items-center gap-1">
                                 <span>(Binance + BCV) / 2</span>
                             </span>
                         </div>
