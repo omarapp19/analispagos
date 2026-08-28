@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Reglas de seguridad para las colecciones de Análispagos
+    
+    // Colección de Usuarios
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Productos de Inventario
+    match /products/{productId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Clientes
+    match /clients/{clientId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Facturas de Venta e Invoices de Compra
+    match /bills/{billId} {
+      allow read, write: if true;
+    }
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Transacciones de Caja (Egresos/Ingresos)
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Ajustes de Inventario manuales
+    match /adjustments/{adjustmentId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Historial de Movimientos Kardex
+    match /kardex/{kardexId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Plantillas de Gastos Fijos Recurrentes
+    match /recurring_expenses/{recurringId} {
+      allow read, write: if true;
+    }
+    
+    // Colección de Configuraciones Globales
+    match /settings/{settingsId} {
+      allow read, write: if true;
+    }
+  }
+}
