@@ -37,7 +37,7 @@ const Billing = () => {
     const [loadingInvoices, setLoadingInvoices] = useState(true);
 
     const [globalSettings, setGlobalSettings] = useState({
-        storeName: 'ANÁLISIS PAGOS C.A',
+        storeName: 'Galpon',
         storeTaxId: 'J-12345678-9',
         storePhone: '0212-5555555',
         storeAddress: 'Caracas, Venezuela'
@@ -140,13 +140,12 @@ const Billing = () => {
         const unsubSettings = onSnapshot(doc(db, 'settings', 'global_settings'), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                setGlobalSettings(prev => ({
-                    ...prev,
-                    storeName: data.storeName || prev.storeName,
-                    storeTaxId: data.storeTaxId || prev.storeTaxId,
-                    storePhone: data.storePhone || prev.storePhone,
-                    storeAddress: data.storeAddress || prev.storeAddress
-                }));
+                setGlobalSettings({
+                    storeName: data.storeName ?? 'Galpon',
+                    storeTaxId: data.storeTaxId ?? '',
+                    storePhone: data.storePhone ?? '',
+                    storeAddress: data.storeAddress ?? ''
+                });
             }
         }, (error) => {
             console.error("Error subscribing to settings in billing:", error);
@@ -449,11 +448,16 @@ const Billing = () => {
         let cy = 50;
         text(store.storeName?.toUpperCase() || 'COMPROBANTE', W / 2, cy, { size: 20, bold: true, align: 'center' });
         cy += 26;
-        text(store.storeTaxId ? `RIF: ${store.storeTaxId}` : '', W / 2, cy, { size: 12, align: 'center', color: '#555' });
-        cy += 22;
+        if (store.storeTaxId) {
+            text(`RIF: ${store.storeTaxId}`, W / 2, cy, { size: 12, align: 'center', color: '#555' });
+            cy += 22;
+        }
         const addr = [store.storeAddress, store.storePhone ? `Tel: ${store.storePhone}` : ''].filter(Boolean).join('  •  ');
-        text(addr, W / 2, cy, { size: 11, align: 'center', color: '#777' });
-        cy += 28;
+        if (addr) {
+            text(addr, W / 2, cy, { size: 11, align: 'center', color: '#777' });
+            cy += 24;
+        }
+        cy += 6;
 
         drawLine(cy); cy += 18;
 
@@ -598,10 +602,10 @@ const Billing = () => {
             itemsText += `• ${item.quantity} x ${item.name} - ${formatCurrency(item.total)}\n`;
         });
 
-        const storeName = globalSettings.storeName.toUpperCase();
-        const taxId = globalSettings.storeTaxId || '-';
-        const address = globalSettings.storeAddress || '-';
-        const phone = globalSettings.storePhone || '-';
+        const storeName = (globalSettings.storeName || 'COMPROBANTE').toUpperCase();
+        const taxId = globalSettings.storeTaxId;
+        const address = globalSettings.storeAddress;
+        const phone = globalSettings.storePhone;
 
         const shareText = 
 `🧾 *COMPROBANTE DE VENTA - ${storeName}*
@@ -1277,8 +1281,10 @@ ${itemsText}-------------------------------
                                                             const r2=(l,v,yy)=>{tx(l,PAD,yy,{size:13});tx(v,W-PAD,yy,{size:13,bold:true,align:'right'});};
                                                             let cy=50;
                                                             tx(store.storeName?.toUpperCase()||'COMPROBANTE',W/2,cy,{size:20,bold:true,align:'center'}); cy+=26;
-                                                            tx(store.storeTaxId?`RIF: ${store.storeTaxId}`:'',W/2,cy,{size:12,align:'center',color:'#555'}); cy+=22;
-                                                            tx([store.storeAddress,store.storePhone?`Tel: ${store.storePhone}`:''].filter(Boolean).join('  •  '),W/2,cy,{size:11,align:'center',color:'#777'}); cy+=28;
+                                                            if(store.storeTaxId){tx(`RIF: ${store.storeTaxId}`,W/2,cy,{size:12,align:'center',color:'#555'}); cy+=22;}
+                                                            const addrStr=[store.storeAddress,store.storePhone?`Tel: ${store.storePhone}`:''].filter(Boolean).join('  •  ');
+                                                            if(addrStr){tx(addrStr,W/2,cy,{size:11,align:'center',color:'#777'}); cy+=24;}
+                                                            cy+=6;
                                                             dL(cy); cy+=18;
                                                             r2('Comprobante Nro:',`#${r.invoiceNumber}`,cy); cy+=lineH;
                                                             r2('Fecha:',new Date((r.date||'')+'T12:00:00').toLocaleDateString(),cy); cy+=lineH;
@@ -1775,9 +1781,15 @@ ${itemsText}-------------------------------
                                     <div className="w-10 h-10 bg-green-50 text-success rounded-full flex items-center justify-center border border-green-100 mb-1 shadow-sm shadow-green-50 no-print animate-bounce">
                                         <CheckCircle size={20} className="text-success" />
                                     </div>
-                                    <h2 className="text-lg font-extrabold text-navy tracking-tight uppercase leading-none">{globalSettings.storeName}</h2>
-                                    <p className="text-[9px] font-black text-secondary uppercase tracking-widest mt-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{globalSettings.storeTaxId}</p>
-                                    <p className="text-[10px] text-secondary opacity-70 px-4 mt-0.5 leading-snug">{globalSettings.storeAddress} • Tel: {globalSettings.storePhone}</p>
+                                    <h2 className="text-lg font-extrabold text-navy tracking-tight uppercase leading-none">{globalSettings.storeName || 'COMPROBANTE'}</h2>
+                                    {globalSettings.storeTaxId ? (
+                                        <p className="text-[9px] font-black text-secondary uppercase tracking-widest mt-1 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">RIF: {globalSettings.storeTaxId}</p>
+                                    ) : null}
+                                    {(globalSettings.storeAddress || globalSettings.storePhone) ? (
+                                        <p className="text-[10px] text-secondary opacity-70 px-4 mt-0.5 leading-snug">
+                                            {[globalSettings.storeAddress, globalSettings.storePhone ? `Tel: ${globalSettings.storePhone}` : ''].filter(Boolean).join(' • ')}
+                                        </p>
+                                    ) : null}
                                 </div>
 
                                 {/* Correlative & Date */}

@@ -1,17 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Upload, CheckCircle, Loader2, FileSpreadsheet, Send, MessageSquare } from 'lucide-react';
+import { 
+    Bot, Sparkles, X, UploadCloud, CheckCircle2, Loader2, 
+    FileSpreadsheet, ChevronDown, ChevronUp, AlertCircle, Calendar
+} from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from '../services/api';
 
 const AIAssistantBubble = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { id: 1, type: 'bot', text: '¡Hola! Soy tu Asistente Inteligente. Sube tu archivo de conciliación Excel (.xlsx) y yo me encargaré de extraer y procesar los días de ventas de forma automática.' }
+        { 
+            id: 1, 
+            type: 'bot', 
+            text: '¡Hola! Soy tu Asistente Inteligente de Conciliación.',
+            subtitle: 'Sube tu archivo de caja en Excel (.xlsx) y extraeré automáticamente todas las ventas diarias para cargarlas en el sistema.'
+        }
     ]);
     const [isTyping, setIsTyping] = useState(false);
     const [processedData, setProcessedData] = useState(null);
     const [importing, setImporting] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [showDetails, setShowDetails] = useState(true);
 
     const fileInputRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -24,7 +33,7 @@ const AIAssistantBubble = () => {
         if (isOpen) {
             scrollToBottom();
         }
-    }, [messages, isOpen]);
+    }, [messages, isOpen, isTyping]);
 
     const handleDragOver = (e) => {
         e.preventDefault();
@@ -49,8 +58,10 @@ const AIAssistantBubble = () => {
     };
 
     const processFile = (file) => {
-        // User message
-        setMessages(prev => [...prev, { id: Date.now(), type: 'user', text: `Archivo subido: ${file.name}`, isFile: true }]);
+        setMessages(prev => [
+            ...prev, 
+            { id: Date.now(), type: 'user', text: file.name, isFile: true }
+        ]);
         setIsTyping(true);
 
         const reader = new FileReader();
@@ -59,7 +70,6 @@ const AIAssistantBubble = () => {
             try {
                 const workbook = XLSX.read(bstr, { type: 'binary' });
 
-                // Fetch existing transactions to check for duplicates
                 let existingDates = new Set();
                 try {
                     const existingTxs = await api.getTransactions();
@@ -67,15 +77,13 @@ const AIAssistantBubble = () => {
                         if (tx.date) existingDates.add(tx.date.split('T')[0]);
                     });
                 } catch (err) {
-                    console.error("Could not fetch verification data in bubble assistant:", err);
+                    console.error("Error fetching verification data in bubble assistant:", err);
                 }
 
-                // ANALYZE LOGIC
                 setTimeout(() => {
                     try {
                         const rawResult = processWorkbook(workbook);
 
-                        // FILTER DUPLICATES
                         const newDays = rawResult.filter(day => !existingDates.has(day.date));
                         const duplicateCount = rawResult.length - newDays.length;
 
@@ -84,7 +92,9 @@ const AIAssistantBubble = () => {
                             setMessages(prev => [...prev, {
                                 id: Date.now(),
                                 type: 'bot',
-                                text: `🎉 ¡Todos tus datos ya están al día!\n\nNo detecté nuevos días en este archivo. Todos los registros ya existen en tu base de datos.`
+                                text: 'Tus datos están al día',
+                                subtitle: 'No se detectaron nuevos días de ventas en este archivo. Todos los registros ya existen en la base de datos.',
+                                isInfo: true
                             }]);
                             return;
                         }
@@ -98,46 +108,37 @@ const AIAssistantBubble = () => {
                             return acc + (divisaSale ? divisaSale.amount : 0);
                         }, 0);
 
-                        // Generate Detailed Breakdown
-                        let breakdownText = `He analizado tu archivo. Detecté ${newDays.length} días **NUEVOS** listos para ser importados.\n`;
-                        if (duplicateCount > 0) {
-                            breakdownText += `ℹ️ Ignoré ${duplicateCount} días que ya existen en tu base de datos.\n\n`;
-                        } else {
-                            breakdownText += `\n`;
-                        }
-
-                        newDays.forEach(day => {
-                            breakdownText += `📅 **${day.date}**\n`;
-                            day.sales.forEach(sale => {
-                                let methodLabel = sale.method;
-                                if (sale.method === 'divisas') {
-                                    methodLabel = 'Divisas (USD/Zelle)';
-                                }
-                                breakdownText += `   • ${methodLabel}: $${sale.amount.toFixed(2)}\n`;
-                            });
-                            breakdownText += '\n';
-                        });
-
-                        breakdownText += `📊 **Monto total:** $${totalAmount.toFixed(2)}\n`;
-                        breakdownText += `💰 **Total Divisas:** $${totalDivisas.toFixed(2)}\n\n`;
-                        breakdownText += `¿Procedemos a guardar las ventas?`;
-
                         setMessages(prev => [...prev, {
                             id: Date.now(),
                             type: 'bot',
-                            text: breakdownText,
-                            action: 'confirm_import'
+                            isAnalysisCard: true,
+                            newDays,
+                            duplicateCount,
+                            totalAmount,
+                            totalDivisas
                         }]);
                     } catch (error) {
                         console.error(error);
                         setIsTyping(false);
-                        setMessages(prev => [...prev, { id: Date.now(), type: 'bot', text: `Error al leer la estructura: ${error.message}. Asegúrate de subir la plantilla válida.` }]);
+                        setMessages(prev => [...prev, { 
+                            id: Date.now(), 
+                            type: 'bot', 
+                            text: 'Error de Lectura',
+                            subtitle: `No pude procesar el archivo: ${error.message}. Asegúrate de usar la plantilla correcta.`,
+                            isError: true 
+                        }]);
                     }
-                }, 1500);
+                }, 1200);
             } catch (error) {
                 console.error(error);
                 setIsTyping(false);
-                setMessages(prev => [...prev, { id: Date.now(), type: 'bot', text: `Error al abrir el archivo. Comprueba que no esté corrupto.` }]);
+                setMessages(prev => [...prev, { 
+                    id: Date.now(), 
+                    type: 'bot', 
+                    text: 'Error en Archivo',
+                    subtitle: 'No fue posible abrir el archivo. Comprueba que no esté dañado o protegido.',
+                    isError: true 
+                }]);
             }
         };
         reader.readAsBinaryString(file);
@@ -272,7 +273,8 @@ const AIAssistantBubble = () => {
             setMessages(prev => [...prev, {
                 id: Date.now(),
                 type: 'bot',
-                text: `¡Listo! He importado correctamente ${count} ventas a tu flujo de caja de manera exitosa.`,
+                text: 'Importación Completada',
+                subtitle: `Se guardaron exitosamente ${count} registros de ventas en tu flujo de caja.`,
                 isSuccess: true
             }]);
             setProcessedData(null);
@@ -280,72 +282,190 @@ const AIAssistantBubble = () => {
             console.error(error);
             setImporting(false);
             setIsTyping(false);
-            setMessages(prev => [...prev, { id: Date.now(), type: 'bot', text: 'Ocurrió un error al guardar los datos.' }]);
+            setMessages(prev => [...prev, { 
+                id: Date.now(), 
+                type: 'bot', 
+                text: 'Error en la Importación',
+                subtitle: 'Ocurrió un inconveniente al guardar las transacciones. Por favor intenta de nuevo.',
+                isError: true 
+            }]);
         }
     };
 
+    const formatMoney = (amount) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    };
+
     return (
-        <div className="fixed bottom-6 right-6 z-[9999] no-print">
+        <div className="fixed bottom-6 right-6 z-[9999] no-print select-none">
             {/* FLOATING CHATBOX WINDOW */}
             {isOpen && (
-                <div className="absolute bottom-16 right-0 w-[calc(100vw-3rem)] sm:w-[400px] h-[520px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
+                <div className="absolute bottom-16 right-0 w-[calc(100vw-2.5rem)] sm:w-[400px] h-[540px] bg-white rounded-2xl shadow-xl border border-slate-200/90 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
                     
-                    {/* Header */}
-                    <div className="bg-gradient-to-br from-[#868CFF] to-[#4318FF] p-4 text-white flex items-center justify-between shadow-md">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner">
-                                <Bot size={20} className="text-white" />
+                    {/* Soft Vibrant Header (No harsh black) */}
+                    <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-3 text-white flex items-center justify-between shadow-sm relative overflow-hidden">
+                        <div className="flex items-center gap-2.5 relative z-10">
+                            <div className="relative">
+                                <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20">
+                                    <Sparkles size={16} />
+                                </div>
+                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-indigo-700"></span>
                             </div>
                             <div>
-                                <h4 className="font-extrabold text-sm leading-tight">Asistente de Conciliación</h4>
-                                <span className="text-[10px] opacity-75">Importación Inteligente Excel</span>
+                                <h4 className="font-semibold text-xs tracking-tight text-white flex items-center gap-1.5 leading-snug">
+                                    Asistente de Conciliación
+                                    <span className="text-[9px] font-medium uppercase tracking-wider bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/30">IA</span>
+                                </h4>
+                                <p className="text-[10px] text-indigo-100 font-normal opacity-90">
+                                    Importación Inteligente Excel
+                                </p>
                             </div>
                         </div>
+
                         <button 
                             onClick={() => setIsOpen(false)}
-                            className="p-1 hover:bg-white/10 rounded-full text-white/80 hover:text-white transition-colors"
+                            className="p-1.5 hover:bg-white/15 rounded-lg text-white/80 hover:text-white transition-all cursor-pointer relative z-10"
                         >
-                            <X size={18} />
+                            <X size={16} />
                         </button>
                     </div>
 
                     {/* Messages Body */}
-                    <div className="flex-grow overflow-y-auto p-4 bg-slate-50/50 space-y-4 text-xs custom-scrollbar">
+                    <div className="flex-grow overflow-y-auto p-4 bg-slate-50/70 space-y-3.5 text-xs custom-scrollbar">
                         {messages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`
-                                    max-w-[85%] rounded-2xl p-3 shadow-sm leading-relaxed whitespace-pre-line
-                                    ${msg.type === 'user'
-                                        ? 'bg-[#4318FF] text-white rounded-tr-none font-bold'
-                                        : 'bg-white border border-gray-100 text-navy rounded-tl-none font-semibold'
-                                    }
-                                `}>
-                                    {msg.isFile && <FileSpreadsheet className="mb-1 opacity-80" size={16} />}
-                                    {msg.text}
+                                {msg.type === 'bot' && (
+                                    <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 mr-2 mt-0.5 shadow-xs">
+                                        <Bot size={14} />
+                                    </div>
+                                )}
 
-                                    {/* Action Button: Confirm Import */}
-                                    {msg.action === 'confirm_import' && (
-                                        <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
-                                            <button
-                                                onClick={confirmImport}
-                                                disabled={importing}
-                                                className="bg-[#4318FF] text-white px-3.5 py-1.5 rounded-lg text-[10px] font-black shadow-md hover:opacity-90 transition-all flex items-center gap-1.5"
-                                            >
-                                                {importing ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
-                                                Sí, Guardar Ventas
-                                            </button>
+                                {msg.type === 'user' ? (
+                                    <div className="bg-indigo-600 text-white rounded-xl rounded-tr-xs px-3 py-2 shadow-xs max-w-[85%] font-medium flex items-center gap-2">
+                                        {msg.isFile && <FileSpreadsheet size={15} className="text-indigo-200 flex-shrink-0" />}
+                                        <span className="truncate">{msg.text}</span>
+                                    </div>
+                                ) : msg.isAnalysisCard ? (
+                                    /* Structured Analysis Result Card */
+                                    <div className="bg-white border border-slate-200 rounded-xl rounded-tl-xs p-3.5 shadow-sm max-w-[92%] space-y-3">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                            <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
+                                                <FileSpreadsheet size={14} className="text-indigo-600" />
+                                                <span>Resumen de Conciliación</span>
+                                            </div>
+                                            <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                                {msg.newDays.length} días nuevos
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
+
+                                        {msg.duplicateCount > 0 && (
+                                            <div className="bg-amber-50/80 text-amber-800 text-[11px] p-2 rounded-lg border border-amber-200/60 flex items-start gap-1.5 font-normal">
+                                                <AlertCircle size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                                                <span>Se omitieron <strong>{msg.duplicateCount} días</strong> ya registrados.</span>
+                                            </div>
+                                        )}
+
+                                        {/* Totals Summary Chips */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-150">
+                                                <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider block">Monto Total</span>
+                                                <span className="text-xs font-bold text-slate-800">{formatMoney(msg.totalAmount)}</span>
+                                            </div>
+                                            <div className="bg-indigo-50/60 p-2 rounded-lg border border-indigo-100">
+                                                <span className="text-[9px] font-medium text-indigo-600 uppercase tracking-wider block">Total Divisas</span>
+                                                <span className="text-xs font-bold text-indigo-900">{formatMoney(msg.totalDivisas)}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Collapsible Breakdown */}
+                                        <div className="border border-slate-150 rounded-lg overflow-hidden bg-slate-50/40">
+                                            <button 
+                                                onClick={() => setShowDetails(!showDetails)}
+                                                className="w-full px-2.5 py-1.5 text-[11px] font-medium text-slate-700 flex items-center justify-between hover:bg-slate-100/60 transition-colors"
+                                            >
+                                                <span className="flex items-center gap-1.5">
+                                                    <Calendar size={12} className="text-indigo-600" />
+                                                    Desglose por día ({msg.newDays.length})
+                                                </span>
+                                                {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                            </button>
+
+                                            {showDetails && (
+                                                <div className="p-2 border-t border-slate-150 space-y-2 max-h-44 overflow-y-auto custom-scrollbar bg-white">
+                                                    {msg.newDays.map((day) => (
+                                                        <div key={day.date} className="text-[11px] border border-slate-100 rounded-md p-1.5 bg-slate-50/30">
+                                                            <div className="font-medium text-slate-800 mb-1 flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                                                Fecha: {day.date}
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {day.sales.map((s, idx) => (
+                                                                    <span key={idx} className="bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-normal text-[10px]">
+                                                                        {s.method === 'divisas' ? 'Divisas' : s.method}: ${s.amount.toFixed(2)}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* CTA Action Button */}
+                                        <button
+                                            onClick={confirmImport}
+                                            disabled={importing}
+                                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                        >
+                                            {importing ? (
+                                                <>
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                    <span>Guardando en caja...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle2 size={14} />
+                                                    <span>Guardar {msg.newDays.length} Días de Ventas</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    /* Standard Bot Message Bubble */
+                                    <div className={`
+                                        max-w-[85%] rounded-xl rounded-tl-xs p-3 shadow-xs text-xs leading-relaxed
+                                        ${msg.isSuccess 
+                                            ? 'bg-emerald-50 border border-emerald-200/70 text-emerald-900' 
+                                            : msg.isError
+                                            ? 'bg-rose-50 border border-rose-200/70 text-rose-900'
+                                            : 'bg-white border border-slate-200/80 text-slate-700'
+                                        }
+                                    `}>
+                                        <div className="font-semibold text-slate-800 text-xs mb-0.5 flex items-center gap-1.5">
+                                            {msg.isSuccess && <CheckCircle2 size={14} className="text-emerald-600" />}
+                                            {msg.isError && <AlertCircle size={14} className="text-rose-600" />}
+                                            <span>{msg.text}</span>
+                                        </div>
+                                        {msg.subtitle && (
+                                            <p className="text-[11px] text-slate-500 font-normal leading-normal">
+                                                {msg.subtitle}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
 
                         {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none p-3 shadow-xs flex gap-1 items-center">
-                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
-                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                            <div className="flex justify-start items-center gap-1.5">
+                                <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                                    <Bot size={14} />
+                                </div>
+                                <div className="bg-white border border-slate-200 rounded-xl rounded-tl-xs px-3 py-2 shadow-xs flex gap-1 items-center">
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"></span>
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                                    <span className="text-[10px] font-normal text-slate-400 ml-1">Analizando Excel...</span>
                                 </div>
                             </div>
                         )}
@@ -357,7 +477,7 @@ const AIAssistantBubble = () => {
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                        className={`p-3 border-t border-gray-100 bg-white flex flex-col items-center justify-center transition-colors duration-200 ${isDragging ? 'bg-indigo-50 border-indigo-200' : ''}`}
+                        className={`p-2.5 border-t border-slate-200 bg-white flex flex-col items-center justify-center transition-colors duration-200 ${isDragging ? 'bg-indigo-50/60 border-indigo-300' : ''}`}
                     >
                         <input 
                             type="file" 
@@ -369,30 +489,39 @@ const AIAssistantBubble = () => {
                         <button 
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full py-3 border-2 border-dashed border-gray-200 hover:border-[#4318FF] rounded-xl flex flex-col items-center justify-center gap-1.5 text-center transition-all bg-slate-50/50 hover:bg-indigo-50/10 group cursor-pointer"
+                            className="w-full py-2.5 border border-dashed border-slate-200 hover:border-indigo-500 rounded-xl flex items-center justify-center gap-2 text-center transition-all bg-slate-50/50 hover:bg-indigo-50/20 group cursor-pointer"
                         >
-                            <Upload size={20} className="text-secondary opacity-60 group-hover:text-[#4318FF] transition-colors" />
-                            <span className="text-[10px] font-bold text-secondary group-hover:text-navy">
-                                {isDragging ? '¡Suelta el Excel aquí!' : 'Sube o arrastra tu archivo Excel'}
-                            </span>
+                            <div className="w-7 h-7 rounded-lg bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white flex items-center justify-center transition-colors">
+                                <UploadCloud size={16} />
+                            </div>
+                            <div className="text-left">
+                                <span className="text-xs font-medium text-slate-700 group-hover:text-indigo-600 block leading-tight">
+                                    {isDragging ? '¡Suelta el archivo aquí!' : 'Subir reporte de Excel (.xlsx)'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-normal">Haz clic o arrastra tu plantilla de caja</span>
+                            </div>
                         </button>
-                        <span className="text-[8px] text-gray-400 mt-1 text-center font-medium">Soporta hojas diarias YYYY-MM-DD para conciliación de caja</span>
                     </div>
                 </div>
             )}
 
             {/* MAIN FLOATING CIRCULAR TOGGLE BUTTON */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`w-14 h-14 bg-gradient-to-br from-[#868CFF] to-[#4318FF] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
-                title="Asistente de Conciliación IA"
-            >
-                {isOpen ? (
-                    <X size={26} />
-                ) : (
-                    <Bot size={26} />
-                )}
-            </button>
+            <div className="relative group">
+                {/* Soft Ambient Glow */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full blur-md opacity-70 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
+                
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={`relative w-14 h-14 bg-gradient-to-tr from-indigo-600 to-violet-600 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all duration-300 border border-indigo-400/30 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
+                    title="Asistente de Conciliación IA"
+                >
+                    {isOpen ? (
+                        <X size={24} />
+                    ) : (
+                        <Sparkles size={24} />
+                    )}
+                </button>
+            </div>
         </div>
     );
 };
