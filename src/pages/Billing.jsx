@@ -3,16 +3,30 @@ import {
     Plus, Search, FileText, Check, X, Loader2, DollarSign, 
     User, Calendar, CreditCard, Landmark, Smartphone, Trash2, 
     ArrowUpRight, AlertTriangle, Printer, Users, Receipt, Clock, CheckCircle,
-    Package, ShoppingCart, Minus, Filter, Share2, Download
+    Package, ShoppingCart, Minus, Filter, Share2, Download, LogOut
 } from 'lucide-react';
 import { api } from '../services/api';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
-import html2canvas from 'html2canvas';
+
 
 const Billing = () => {
+    // Role Access
+    const userRole = localStorage.getItem('userRole') || 'cajero';
+    const userDisplayName = localStorage.getItem('userDisplayName') || 'Cajero';
+
     // Tab State: 'new' (POS) | 'history' | 'receivables' | 'clients'
     const [activeTab, setActiveTab] = useState('new');
+
+    const handleLogout = () => {
+        if (window.confirm('¿Cerrar sesión en el sistema?')) {
+            localStorage.removeItem('isAuthenticated');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('adminUser');
+            localStorage.removeItem('userDisplayName');
+            window.location.href = '/login';
+        }
+    };
 
     // Data States
     const [products, setProducts] = useState([]);
@@ -368,68 +382,150 @@ const Billing = () => {
         }
     };
 
-    // Converts every oklch(...) occurrence in <style> tags of a cloned document
-    // to an rgb() equivalent that html2canvas can parse.
-    // Strategy: ask the browser itself to resolve the color via a temp element.
-    const patchOklchColors = (clonedDoc) => {
-        const cache = new Map();
+    // ─── Pure Canvas 2D receipt generator (no html2canvas, no CSS issues) ─────────
+    const generateReceiptCanvas = () => {
+        if (!activeReceipt) return null;
 
-        const toRgb = (oklchStr) => {
-            if (cache.has(oklchStr)) return cache.get(oklchStr);
-            try {
-                const tmp = document.createElement('span');
-                tmp.style.display = 'none';
-                tmp.style.color = oklchStr;
-                document.body.appendChild(tmp);
-                const rgb = window.getComputedStyle(tmp).color; // browser resolves oklch → rgb
-                document.body.removeChild(tmp);
-                const result = rgb && rgb !== 'rgba(0, 0, 0, 0)' ? rgb : '#000000';
-                cache.set(oklchStr, result);
-                return result;
-            } catch {
-                return '#000000';
-            }
+        const r = activeReceipt;
+        const store = globalSettings;
+        const W = 640;    // ticket width in px
+        const PAD = 40;   // horizontal padding
+        const lineH = 26; // normal line height
+        const smallH = 22;
+
+        // Measure total height first (dry-run)
+        let y = 0;
+        const rows = r.items?.length || 0;
+        y += 60;   // logo / store name area
+        y += 28;   // tax id
+        y += 24;   // address+phone
+        y += 30;   // divider
+        y += lineH * 4; // invoice meta fields
+        y += 30;   // divider
+        y += 30;   // column headers
+        y += rows * (lineH + smallH + 6); // items
+        y += 30;   // divider
+        y += lineH * 3; // subtotal/tax/total
+        y += 40;   // footer
+        y += 40;   // bottom padding
+
+        const canvas = document.createElement('canvas');
+        const scale = 2; // retina
+        canvas.width  = W * scale;
+        canvas.height = (y + 20) * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scale, scale);
+
+        // Background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, canvas.height / scale);
+
+        // Helpers
+        const drawLine = (yy) => {
+            ctx.strokeStyle = '#cccccc';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(PAD, yy);
+            ctx.lineTo(W - PAD, yy);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        };
+        const text = (str, x, yy, opts = {}) => {
+            const size  = opts.size  || 13;
+            const bold  = opts.bold  ? 'bold ' : '';
+            const align = opts.align || 'left';
+            ctx.font = `${bold}${size}px Arial, sans-serif`;
+            ctx.fillStyle = opts.color || '#111111';
+            ctx.textAlign = align;
+            ctx.fillText(String(str ?? ''), x, yy);
+        };
+        const row2 = (label, value, yy) => {
+            text(label, PAD, yy, { size: 13 });
+            text(value, W - PAD, yy, { size: 13, bold: true, align: 'right' });
         };
 
-        clonedDoc.querySelectorAll('style').forEach(styleEl => {
-            if (!styleEl.textContent.includes('oklch')) return;
-            styleEl.textContent = styleEl.textContent.replace(
-                /oklch\([^)]+\)/g,
-                (match) => toRgb(match)
-            );
+        // ── HEADER ──────────────────────────────────────────────────────
+        let cy = 50;
+        text(store.storeName?.toUpperCase() || 'COMPROBANTE', W / 2, cy, { size: 20, bold: true, align: 'center' });
+        cy += 26;
+        text(store.storeTaxId ? `RIF: ${store.storeTaxId}` : '', W / 2, cy, { size: 12, align: 'center', color: '#555' });
+        cy += 22;
+        const addr = [store.storeAddress, store.storePhone ? `Tel: ${store.storePhone}` : ''].filter(Boolean).join('  •  ');
+        text(addr, W / 2, cy, { size: 11, align: 'center', color: '#777' });
+        cy += 28;
+
+        drawLine(cy); cy += 18;
+
+        // ── META ────────────────────────────────────────────────────────
+        const dateStr = new Date((r.date || '') + 'T12:00:00').toLocaleDateString();
+        row2('Comprobante Nro:', `#${r.invoiceNumber}`, cy); cy += lineH;
+        row2('Fecha:', dateStr, cy); cy += lineH;
+        row2('Condición:',
+            r.isCredit ? `Crédito (${r.creditDays} días)` : `Contado (${r.paymentMethod || '-'})`,
+            cy); cy += lineH;
+        if (r.isCredit && r.dueDate) {
+            const dueStr = new Date(r.dueDate + 'T12:00:00').toLocaleDateString();
+            row2('Vence:', dueStr, cy); cy += lineH;
+        }
+        row2('Cliente:', r.clientName || '-', cy); cy += lineH;
+        if (r.clientDocument) {
+            row2('Cédula/RIF:', r.clientDocument, cy); cy += lineH;
+        }
+
+        cy += 10; drawLine(cy); cy += 18;
+
+        // ── ITEMS HEADER ────────────────────────────────────────────────
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(PAD, cy - 16, W - PAD * 2, 28);
+        text('PRODUCTO', PAD + 8, cy, { size: 12, bold: true, color: '#333' });
+        text('CANT', W / 2 + 40, cy, { size: 12, bold: true, align: 'center', color: '#333' });
+        text('TOTAL', W - PAD - 8, cy, { size: 12, bold: true, align: 'right', color: '#333' });
+        cy += 18;
+
+        // ── ITEMS ────────────────────────────────────────────────────────
+        (r.items || []).forEach((item, i) => {
+            if (i % 2 === 0) {
+                ctx.fillStyle = '#fafafa';
+                ctx.fillRect(PAD, cy - 16, W - PAD * 2, lineH + smallH + 4);
+            }
+            text(item.name || item.productName || '—', PAD + 8, cy, { size: 13, bold: true });
+            text(String(item.quantity ?? 1), W / 2 + 40, cy, { size: 13, align: 'center' });
+            text(formatCurrency(item.total ?? (item.price * item.quantity)), W - PAD - 8, cy, { size: 13, bold: true, align: 'right' });
+            cy += smallH;
+            if (item.taxRate != null) {
+                text(`IVA: ${item.taxRate}%`, PAD + 16, cy, { size: 11, color: '#888' });
+            }
+            cy += lineH - 10 + 6;
         });
+
+        cy += 6; drawLine(cy); cy += 20;
+
+        // ── TOTALS ───────────────────────────────────────────────────────
+        row2('Subtotal:', formatCurrency(r.subtotal ?? 0), cy); cy += lineH;
+        row2('IVA:', formatCurrency(r.tax ?? 0), cy); cy += lineH + 4;
+
+        // Total destacado
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(PAD, cy - 20, W - PAD * 2, 38);
+        text('TOTAL:', PAD + 12, cy + 4, { size: 15, bold: true, color: '#ffffff' });
+        text(formatCurrency(r.total ?? 0), W - PAD - 12, cy + 4, { size: 17, bold: true, align: 'right', color: '#ffffff' });
+        cy += 46;
+
+        // ── FOOTER ───────────────────────────────────────────────────────
+        text('¡Gracias por su preferencia!', W / 2, cy, { size: 12, align: 'center', color: '#888' });
+
+        return canvas;
     };
 
-    // Share POS Receipt as Image (PNG) — shows preview modal for share
+    // Share POS Receipt as Image (PNG) — shows preview modal
     const handleShareReceiptAsImage = async () => {
         if (!activeReceipt || generatingImage) return;
-
         setGeneratingImage(true);
         try {
-            await new Promise(r => setTimeout(r, 80));
-            const element = document.getElementById('invoice-print-area');
-            if (!element) throw new Error('Elemento del comprobante no encontrado en el DOM.');
-            element.scrollIntoView({ block: 'nearest' });
-            await new Promise(r => setTimeout(r, 150));
-
-            const canvas = await html2canvas(element, {
-                scale: 2.5,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                foreignObjectRendering: false,
-                onclone: (clonedDoc, clonedEl) => {
-                    patchOklchColors(clonedDoc);
-                    clonedEl.querySelectorAll('.no-print').forEach(el => el.remove());
-                    clonedEl.style.overflow  = 'visible';
-                    clonedEl.style.maxHeight = 'none';
-                    clonedEl.style.height    = 'auto';
-                }
-            });
-            const dataUrl = canvas.toDataURL('image/png');
-            setGeneratedReceiptImage(dataUrl); // opens preview modal
-
+            const canvas = generateReceiptCanvas();
+            if (!canvas) throw new Error('No se pudo generar el canvas del comprobante.');
+            setGeneratedReceiptImage(canvas.toDataURL('image/png'));
         } catch (error) {
             console.error('Error generando imagen del comprobante:', error);
             alert('No se pudo generar la imagen: ' + (error?.message || 'error desconocido'));
@@ -439,42 +535,18 @@ const Billing = () => {
     };
 
     // Direct download — generates and downloads immediately, no preview modal
-    const handleDirectDownload = async () => {
+    const handleDirectDownload = () => {
         if (!activeReceipt || generatingImage) return;
-
         setGeneratingImage(true);
         try {
-            await new Promise(r => setTimeout(r, 80));
-            const element = document.getElementById('invoice-print-area');
-            if (!element) throw new Error('Elemento del comprobante no encontrado en el DOM.');
-            element.scrollIntoView({ block: 'nearest' });
-            await new Promise(r => setTimeout(r, 150));
-
-            const canvas = await html2canvas(element, {
-                scale: 2.5,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                foreignObjectRendering: false,
-                onclone: (clonedDoc, clonedEl) => {
-                    patchOklchColors(clonedDoc);
-                    clonedEl.querySelectorAll('.no-print').forEach(el => el.remove());
-                    clonedEl.style.overflow  = 'visible';
-                    clonedEl.style.maxHeight = 'none';
-                    clonedEl.style.height    = 'auto';
-                }
-            });
-            const dataUrl = canvas.toDataURL('image/png');
-
-            // Trigger browser download directly
+            const canvas = generateReceiptCanvas();
+            if (!canvas) throw new Error('No se pudo generar el canvas del comprobante.');
             const link = document.createElement('a');
             link.download = `Ticket-${activeReceipt.invoiceNumber}.png`;
-            link.href = dataUrl;
+            link.href = canvas.toDataURL('image/png');
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-
         } catch (error) {
             console.error('Error descargando imagen:', error);
             alert('No se pudo descargar la imagen: ' + (error?.message || 'error desconocido'));
@@ -610,17 +682,96 @@ ${itemsText}-------------------------------
     }, [invoices]);
 
     return (
-        <div className="flex flex-col gap-6 h-full">
+        <div className={`flex flex-col h-full bg-slate-50/30 ${userRole === 'cajero' ? 'p-0 gap-0' : 'gap-6'}`}>
             {/* Header */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
-                        <ShoppingCart className="text-primary" size={26} />
-                        Facturación / POS
-                    </h1>
-                    <p className="text-secondary opacity-60">Terminal de Punto de Venta y Control de Caja Registradora</p>
+            {userRole === 'cajero' ? (
+                <div className="flex justify-between items-center bg-white p-5 border-b border-gray-150/70 shadow-sm flex-shrink-0">
+                    <div>
+                        <h1 className="text-lg font-black text-navy flex items-center gap-2">
+                            <ShoppingCart className="text-primary" size={20} />
+                            Facturación / POS
+                        </h1>
+                        <p className="text-[11px] text-slate-500 font-medium">Terminal de Facturación y Control de Ventas</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-600 bg-slate-100/70 px-3 py-1.5 rounded-xl border border-slate-200/50">
+                            Cajero: <span className="text-navy font-black">{userDisplayName}</span>
+                        </span>
+                        <button
+                            onClick={handleLogout}
+                            className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-all border border-rose-100 cursor-pointer flex items-center gap-1.5"
+                        >
+                            <LogOut size={13} />
+                            Cerrar Sesión
+                        </button>
+                    </div>
                 </div>
+            ) : (
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-navy flex items-center gap-2">
+                            <ShoppingCart className="text-primary" size={26} />
+                            Facturación / POS
+                        </h1>
+                        <p className="text-secondary opacity-60">Terminal de Punto de Venta y Control de Caja Registradora</p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── TAB BAR: visible for all roles ── */}
+            <div className={`flex gap-2 flex-shrink-0 flex-wrap ${userRole === 'cajero' ? 'px-5 pt-4 pb-0' : 'pt-2 pb-0'}`}>
+                <button
+                    onClick={() => setActiveTab('new')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                        activeTab === 'new'
+                            ? 'bg-navy text-white border-navy shadow-md'
+                            : 'bg-white text-slate-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                >
+                    <ShoppingCart size={15} />
+                    Nueva Venta
+                </button>
+                <button
+                    onClick={() => setActiveTab('history')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                        activeTab === 'history'
+                            ? 'bg-navy text-white border-navy shadow-md'
+                            : 'bg-white text-slate-600 border-gray-200 hover:bg-slate-50'
+                    }`}
+                >
+                    <Clock size={15} />
+                    Historial
+                </button>
+                {userRole !== 'cajero' && (
+                    <>
+                        <button
+                            onClick={() => setActiveTab('receivables')}
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                                activeTab === 'receivables'
+                                    ? 'bg-navy text-white border-navy shadow-md'
+                                    : 'bg-white text-slate-600 border-gray-200 hover:bg-slate-50'
+                            }`}
+                        >
+                            <Receipt size={15} />
+                            Cuentas x Cobrar
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('clients')}
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+                                activeTab === 'clients'
+                                    ? 'bg-navy text-white border-navy shadow-md'
+                                    : 'bg-white text-slate-600 border-gray-200 hover:bg-slate-50'
+                            }`}
+                        >
+                            <Users size={15} />
+                            Clientes
+                        </button>
+                    </>
+                )}
             </div>
+
+            {/* Content Container (Applies padding if cashier) */}
+            <div className={`flex-1 flex flex-col ${userRole === 'cajero' ? 'p-5 overflow-y-auto gap-4' : ''}`}>
 
             {/* TAB CONTENT: PUNTO DE VENTA (POS) */}
             {activeTab === 'new' && (
@@ -1098,16 +1249,64 @@ ${itemsText}-------------------------------
                                                 {formatCurrency(inv.total)}
                                             </td>
                                             <td className="py-4 px-6 text-center">
-                                                <button
-                                                    onClick={() => {
-                                                        setActiveReceipt(inv);
-                                                        setShowReceiptModal(true);
-                                                    }}
-                                                    className="p-2 bg-slate-50 hover:bg-slate-100 rounded-lg text-primary font-bold text-xs inline-flex items-center gap-1 border border-gray-100 shadow-sm"
-                                                >
-                                                    <Printer size={14} />
-                                                    Ver Ticket
-                                                </button>
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setActiveReceipt(inv);
+                                                            setShowReceiptModal(true);
+                                                        }}
+                                                        className="p-2 bg-slate-50 hover:bg-slate-100 rounded-lg text-primary font-bold text-xs inline-flex items-center gap-1 border border-gray-100 shadow-sm"
+                                                    >
+                                                        <Printer size={14} />
+                                                        Ver
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            const r = inv;
+                                                            const store = globalSettings;
+                                                            const W = 640, PAD = 40, lineH = 26, smallH = 22;
+                                                            let y = 60+28+24+30+(lineH*4)+30+30+((r.items?.length||0)*(lineH+smallH+6))+30+(lineH*3)+40+40;
+                                                            const canv = document.createElement('canvas');
+                                                            const sc = 2;
+                                                            canv.width=W*sc; canv.height=(y+20)*sc;
+                                                            const ctx=canv.getContext('2d');
+                                                            ctx.scale(sc,sc);
+                                                            ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,canv.height/sc);
+                                                            const dL=(yy)=>{ctx.strokeStyle='#ccc';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(PAD,yy);ctx.lineTo(W-PAD,yy);ctx.stroke();ctx.setLineDash([]);};
+                                                            const tx=(s,x,yy,o={})=>{ctx.font=`${o.bold?'bold ':''  }${o.size||13}px Arial,sans-serif`;ctx.fillStyle=o.color||'#111';ctx.textAlign=o.align||'left';ctx.fillText(String(s??''),x,yy);};
+                                                            const r2=(l,v,yy)=>{tx(l,PAD,yy,{size:13});tx(v,W-PAD,yy,{size:13,bold:true,align:'right'});};
+                                                            let cy=50;
+                                                            tx(store.storeName?.toUpperCase()||'COMPROBANTE',W/2,cy,{size:20,bold:true,align:'center'}); cy+=26;
+                                                            tx(store.storeTaxId?`RIF: ${store.storeTaxId}`:'',W/2,cy,{size:12,align:'center',color:'#555'}); cy+=22;
+                                                            tx([store.storeAddress,store.storePhone?`Tel: ${store.storePhone}`:''].filter(Boolean).join('  •  '),W/2,cy,{size:11,align:'center',color:'#777'}); cy+=28;
+                                                            dL(cy); cy+=18;
+                                                            r2('Comprobante Nro:',`#${r.invoiceNumber}`,cy); cy+=lineH;
+                                                            r2('Fecha:',new Date((r.date||'')+'T12:00:00').toLocaleDateString(),cy); cy+=lineH;
+                                                            r2('Condición:',r.isCredit?`Crédito (${r.creditDays} días)`:`Contado (${r.paymentMethod||'-'})`,cy); cy+=lineH;
+                                                            if(r.isCredit&&r.dueDate){r2('Vence:',new Date(r.dueDate+'T12:00:00').toLocaleDateString(),cy);cy+=lineH;}
+                                                            r2('Cliente:',r.clientName||'-',cy); cy+=lineH;
+                                                            if(r.clientDocument){r2('Cédula/RIF:',r.clientDocument,cy);cy+=lineH;}
+                                                            cy+=10; dL(cy); cy+=18;
+                                                            ctx.fillStyle='#f0f0f0'; ctx.fillRect(PAD,cy-16,W-PAD*2,28);
+                                                            tx('PRODUCTO',PAD+8,cy,{size:12,bold:true,color:'#333'}); tx('CANT',W/2+40,cy,{size:12,bold:true,align:'center',color:'#333'}); tx('TOTAL',W-PAD-8,cy,{size:12,bold:true,align:'right',color:'#333'}); cy+=18;
+                                                            (r.items||[]).forEach((item,i)=>{if(i%2===0){ctx.fillStyle='#fafafa';ctx.fillRect(PAD,cy-16,W-PAD*2,lineH+smallH+4);}tx(item.name||item.productName||'—',PAD+8,cy,{size:13,bold:true});tx(String(item.quantity??1),W/2+40,cy,{size:13,align:'center'});tx(formatCurrency(item.total??(item.price*item.quantity)),W-PAD-8,cy,{size:13,bold:true,align:'right'});cy+=smallH;if(item.taxRate!=null){tx(`IVA: ${item.taxRate}%`,PAD+16,cy,{size:11,color:'#888'});}cy+=lineH-10+6;});
+                                                            cy+=6; dL(cy); cy+=20;
+                                                            r2('Subtotal:',formatCurrency(r.subtotal??0),cy); cy+=lineH;
+                                                            r2('IVA:',formatCurrency(r.tax??0),cy); cy+=lineH+4;
+                                                            ctx.fillStyle='#1a1a2e'; ctx.fillRect(PAD,cy-20,W-PAD*2,38);
+                                                            tx('TOTAL:',PAD+12,cy+4,{size:15,bold:true,color:'#fff'}); tx(formatCurrency(r.total??0),W-PAD-12,cy+4,{size:17,bold:true,align:'right',color:'#fff'}); cy+=46;
+                                                            tx('¡Gracias por su preferencia!',W/2,cy,{size:12,align:'center',color:'#888'});
+                                                            const lnk=document.createElement('a');
+                                                            lnk.download=`Ticket-${r.invoiceNumber}.png`;
+                                                            lnk.href=canv.toDataURL('image/png');
+                                                            document.body.appendChild(lnk); lnk.click(); document.body.removeChild(lnk);
+                                                        }}
+                                                        className="p-2 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-emerald-700 font-bold text-xs inline-flex items-center gap-1 border border-emerald-100 shadow-sm"
+                                                    >
+                                                        <Download size={14} />
+                                                        Reimprimir
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -1778,6 +1977,7 @@ ${itemsText}-------------------------------
                     </div>
                 </div>
             )}
+            </div>{/* end content container */}
         </div>
     );
 };
