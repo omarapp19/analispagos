@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { Loader2, ArrowRightLeft, TrendingUp, DollarSign, Calendar } from 'lucide-react';
+import { api } from '../services/api';
+import { subscribeToTable } from '../supabase';
+import { Pencil, RefreshCw } from 'lucide-react';
 
 const ExchangeRatesCard = () => {
     const [loading, setLoading] = useState(true);
@@ -14,6 +14,7 @@ const ExchangeRatesCard = () => {
     });
 
     const userRole = localStorage.getItem('userRole') || 'cajero';
+    const [calcUsd, setCalcUsd] = useState('');
 
     // Manual Edit States
     const [isEditing, setIsEditing] = useState(false);
@@ -69,42 +70,54 @@ const ExchangeRatesCard = () => {
                 lastUpdated: todayStr
             };
 
-            const ratesRef = doc(db, 'settings', 'exchange_rates');
-            await setDoc(ratesRef, updatedRates, { merge: true });
-            console.log("Successfully auto-updated exchange rates in Firestore!");
+            await api.updateSettings('exchange_rates', updatedRates);
+            console.log("Successfully auto-updated exchange rates in Supabase!");
         } catch (err) {
             console.error("Failed to automatically update exchange rates:", err);
         }
     };
 
-    // Listen to real-time updates from Firestore
+    // Listen to real-time updates from Supabase
     useEffect(() => {
-        const ratesRef = doc(db, 'settings', 'exchange_rates');
-        const unsubscribe = onSnapshot(ratesRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setRates(data);
-                
-                // Trigger daily check asynchronously in the background
-                checkAndFetchRates(data);
-            } else {
-                // Initialize default rates document
-                const defaultRates = {
-                    bcv: 45.50,
-                    euro: 49.20,
-                    binance: 46.10,
-                    promedio: 45.80,
-                    lastUpdated: ''
-                };
-                setDoc(ratesRef, defaultRates);
+        let isMounted = true;
+
+        const loadRates = async () => {
+            try {
+                const data = await api.getSettings('exchange_rates');
+                if (data && isMounted) {
+                    setRates(data);
+                    checkAndFetchRates(data);
+                } else if (isMounted) {
+                    const defaultRates = {
+                        bcv: 45.50,
+                        euro: 49.20,
+                        binance: 46.10,
+                        promedio: 45.80,
+                        lastUpdated: ''
+                    };
+                    await api.updateSettings('exchange_rates', defaultRates);
+                    setRates(defaultRates);
+                }
+            } catch (error) {
+                console.error("Error loading exchange rates from Supabase:", error);
+            } finally {
+                if (isMounted) setLoading(false);
             }
-            setLoading(false);
-        }, (error) => {
-            console.error("Error loading exchange rates from Firestore:", error);
-            setLoading(false);
+        };
+
+        loadRates();
+
+        // Subscribe to changes in settings table
+        const unsubscribe = subscribeToTable('settings', (payload) => {
+            if (payload.new && payload.new.id === 'exchange_rates' && payload.new.data) {
+                setRates(payload.new.data);
+            }
         });
 
-        return () => unsubscribe();
+        return () => {
+            isMounted = false;
+            unsubscribe();
+        };
     }, []);
 
     const handleSaveManualRates = async (e) => {
@@ -115,8 +128,7 @@ const ExchangeRatesCard = () => {
         const promedioVal = (bcvVal + binanceVal) / 2;
 
         try {
-            const ratesRef = doc(db, 'settings', 'exchange_rates');
-            await setDoc(ratesRef, {
+            await api.updateSettings('exchange_rates', {
                 bcv: bcvVal,
                 euro: euroVal,
                 binance: binanceVal,
@@ -124,183 +136,123 @@ const ExchangeRatesCard = () => {
                 lastUpdated: new Date().toLocaleDateString('en-CA')
             });
             setIsEditing(false);
-            alert('Tasas de cambio actualizadas correctamente.');
         } catch (err) {
             console.error("Error updating manual rates:", err);
             alert("No se pudieron guardar las tasas");
         }
     };
 
-    if (loading) {
-        return (
-            <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-center items-center gap-3 min-h-[420px] h-fit">
-                <Loader2 className="animate-spin text-primary" size={28} />
-                <p className="text-xs font-bold text-secondary opacity-60">Cargando tasas de cambio...</p>
-            </div>
-        );
-    }
+    const fmt = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+    const rows = [
+        { key: 'bcv', label: 'Dólar BCV', note: 'Oficial', value: rates.bcv, primary: true },
+        { key: 'binance', label: 'Paralelo', note: 'Binance P2P', value: rates.binance },
+        { key: 'promedio', label: 'Promedio', note: 'BCV + paralelo', value: rates.promedio },
+        { key: 'euro', label: 'Euro BCV', note: 'Oficial', value: rates.euro },
+    ];
+    const gap = rates.bcv > 0 ? ((rates.binance - rates.bcv) / rates.bcv) * 100 : 0;
+    const calcBs = (parseFloat(String(calcUsd).replace(',', '.')) || 0) * (rates.bcv || 0);
+    const updatedLabel = rates.lastUpdated
+        ? new Date(rates.lastUpdated + 'T12:00:00').toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })
+        : null;
 
     return (
-        <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between min-h-[420px] h-fit relative overflow-hidden transition-all duration-350 pb-6">
-            {/* Top decorative gradient glow */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-primary to-teal-500"></div>
+        <section className="card p-0">
+            <header className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
+                <div>
+                    <h2 className="text-[16px] font-bold">Tasas de cambio</h2>
+                    <p className="text-[13px] text-secondary font-medium mt-0.5 flex items-center gap-1.5">
+                        <RefreshCw size={12} /> {loading ? 'Sincronizando…' : updatedLabel ? `Actualizado ${updatedLabel}` : 'Sincronización diaria'}
+                    </p>
+                </div>
+                {userRole === 'administrador' && (
+                    <button
+                        onClick={() => {
+                            setEditForm({ bcv: String(rates.bcv), euro: String(rates.euro), binance: String(rates.binance) });
+                            setIsEditing(true);
+                        }}
+                        className="btn btn-ghost h-8 px-2.5 text-[13px]"
+                    >
+                        <Pencil size={14} /> Editar
+                    </button>
+                )}
+            </header>
 
-            <div className="flex flex-col justify-between h-full animate-in fade-in duration-200">
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center pb-3 border-b border-gray-150/70 gap-2">
+            <ul className="px-5">
+                {rows.map((r) => (
+                    <li key={r.key} className="flex items-center justify-between py-2.5 border-t border-gray-100 first:border-t-0">
                         <div>
-                            <h3 className="text-[15px] font-bold text-navy flex items-center gap-2">
-                                <ArrowRightLeft className="text-primary" size={18} />
-                                Tasas de Cambio
-                            </h3>
-                            <p className="text-[11px] text-slate-500 font-medium">Sincronizado automáticamente todos los días</p>
+                            <p className={`text-[14px] ${r.primary ? 'font-bold' : 'font-semibold'}`}>{r.label}</p>
+                            <p className="text-[12px] text-secondary font-medium">{r.note}</p>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                            {rates.lastUpdated && (
-                                <span className="text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-100/80 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-sm">
-                                    <Calendar size={13} className="text-slate-400" />
-                                    Act: {new Date(rates.lastUpdated + 'T12:00:00').toLocaleDateString()}
-                                </span>
-                            )}
-                            {userRole === 'administrador' && (
-                                <button
-                                    onClick={() => {
-                                        setEditForm({
-                                            bcv: rates.bcv.toString(),
-                                            euro: rates.euro.toString(),
-                                            binance: rates.binance.toString()
-                                        });
-                                        setIsEditing(true);
-                                    }}
-                                    className="px-2.5 py-1.5 text-xs font-bold bg-primary/5 hover:bg-primary/10 border border-primary/20 text-primary rounded-xl cursor-pointer flex items-center gap-1 transition-all border-none"
-                                >
-                                    Editar tasas
-                                </button>
-                            )}
-                        </div>
+                        {loading ? (
+                            <span className="skeleton h-5 w-24" />
+                        ) : (
+                            <p className={`tabular-nums ${r.primary ? 'text-[18px] font-extrabold' : 'text-[15px] font-bold'}`}>
+                                <span className="text-secondary font-semibold text-[12.5px] mr-1">Bs</span>{fmt(r.value)}
+                            </p>
+                        )}
+                    </li>
+                ))}
+            </ul>
+
+            {!loading && rates.bcv > 0 && (
+                <p className="mx-5 mt-1 text-[12.5px] font-semibold text-secondary">
+                    Brecha paralelo / BCV: <span className={gap > 0 ? 'text-[#B76E00]' : 'text-success'}>{gap >= 0 ? '+' : ''}{gap.toFixed(1)}%</span>
+                </p>
+            )}
+
+            <div className="m-5 mt-4 rounded-xl bg-gray-50 border border-line p-3">
+                <label htmlFor="fx-calc" className="text-[12.5px] font-semibold text-secondary">Convertir a bolívares (BCV)</label>
+                <div className="mt-2 flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary font-bold text-[14px]">$</span>
+                        <input
+                            id="fx-calc"
+                            inputMode="decimal"
+                            value={calcUsd}
+                            onChange={(e) => setCalcUsd(e.target.value)}
+                            placeholder="0,00"
+                            className="field h-10 pl-7 bg-white"
+                        />
                     </div>
-
-                    {/* Currency Rates Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                        {/* BCV Card */}
-                        <div className="p-4 bg-gradient-to-br from-blue-50/60 to-blue-100/30 border border-blue-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-blue-600 group-hover:scale-110 transition-transform duration-300">
-                                <TrendingUp size={64} />
-                            </div>
-                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">Tasa BCV</span>
-                            <span className="text-xl font-black text-navy">{rates.bcv.toFixed(2)} Bs.</span>
-                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block animate-pulse"></span>
-                                Oficial (BCV)
-                            </span>
-                        </div>
-
-                        {/* Euro Card */}
-                        <div className="p-4 bg-gradient-to-br from-purple-50/60 to-purple-100/30 border border-purple-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-purple-600 group-hover:scale-110 transition-transform duration-300">
-                                <TrendingUp size={64} />
-                            </div>
-                            <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest block">Tasa Euro</span>
-                            <span className="text-xl font-black text-navy">{rates.euro.toFixed(2)} Bs.</span>
-                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-purple-500 inline-block animate-pulse"></span>
-                                Oficial (Euro)
-                            </span>
-                        </div>
-
-                        {/* Binance Card */}
-                        <div className="p-4 bg-gradient-to-br from-amber-50/60 to-amber-100/30 border border-amber-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-amber-600 group-hover:scale-110 transition-transform duration-300">
-                                <DollarSign size={64} />
-                            </div>
-                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest block">Binance P2P</span>
-                            <span className="text-xl font-black text-navy">{rates.binance.toFixed(2)} Bs.</span>
-                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 inline-block animate-pulse"></span>
-                                Mercado Paralelo
-                            </span>
-                        </div>
-
-                        {/* Promedio Card */}
-                        <div className="p-4 bg-gradient-to-br from-teal-50/60 to-teal-100/30 border border-teal-100/70 rounded-2xl flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-all duration-300">
-                            <div className="absolute -top-3 -right-3 opacity-[0.06] text-teal-600 group-hover:scale-110 transition-transform duration-300">
-                                <TrendingUp size={64} />
-                            </div>
-                            <span className="text-[10px] font-black text-teal-600 uppercase tracking-widest block">Tasa Promedio</span>
-                            <span className="text-xl font-black text-navy">{rates.promedio.toFixed(2)} Bs.</span>
-                            <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-teal-500 inline-block animate-pulse"></span>
-                                Promedio Comercial
-                            </span>
-                        </div>
-                    </div>
+                    <p className="flex-1 text-right font-extrabold text-[16px] tabular-nums truncate">Bs {fmt(calcBs)}</p>
                 </div>
             </div>
 
-            {/* Manual Edit Modal */}
             {isEditing && (
-                <div className="fixed inset-0 bg-navy/40 backdrop-blur-xs flex items-center justify-center z-[1000] font-sans">
-                    <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-150 max-w-sm w-full mx-4 space-y-4">
-                        <h4 className="font-extrabold text-navy text-sm uppercase tracking-wider">Modificar Tasas de Cambio</h4>
-                        
-                        <form onSubmit={handleSaveManualRates} className="space-y-3.5">
-                            <div>
-                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1 block">Tasa BCV (Bs.)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    required
-                                    value={editForm.bcv}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, bcv: e.target.value }))}
-                                    className="w-full p-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs font-bold text-navy focus:border-primary"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1 block">Tasa Euro (Bs.)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    required
-                                    value={editForm.euro}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, euro: e.target.value }))}
-                                    className="w-full p-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs font-bold text-navy focus:border-primary"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1 block">Tasa Binance P2P (Bs.)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    required
-                                    value={editForm.binance}
-                                    onChange={(e) => setEditForm(prev => ({ ...prev, binance: e.target.value }))}
-                                    className="w-full p-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs font-bold text-navy focus:border-primary"
-                                />
-                            </div>
-
+                <div className="fixed inset-0 bg-black/50 z-[1000] flex items-center justify-center p-4" onClick={() => setIsEditing(false)}>
+                    <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-[17px] font-bold">Editar tasas de cambio</h3>
+                        <p className="text-[13.5px] text-secondary mt-1">Se reemplazan los valores sincronizados de hoy.</p>
+                        <form onSubmit={handleSaveManualRates} className="mt-5 space-y-4">
+                            {[
+                                ['bcv', 'Dólar BCV (Bs)'],
+                                ['binance', 'Paralelo / Binance P2P (Bs)'],
+                                ['euro', 'Euro BCV (Bs)'],
+                            ].map(([k, label]) => (
+                                <div key={k}>
+                                    <label htmlFor={`rate-${k}`} className="text-[13px] font-semibold text-navy block mb-1.5">{label}</label>
+                                    <input
+                                        id={`rate-${k}`}
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        value={editForm[k]}
+                                        onChange={(e) => setEditForm((prev) => ({ ...prev, [k]: e.target.value }))}
+                                        className="field tabular-nums"
+                                    />
+                                </div>
+                            ))}
                             <div className="pt-2 flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditing(false)}
-                                    className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-secondary font-bold text-xs rounded-xl transition-all cursor-pointer border-none"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer border-none"
-                                >
-                                    Guardar
-                                </button>
+                                <button type="button" onClick={() => setIsEditing(false)} className="btn btn-outline flex-1">Cancelar</button>
+                                <button type="submit" className="btn btn-primary flex-1">Guardar tasas</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     );
 };
 

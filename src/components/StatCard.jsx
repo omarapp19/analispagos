@@ -1,33 +1,19 @@
 import React from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 
-const StatCard = ({ title, value, trend, trendValue, icon, type = 'default' }) => {
-    return (
-        <div className="card flex flex-col justify-between h-full bg-white">
-            <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-secondary text-sm font-medium mb-1">{title}</p>
-                    <h3 className="text-2xl font-bold text-secondary">{value}</h3>
-                </div>
-                {icon && (
-                    <div className="icon-box bg-background rounded-full w-10 h-10">
-                        {icon}
-                    </div>
-                )}
-            </div>
-
-            {/* Trend or Footer */}
-            {(trend || trendValue) && (
-                <div className="flex items-center gap-2 mt-4">
-                    {trend === 'up' && <TrendingUp size={16} className="text-success" />}
-                    {trend === 'down' && <TrendingDown size={16} className="text-danger" />}
-                    <span className={`text-sm font-medium ${trend === 'up' ? 'text-success' : trend === 'down' ? 'text-danger' : 'text-secondary'}`}>
-                        {trendValue}
-                    </span>
-                </div>
-            )}
-        </div>
-    );
-};
+// Label + figure carry the card; no decorative icon tile.
+const StatCard = ({ title, value, trend, trendValue }) => (
+    <div className="card p-5 flex flex-col justify-between h-full">
+        <p className="text-[13px] font-semibold text-secondary">{title}</p>
+        <p className="text-[26px] leading-tight font-extrabold tracking-[-0.02em] text-navy tabular-nums mt-1.5">{value}</p>
+        {(trend || trendValue) && (
+            <p className={`flex items-center gap-1.5 mt-3 text-[13px] font-semibold ${trend === 'up' ? 'text-success' : trend === 'down' ? 'text-danger' : 'text-secondary'}`}>
+                {trend === 'up' && <TrendingUp size={15} />}
+                {trend === 'down' && <TrendingDown size={15} />}
+                {trendValue}
+            </p>
+        )}
+    </div>
+);
 
 export default StatCard;

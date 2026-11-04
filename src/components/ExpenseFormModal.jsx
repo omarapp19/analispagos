@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { X, Check, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -223,7 +223,7 @@ const ExpenseFormModal = ({ onClose, onExpenseAdded }) => {
                     {/* Support Document Upload */}
                     <div className="bg-slate-50 p-4 rounded-xl border border-gray-200/60">
                         <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 block flex items-center gap-1.5">
-                            📎 Documento de Soporte / Recibo (Opcional)
+                            Documento de Soporte / Recibo (Opcional)
                         </label>
                         <p className="text-[11px] text-secondary opacity-65 mb-2.5">
                             Sube una foto o PDF del comprobante como respaldo (Máx. 1MB).

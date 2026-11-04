@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -86,30 +86,30 @@ const LiquidityChart = ({ balance = 0, bills = [] }) => {
                     <AreaChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorTeal" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#05CD99" stopOpacity={0.2} />
-                                <stop offset="95%" stopColor="#05CD99" stopOpacity={0} />
+                                <stop offset="5%" stopColor="#12B76A" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#12B76A" stopOpacity={0} />
                             </linearGradient>
                         </defs>
-                        <CartesianGrid vertical={false} stroke="#E0E5F2" strokeDasharray="3 3" />
+                        <CartesianGrid vertical={false} stroke="#E3E7F0" strokeDasharray="3 3" />
                         <XAxis
                             dataKey="name"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#A3AED0', fontSize: 12, fontWeight: 500 }}
+                            tick={{ fill: '#9AA3B8', fontSize: 12, fontWeight: 500 }}
                             dy={15}
                             interval={0}
                         />
                         <YAxis
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#A3AED0', fontSize: 12, fontWeight: 500 }}
-                            tickFormatter={(value) => `$${value / 1000}k`}
+                            tick={{ fill: '#9AA3B8', fontSize: 12, fontWeight: 500 }}
+                            tickFormatter={(value) => Math.abs(value) >= 1000 ? `$${(value / 1000).toLocaleString("es-VE", { maximumFractionDigits: 1 })}k` : `$${Math.round(value)}`}
                         />
-                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#05CD99', strokeWidth: 2, strokeDasharray: '5 5' }} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#12B76A', strokeWidth: 2, strokeDasharray: '5 5' }} />
                         <Area
                             type="monotone"
                             dataKey="uv"
-                            stroke="#05CD99"
+                            stroke="#12B76A"
                             strokeWidth={4}
                             fillOpacity={1}
                             fill="url(#colorTeal)"

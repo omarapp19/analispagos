@@ -1,0 +1,689 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-04T18:25:07.890225+00:00",
+  "title": "Design System: Galpón",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Azul Eléctrico",
+        "tonalRamp": [
+          "#1C3A8A",
+          "#1E44AE",
+          "#2453D9",
+          "#2F64F5",
+          "#6D93FB",
+          "#9DB8FF",
+          "#C5D6FF",
+          "#EBF1FF"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Azul Profundo",
+        "tonalRamp": [
+          "#1C3A8A",
+          "#1E44AE",
+          "#2453D9",
+          "#2F64F5",
+          "#6D93FB",
+          "#9DB8FF",
+          "#C5D6FF",
+          "#EBF1FF"
+        ]
+      },
+      "primary-soft": {
+        "role": "primary",
+        "displayName": "Azul Bruma",
+        "tonalRamp": [
+          "#1C3A8A",
+          "#1E44AE",
+          "#2453D9",
+          "#2F64F5",
+          "#6D93FB",
+          "#9DB8FF",
+          "#C5D6FF",
+          "#EBF1FF"
+        ]
+      },
+      "brand-cyan": {
+        "role": "secondary",
+        "displayName": "Cian de Marca",
+        "tonalRamp": [
+          "#0A4F61",
+          "#0B7590",
+          "#1399BB",
+          "#1FC0E8",
+          "#5FD6F2",
+          "#93E4F6",
+          "#C6F1FB",
+          "#EBFAFE"
+        ]
+      },
+      "shell": {
+        "role": "neutral",
+        "displayName": "Azul Noche",
+        "tonalRamp": [
+          "#050A18",
+          "#0A1128",
+          "#131D3B",
+          "#1F2A4E",
+          "#3B4770",
+          "#7F8BB0",
+          "#B4BDD8",
+          "#E3E7F3"
+        ]
+      },
+      "shell-2": {
+        "role": "neutral",
+        "displayName": "Azul Noche Alto",
+        "tonalRamp": [
+          "#050A18",
+          "#0A1128",
+          "#131D3B",
+          "#1F2A4E",
+          "#3B4770",
+          "#7F8BB0",
+          "#B4BDD8",
+          "#E3E7F3"
+        ]
+      },
+      "shell-text": {
+        "role": "neutral",
+        "displayName": "Texto del cascarón",
+        "tonalRamp": [
+          "#050A18",
+          "#0A1128",
+          "#131D3B",
+          "#1F2A4E",
+          "#3B4770",
+          "#7F8BB0",
+          "#B4BDD8",
+          "#E3E7F3"
+        ]
+      },
+      "shell-muted": {
+        "role": "neutral",
+        "displayName": "Bruma del cascarón",
+        "tonalRamp": [
+          "#050A18",
+          "#0A1128",
+          "#131D3B",
+          "#1F2A4E",
+          "#3B4770",
+          "#7F8BB0",
+          "#B4BDD8",
+          "#E3E7F3"
+        ]
+      },
+      "shell-faint": {
+        "role": "neutral",
+        "displayName": "Tenue del cascarón",
+        "tonalRamp": [
+          "#050A18",
+          "#0A1128",
+          "#131D3B",
+          "#1F2A4E",
+          "#3B4770",
+          "#7F8BB0",
+          "#B4BDD8",
+          "#E3E7F3"
+        ]
+      },
+      "shell-blue": {
+        "role": "neutral",
+        "displayName": "Azul sobre noche",
+        "tonalRamp": [
+          "#1C3A8A",
+          "#1E44AE",
+          "#2453D9",
+          "#2F64F5",
+          "#6D93FB",
+          "#9DB8FF",
+          "#C5D6FF",
+          "#EBF1FF"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Tinta suave",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Gris pizarra",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "placeholder": {
+        "role": "neutral",
+        "displayName": "Marcador",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Suelo",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superficie",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "surface-sunken": {
+        "role": "neutral",
+        "displayName": "Superficie hundida",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "fill": {
+        "role": "neutral",
+        "displayName": "Relleno",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Línea",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Línea fuerte",
+        "tonalRamp": [
+          "#0F1A33",
+          "#1F2942",
+          "#3D475F",
+          "#556079",
+          "#727D96",
+          "#9AA3B8",
+          "#C8CEDB",
+          "#EEF1F6"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Éxito",
+        "tonalRamp": [
+          "#064D2D",
+          "#08703F",
+          "#0C9455",
+          "#12B76A",
+          "#3DDC97",
+          "#86EBBF",
+          "#C3F5DD",
+          "#E7F7EE"
+        ]
+      },
+      "success-soft": {
+        "role": "semantic",
+        "displayName": "Fondo de éxito",
+        "tonalRamp": [
+          "#064D2D",
+          "#08703F",
+          "#0C9455",
+          "#12B76A",
+          "#3DDC97",
+          "#86EBBF",
+          "#C3F5DD",
+          "#E7F7EE"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Peligro",
+        "tonalRamp": [
+          "#6B1416",
+          "#B42328",
+          "#CF3237",
+          "#E5484D",
+          "#FF8A8E",
+          "#F7B2B4",
+          "#FBD5D6",
+          "#FDECEC"
+        ]
+      },
+      "danger-soft": {
+        "role": "semantic",
+        "displayName": "Fondo de peligro",
+        "tonalRamp": [
+          "#6B1416",
+          "#B42328",
+          "#CF3237",
+          "#E5484D",
+          "#FF8A8E",
+          "#F7B2B4",
+          "#FBD5D6",
+          "#FDECEC"
+        ]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Aviso",
+        "tonalRamp": [
+          "#5C3A00",
+          "#8A5A00",
+          "#B76E00",
+          "#F5A524",
+          "#F8BF5E",
+          "#FBD898",
+          "#FFF4DB",
+          "#FFFAEE"
+        ]
+      },
+      "warning-ink": {
+        "role": "semantic",
+        "displayName": "Tinta de aviso",
+        "tonalRamp": [
+          "#5C3A00",
+          "#8A5A00",
+          "#B76E00",
+          "#F5A524",
+          "#F8BF5E",
+          "#FBD898",
+          "#FFF4DB",
+          "#FFFAEE"
+        ]
+      },
+      "info": {
+        "role": "semantic",
+        "displayName": "Información",
+        "tonalRamp": [
+          "#1C3A8A",
+          "#1E44AE",
+          "#2453D9",
+          "#2F64F5",
+          "#6D93FB",
+          "#9DB8FF",
+          "#C5D6FF",
+          "#EBF1FF"
+        ]
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "Selección",
+        "tonalRamp": [
+          "#1C3A8A",
+          "#1E44AE",
+          "#2453D9",
+          "#2F64F5",
+          "#6D93FB",
+          "#9DB8FF",
+          "#C5D6FF",
+          "#EBF1FF"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Cifra del saldo en el panel azul noche; titular del login."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Título de página."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Título de tarjeta, sección o modal."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto base, filas y subtítulos."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Etiquetas de dato, leyendas y notas, en minúsculas de oración."
+      },
+      "figure-lg": {
+        "displayName": "Cifra grande",
+        "purpose": "Monto USD del componente de dinero (lg) y tarjetas de dato."
+      },
+      "figure-bs": {
+        "displayName": "Cifra en Bs",
+        "purpose": "Equivalente en bolívares bajo cada monto USD."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 1px 2px rgba(15,26,51,0.04), 0 1px 0 rgba(15,26,51,0.02)",
+        "purpose": "Tarjetas y ticket en reposo."
+      },
+      {
+        "name": "xs",
+        "value": "0 1px 2px rgba(15,26,51,0.05)",
+        "purpose": "Campo de búsqueda del POS."
+      },
+      {
+        "name": "md",
+        "value": "0 4px 12px -2px rgba(15,26,51,0.08), 0 2px 4px rgba(15,26,51,0.04)",
+        "purpose": "Hover de producto, contador del carrito."
+      },
+      {
+        "name": "lg",
+        "value": "0 12px 28px -8px rgba(15,26,51,0.16), 0 4px 8px rgba(15,26,51,0.04)",
+        "purpose": "Tooltips y popovers."
+      },
+      {
+        "name": "modal",
+        "value": "0 32px 64px -24px rgba(10,17,40,0.45), 0 0 0 1px rgba(15,26,51,0.06)",
+        "purpose": "Panel de modal."
+      },
+      {
+        "name": "balance-panel",
+        "value": "0 24px 48px -24px rgba(10,17,40,0.6)",
+        "purpose": "Panel de saldo azul noche."
+      },
+      {
+        "name": "primary-glow",
+        "value": "0 8px 20px -6px rgba(47,100,245,0.45)",
+        "purpose": "Botón primario (token heredado --shadow-purple)."
+      },
+      {
+        "name": "nav-active-glow",
+        "value": "0 6px 16px -8px rgba(47,100,245,0.9)",
+        "purpose": "Ítem activo de la barra lateral."
+      },
+      {
+        "name": "action-bar",
+        "value": "0 -10px 14px -12px rgba(15,26,51,0.18)",
+        "purpose": "Barra de acciones pegada en modales y bloque de cobro."
+      },
+      {
+        "name": "focus-ring-field",
+        "value": "0 0 0 3px rgba(47,100,245,0.14)",
+        "purpose": "Foco de campos."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Transiciones de estado, entradas, grupos plegables."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "Movimientos de ida y vuelta."
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "Cajón lateral móvil y hoja inferior."
+      },
+      {
+        "name": "duration-state",
+        "value": "150ms",
+        "purpose": "Color, fondo, borde y sombra de controles."
+      },
+      {
+        "name": "enter",
+        "value": "220ms ease-out; translateY(6px) scale(0.985) -> none",
+        "purpose": "Entrada de paneles y modales."
+      },
+      {
+        "name": "fade",
+        "value": "160-180ms ease-out",
+        "purpose": "Velos y contenido que aparece."
+      },
+      {
+        "name": "sheet-up",
+        "value": "320ms ease-drawer",
+        "purpose": "Hoja inferior bajo 640px."
+      },
+      {
+        "name": "press",
+        "value": "scale 0.97",
+        "purpose": "Presión de todo lo pulsable."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "2xl",
+        "value": "1536px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción principal: Vender, Cobrar, Guardar.",
+      "html": "<button class=\"ds-btn ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z\"/><path d=\"M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8\"/><path d=\"M12 17.5v-11\"/></svg> Vender</button>",
+      "css": ".ds-btn { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; justify-content:center; gap:8px; height:40px; padding:0 16px; border-radius:12px; font-size:14px; font-weight:700; border:1px solid transparent; cursor:pointer; transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease, border-color 150ms ease, scale 160ms cubic-bezier(0.23,1,0.32,1); } .ds-btn:active { scale:0.97; } .ds-btn:focus-visible { outline:2px solid #2F64F5; outline-offset:2px; } .ds-btn-primary { background:#2F64F5; color:#fff; box-shadow:0 8px 20px -6px rgba(47,100,245,0.45); } .ds-btn-primary:hover { background:#2453D9; }"
+    },
+    {
+      "name": "Botón contorno",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Acción secundaria junto a una primaria (Cancelar).",
+      "html": "<button class=\"ds-btn ds-btn-outline\">Cancelar</button>",
+      "css": ".ds-btn { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; justify-content:center; gap:8px; height:40px; padding:0 16px; border-radius:12px; font-size:14px; font-weight:700; border:1px solid transparent; cursor:pointer; transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease, border-color 150ms ease, scale 160ms cubic-bezier(0.23,1,0.32,1); } .ds-btn:active { scale:0.97; } .ds-btn:focus-visible { outline:2px solid #2F64F5; outline-offset:2px; } .ds-btn-outline { background:#fff; color:#0F1A33; border-color:#E3E7F0; } .ds-btn-outline:hover { background:#F7F8FB; border-color:#C8CEDB; }"
+    },
+    {
+      "name": "Botón fantasma",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acciones de cabecera de tarjeta y paginación.",
+      "html": "<button class=\"ds-btn ds-btn-ghost\">Editar</button>",
+      "css": ".ds-btn { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; justify-content:center; gap:8px; height:40px; padding:0 16px; border-radius:12px; font-size:14px; font-weight:700; border:1px solid transparent; cursor:pointer; transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease, border-color 150ms ease, scale 160ms cubic-bezier(0.23,1,0.32,1); } .ds-btn:active { scale:0.97; } .ds-btn:focus-visible { outline:2px solid #2F64F5; outline-offset:2px; } .ds-btn-ghost { background:transparent; color:#5B6680; } .ds-btn-ghost:hover { background:#EEF1F6; color:#0F1A33; }"
+    },
+    {
+      "name": "Campo",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Campo de texto con etiqueta en minúsculas de oración.",
+      "html": "<label class=\"ds-field-wrap\"><span class=\"ds-field-label\">Usuario</span><input class=\"ds-field\" placeholder=\"Tu usuario\" /></label>",
+      "css": ".ds-field-wrap { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display:flex; flex-direction:column; gap:6px; width:280px; } .ds-field-label { font-size:13.5px; font-weight:600; color:#0F1A33; } .ds-field { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; height:44px; padding:0 14px; border-radius:12px; border:1px solid #E3E7F0; background:#fff; color:#0F1A33; font-size:14px; font-weight:600; outline:none; caret-color:#2F64F5; transition:border-color 150ms ease, box-shadow 150ms ease; } .ds-field::placeholder { color:#8E98AE; font-weight:500; } .ds-field:hover { border-color:#C8CEDB; } .ds-field:focus-visible { border-color:#2F64F5; box-shadow:0 0 0 3px rgba(47,100,245,0.14); }"
+    },
+    {
+      "name": "Navegación lateral",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Barra lateral azul noche con mosaico de marca, ítem activo azul y grupo plegable.",
+      "html": "<nav class=\"ds-nav\"><div class=\"ds-nav-brand\"><span class=\"ds-nav-mark\"></span>Galpón</div><a class=\"ds-nav-item ds-active\" href=\"#\">Resumen</a><a class=\"ds-nav-item\" href=\"#\">Punto de venta</a><button class=\"ds-nav-item ds-nav-group\" aria-expanded=\"true\">Finanzas<svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#7F8BB0\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"transform:rotate(180deg)\"><path d=\"m6 9 6 6 6-6\"/></svg></button><div class=\"ds-nav-children\"><a class=\"ds-nav-child ds-active\" href=\"#\">Cuentas por pagar</a><a class=\"ds-nav-child\" href=\"#\">Calendario de pagos</a></div></nav>",
+      "css": ".ds-nav { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; width:248px; background:#0A1128; color:#fff; padding:12px; border-radius:12px; display:flex; flex-direction:column; gap:4px; } .ds-nav-brand { display:flex; align-items:center; gap:10px; height:48px; padding:0 8px; font-weight:800; font-size:16px; letter-spacing:-0.01em; } .ds-nav-mark { width:32px; height:32px; border-radius:10px; background:linear-gradient(135deg,#2F64F5,#1FC0E8); box-shadow:0 6px 16px -6px rgba(47,100,245,0.8); } .ds-nav-item { display:flex; align-items:center; width:100%; height:40px; padding:0 12px; border-radius:8px; font-size:14px; font-weight:600; color:#B4BDD8; text-decoration:none; background:none; border:0; font-family:inherit; cursor:pointer; transition:background-color 150ms ease, color 150ms ease; } .ds-nav-item:hover { color:#fff; background:rgba(255,255,255,0.06); } .ds-nav-item.ds-active, .ds-nav-child.ds-active { background:#2F64F5; color:#fff; box-shadow:0 6px 16px -8px rgba(47,100,245,0.9); } .ds-nav-group { justify-content:space-between; color:#fff; } .ds-nav-children { margin-left:21px; padding:4px 0 4px 12px; border-left:1px solid rgba(255,255,255,0.09); display:flex; flex-direction:column; gap:2px; } .ds-nav-child { height:36px; display:flex; align-items:center; padding:0 12px; border-radius:8px; font-size:13.5px; font-weight:600; color:#98A3C4; text-decoration:none; transition:background-color 150ms ease, color 150ms ease; } .ds-nav-child:hover { color:#fff; background:rgba(255,255,255,0.06); } .ds-nav-item:focus-visible, .ds-nav-child:focus-visible { outline:2px solid #2F64F5; outline-offset:2px; }"
+    },
+    {
+      "name": "Tarjeta de dato",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Tarjeta blanca con etiqueta, cifra USD y su equivalente en Bs.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-label\">Ingresos del mes</p><p class=\"ds-money\">$ 12.480,00</p><p class=\"ds-money-bs\">Bs 455.520,00</p><p class=\"ds-trend\">+8,2 % vs. mes anterior</p></div>",
+      "css": ".ds-card { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; width:260px; background:#fff; border:1px solid #E3E7F0; border-radius:16px; padding:20px; box-shadow:0 1px 2px rgba(15,26,51,0.04), 0 1px 0 rgba(15,26,51,0.02); color:#0F1A33; } .ds-card p { margin:0; } .ds-card-label { font-size:13px; font-weight:600; color:#5B6680; } .ds-card .ds-money { margin-top:6px; font-size:26px; line-height:1; font-weight:800; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; } .ds-card .ds-money-bs { margin-top:6px; font-size:12.5px; font-weight:600; color:#5B6680; font-variant-numeric:tabular-nums; } .ds-card .ds-trend { margin-top:12px; font-size:13px; font-weight:600; color:#12B76A; }"
+    },
+    {
+      "name": "Panel de saldo",
+      "kind": "custom",
+      "refersTo": "balance-panel",
+      "description": "Superficie azul noche con resplandores radiales, cifra display y Bs debajo.",
+      "html": "<section class=\"ds-balance\"><p class=\"ds-balance-label\">Saldo en caja</p><p class=\"ds-balance-fig\">$ 8.214,50</p><p class=\"ds-balance-bs\">Bs 299.829,25</p><span class=\"ds-today\"><i></i>Hoy + $ 412,00</span></section>",
+      "css": ".ds-balance { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; position:relative; overflow:hidden; width:420px; padding:28px; border-radius:16px; color:#fff; background: radial-gradient(260px 200px at 90% 0%, rgba(47,100,245,0.45), transparent), radial-gradient(220px 160px at 40% 110%, rgba(31,192,232,0.16), transparent), #0A1128; box-shadow:0 24px 48px -24px rgba(10,17,40,0.6); } .ds-balance p { margin:0; } .ds-balance-label { font-size:13.5px; font-weight:600; color:#9FB0DA; } .ds-balance .ds-balance-fig { margin-top:8px; font-size:46px; line-height:1; font-weight:800; letter-spacing:-0.03em; font-variant-numeric:tabular-nums; } .ds-balance .ds-balance-bs { margin-top:8px; font-size:15px; font-weight:600; color:#9FB0DA; font-variant-numeric:tabular-nums; } .ds-today { margin-top:16px; display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 12px; border-radius:9999px; background:rgba(255,255,255,0.08); font-size:13px; font-weight:600; } .ds-today i { width:6px; height:6px; border-radius:9999px; background:#3DDC97; }"
+    },
+    {
+      "name": "Barras de vencimiento",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Pagos próximos; la longitud de la barra codifica los días restantes.",
+      "html": "<ul class=\"ds-due\"><li><div class=\"ds-due-row\"><span>Alquiler</span><b>$ 600,00</b></div><div class=\"ds-track\"><div class=\"ds-bar ds-late\" style=\"width:100%\"></div></div><p class=\"ds-note ds-n-late\">Vencido hace 2 días</p></li><li><div class=\"ds-due-row\"><span>Proveedor Polar</span><b>$ 1.240,00</b></div><div class=\"ds-track\"><div class=\"ds-bar ds-soon\" style=\"width:94%\"></div></div><p class=\"ds-note ds-n-soon\">Vence en 2 días</p></li><li><div class=\"ds-due-row\"><span>Internet</span><b>$ 45,00</b></div><div class=\"ds-track\"><div class=\"ds-bar\" style=\"width:40%\"></div></div><p class=\"ds-note\">Vence en 18 días</p></li></ul>",
+      "css": ".ds-due { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; width:300px; list-style:none; margin:0; padding:0 20px; background:#fff; border:1px solid #E3E7F0; border-radius:16px; color:#0F1A33; } .ds-due li { padding:12px 0; border-top:1px solid #EEF1F6; } .ds-due li:first-child { border-top:0; } .ds-due-row { display:flex; justify-content:space-between; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; } .ds-track { margin-top:8px; height:6px; border-radius:9999px; background:#EEF1F6; overflow:hidden; } .ds-bar { height:100%; border-radius:9999px; background:#2F64F5; } .ds-bar.ds-soon { background:#F5A524; } .ds-bar.ds-late { background:#E5484D; } .ds-note { margin:6px 0 0; font-size:12.5px; font-weight:600; color:#5B6680; } .ds-n-soon { color:#B76E00; } .ds-n-late { color:#E5484D; }"
+    },
+    {
+      "name": "Chip de tasa",
+      "kind": "chip",
+      "refersTo": "rate-chip",
+      "description": "Tasa BCV y euro en la barra superior.",
+      "html": "<div class=\"ds-rate\"><span class=\"ds-rate-k\">BCV</span><span class=\"ds-rate-v\">Bs 36,50</span><span class=\"ds-rate-eur\">€ 39,80</span></div>",
+      "css": ".ds-rate { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 4px 0 12px; border-radius:12px; background:#fff; border:1px solid #E3E7F0; font-size:13px; font-variant-numeric:tabular-nums; } .ds-rate-k { font-weight:600; color:#5B6680; } .ds-rate-v { font-weight:700; color:#0F1A33; } .ds-rate-eur { height:28px; padding:0 8px; display:inline-flex; align-items:center; border-radius:8px; background:#EEF1F6; font-size:12px; font-weight:600; color:#5B6680; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La caja en azul noche",
+    "overview": "Un cascarón de mando azul noche (barra lateral, panel de saldo, login) rodea una superficie de trabajo clara, fría y tranquila. Todo lo que se toca para actuar o lo que está seleccionado es de un solo azul eléctrico; el resto vive en neutros gris pizarra teñidos de azul, de modo que ningún gris es ajeno al mundo. La densidad es la de una herramienta de trabajo: filas de 40 px, campos de 44 px, tarjetas con borde fino y sombra casi imperceptible.\n\nEl dinero es el protagonista. Cada cifra clave se muestra en USD con su equivalente en bolívares debajo, a la tasa BCV, con numerales tabulares para que las columnas no bailen. El peso tipográfico es disciplinado: la cifra va en extrabold, la etiqueta en semibold y en minúsculas de oración; nada grita en mayúsculas.\n\nEl sistema rechaza el aspecto de plantilla Horizon-UI del que viene el código: mosaicos de íconos pastel, tarjetas con degradado, todo en negrita, violeta como acento. El degradado azul→cian existe, pero solo en el mosaico de la marca.",
+    "keyCharacteristics": [
+      "Cascarón azul noche (#0A1128) + superficie fría (#F4F6FA); el contraste entre ambos es la estructura.",
+      "Un solo color de acción: azul #2F64F5, para botones primarios, selección y navegación activa.",
+      "Pareja USD / Bs en cada cifra importante, con numerales tabulares.",
+      "Barras de vencimiento cuya longitud codifica los días restantes.",
+      "Bordes finos (#E3E7F0) y sombras suaves teñidas de tinta, nunca negras.",
+      "Movimiento corto y de salida rápida; presión al 97 % en todo lo pulsable."
+    ],
+    "rules": [
+      {
+        "name": "La Regla de Una Sola Voz",
+        "body": "El azul eléctrico es el único color de acción y selección. Si algo está activo, seleccionado o es la acción principal, es azul; si no, es neutro.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Degradado de Marca",
+        "body": "El degradado lineal azul→cian vive solo en el mosaico del logotipo. Ningún botón, tarjeta ni texto lleva ese degradado. Sobre el cascarón se permiten resplandores radiales difusos de azul (≤45 %) y cian (≤18 %), nunca sobre la superficie clara.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Gris con Matiz",
+        "body": "Todo neutro pertenece a la escala gris pizarra teñida de azul; no se introducen grises neutros puros ni negros. Los velos de modal son tinta noche al 52 %, no negro.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla de la Pareja USD/Bs",
+        "body": "Toda cifra clave muestra el monto en USD y, debajo, su equivalente en bolívares a la tasa BCV, más pequeño y en gris pizarra (o bruma del cascarón sobre azul noche). Si no hay tasa, se muestra solo el USD; nunca un Bs inventado.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla de las Cifras Quietas",
+        "body": "Tablas, campos y toda cifra de dinero usan numerales tabulares.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla de la Voz Baja",
+        "body": "Etiquetas en minúsculas de oración y peso 600; la mayúscula sostenida no forma parte del sistema. El 800 queda para cifras y títulos de página.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla del Suelo Firme",
+        "body": "En una herramienta de trabajo las tarjetas no flotan: en hover cambian borde o sombra, nunca escala ni posición.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** mostrar cada cifra clave con el componente de dinero: USD arriba, Bs debajo a la tasa BCV.",
+      "**Do** usar el azul eléctrico (#2F64F5) como único color de acción y selección, con hover a #2453D9.",
+      "**Do** separar superficies con borde de 1 px #E3E7F0 y la sombra de tarjeta; reservar sombras mayores para capas que flotan de verdad.",
+      "**Do** teñir toda sombra y todo velo con la tinta noche, nunca con negro.",
+      "**Do** usar numerales tabulares en tablas, campos y montos.",
+      "**Do** dar presión de escala 0.97 a todo lo pulsable y usar ease-out cubic-bezier(0.23,1,0.32,1) en transiciones de 150–240 ms; respetar reduced-motion.",
+      "**Do** usar el ámbar como relleno y #B76E00 cuando el aviso es texto sobre claro.",
+      "**Do** mantener un solo grupo abierto en la barra lateral, el de la ruta actual."
+    ],
+    "donts": [
+      "**Don't** usar el degradado azul→cian fuera del mosaico de la marca: ni botones, ni tarjetas, ni texto.",
+      "**Don't** volver al aspecto Horizon-UI: mosaicos de íconos pastel, tarjetas con degradado, todo en negrita, violeta como acento.",
+      "**Don't** escribir etiquetas en mayúscula sostenida ni poner rótulos pequeños sobre los títulos.",
+      "**Don't** hacer flotar tarjetas en hover con escala o desplazamiento.",
+      "**Don't** usar `transition: all` ni animaciones decorativas de rebote.",
+      "**Don't** desvanecer texto secundario dos veces (color gris más opacidad).",
+      "**Don't** usar vidrio esmerilado sobre el contenido; el desenfoque queda para la barra superior, la barra inferior del POS y los velos de modal."
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Search, Calendar, Filter, ArrowUpRight, ArrowDownLeft, RefreshCw, Layers } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -42,7 +42,7 @@ const Kardex = () => {
     });
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     return (

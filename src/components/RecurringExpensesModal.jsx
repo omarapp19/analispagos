@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Plus, Calendar, Coins, Sparkles, CheckCircle, Trash2, Loader2, Clock } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -154,7 +154,7 @@ const RecurringExpensesModal = ({ onClose, onExpenseAdded, existingBills }) => {
                         onClick={() => setActiveSubTab('new')}
                         className={`pb-2 border-b-2 transition-all cursor-pointer ${activeSubTab === 'new' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
-                        ➕ Programar Gasto Nuevo
+                        Programar Gasto Nuevo
                     </button>
                 </div>
 

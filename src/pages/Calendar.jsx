@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp } from 'lucide-react';
 import { api } from '../services/api';
 import DayDetailsPanel from '../components/DayDetailsPanel';
@@ -111,7 +111,7 @@ const CalendarPage = () => {
     const balanceNeto = totalReceivablesPending - totalPayablesPending;
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     return (
@@ -137,9 +137,6 @@ const CalendarPage = () => {
                                 </span>
                             </div>
                         </div>
-                        <div className="w-12 h-12 bg-teal-50/50 rounded-xl flex items-center justify-center text-teal-600">
-                            <TrendingUp size={24} />
-                        </div>
                     </div>
 
                     {/* Card 2: Total por Pagar (Debes) */}
@@ -152,9 +149,6 @@ const CalendarPage = () => {
                                     Pasivo
                                 </span>
                             </div>
-                        </div>
-                        <div className="w-12 h-12 bg-red-50/50 rounded-xl flex items-center justify-center text-danger">
-                            <TrendingDown size={24} />
                         </div>
                     </div>
                 </div>

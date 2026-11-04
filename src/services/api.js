@@ -1,45 +1,19 @@
-import { db } from '../firebase';
-import {
-    collection,
-    getDocs,
-    getDoc,
-    addDoc,
-    deleteDoc,
-    doc,
-    updateDoc,
-    setDoc,
-    query,
-    orderBy,
-    where,
-    limit,
-    Timestamp
-} from 'firebase/firestore';
+﻿import { supabase, getSettingDoc, setSettingDoc } from '../supabase';
 
 export const api = {
-    // Transactions
+    // ==========================================
+    // TRANSACTIONS
+    // ==========================================
     getTransactions: async () => {
         try {
-            const q = query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(500));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .order('date', { ascending: false })
+                .limit(500);
 
-                let dateStr = data.date;
-                // Handle legacy Timestamp or Date objects
-                if (data.date?.toDate) {
-                    dateStr = data.date.toDate().toISOString().split('T')[0];
-                } else if (typeof data.date === 'object' || (typeof data.date === 'string' && data.date.includes('T'))) {
-                    dateStr = new Date(data.date).toISOString().split('T')[0];
-                }
-
-                return {
-                    id: doc.id,
-                    ...data,
-                    // Handle Timestamp to Date conversion safely
-                    date: dateStr,
-                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-                };
-            });
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching transactions:", error);
             return [];
@@ -48,15 +22,25 @@ export const api = {
 
     createTransaction: async (data) => {
         try {
+            const dateStr = data.date 
+                ? (typeof data.date === 'string' ? data.date.split('T')[0] : new Date(data.date).toISOString().split('T')[0])
+                : new Date().toISOString().split('T')[0];
+
             const newTransaction = {
                 ...data,
-                amount: parseFloat(data.amount),
-                // Save as string "YYYY-MM-DD" directly if provided, else current date string
-                date: data.date ? data.date : new Date().toISOString().split('T')[0],
-                createdAt: new Date()
+                amount: parseFloat(data.amount) || 0,
+                date: dateStr,
+                status: data.status || 'COMPLETED'
             };
-            const docRef = await addDoc(collection(db, 'transactions'), newTransaction);
-            return { id: docRef.id, ...newTransaction };
+
+            const { data: created, error } = await supabase
+                .from('transactions')
+                .insert([newTransaction])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return created;
         } catch (error) {
             console.error("Error creating transaction:", error);
             throw error;
@@ -64,16 +48,20 @@ export const api = {
     },
 
     getBalance: async () => {
-        // Client-side aggregation (simpler for now without backend)
         try {
-            const snapshot = await getDocs(collection(db, 'transactions'));
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('amount, type');
+
+            if (error) throw error;
+
             let totalIncome = 0;
             let totalExpense = 0;
 
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.type === 'INCOME') totalIncome += (data.amount || 0);
-                if (data.type === 'EXPENSE') totalExpense += (data.amount || 0);
+            (data || []).forEach(tx => {
+                const amount = parseFloat(tx.amount) || 0;
+                if (tx.type === 'INCOME') totalIncome += amount;
+                if (tx.type === 'EXPENSE') totalExpense += amount;
             });
 
             return {
@@ -87,29 +75,48 @@ export const api = {
         }
     },
 
-    // Bills
+    deleteTransaction: async (id) => {
+        try {
+            const { error } = await supabase
+                .from('transactions')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            return { message: 'Deleted' };
+        } catch (error) {
+            console.error("Error deleting transaction:", error);
+            throw error;
+        }
+    },
+
+    deleteTransactionsByDate: async (dateStr) => {
+        try {
+            const { error } = await supabase
+                .from('transactions')
+                .delete()
+                .eq('date', dateStr);
+
+            if (error) throw error;
+            return { message: 'Deleted' };
+        } catch (error) {
+            console.error("Error deleting transactions by date:", error);
+            throw error;
+        }
+    },
+
+    // ==========================================
+    // BILLS (Cuentas por pagar / Gastos)
+    // ==========================================
     getBills: async () => {
         try {
-            const q = query(collection(db, 'bills'), orderBy('dueDate', 'asc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
-                let dueDate = data.dueDate;
+            const { data, error } = await supabase
+                .from('bills')
+                .select('*')
+                .order('dueDate', { ascending: true });
 
-                // Handle legacy Timestamp or Date objects
-                if (data.dueDate?.toDate) {
-                    dueDate = data.dueDate.toDate().toISOString().split('T')[0];
-                } else if (typeof data.dueDate === 'object' || (typeof data.dueDate === 'string' && data.dueDate.includes('T'))) {
-                    // If it's an ISO string or Date object string result
-                    dueDate = new Date(data.dueDate).toISOString().split('T')[0];
-                }
-
-                return {
-                    id: doc.id,
-                    ...data,
-                    dueDate // Should be "YYYY-MM-DD"
-                };
-            });
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching bills:", error);
             return [];
@@ -120,37 +127,39 @@ export const api = {
         try {
             const itemsToSave = [];
 
-            // 1. Update/Create items in inventory ONLY if it's PAYABLE and items exist
+            // 1. Actualizar/Crear productos en inventario si es PAYABLE y vienen ítems
             if (data.type === 'PAYABLE' && data.items && data.items.length > 0) {
-                const itemPromises = data.items.map(async (item) => {
+                for (const item of data.items) {
                     if (item.productId && !item.isNew) {
-                        // Existing product: add quantity and update prices
-                        const productRef = doc(db, 'inventory', item.productId);
-                        const productSnap = await getDoc(productRef);
-                        if (productSnap.exists()) {
-                            const currentData = productSnap.data();
-                            const currentQty = parseInt(currentData.quantity) || 0;
+                        const { data: currentProduct } = await supabase
+                            .from('inventory')
+                            .select('*')
+                            .eq('id', item.productId)
+                            .single();
+
+                        if (currentProduct) {
+                            const currentQty = parseInt(currentProduct.quantity) || 0;
                             const addedQty = parseInt(item.quantity) || 0;
                             const newQty = currentQty + addedQty;
-                            
-                            const updateData = {
-                                quantity: newQty,
-                                costPrice: parseFloat(item.costPrice) || 0,
-                                marginPercentage: parseFloat(item.marginPercentage) || 0,
-                                sellingPrice: parseFloat(item.sellingPrice) || 0,
-                                updatedAt: new Date(),
-                                unitsPerPackage: parseInt(item.unitsPerPackage) || 1
-                            };
-                            await updateDoc(productRef, updateData);
-                            itemsToSave.push({
-                                ...item,
-                                isNew: false
-                            });
 
-                            // Register Kardex ENTRADA
+                            await supabase
+                                .from('inventory')
+                                .update({
+                                    quantity: newQty,
+                                    costPrice: parseFloat(item.costPrice) || 0,
+                                    marginPercentage: parseFloat(item.marginPercentage) || 0,
+                                    sellingPrice: parseFloat(item.sellingPrice) || 0,
+                                    unitsPerPackage: parseInt(item.unitsPerPackage) || 1,
+                                    updatedAt: new Date().toISOString()
+                                })
+                                .eq('id', item.productId);
+
+                            itemsToSave.push({ ...item, isNew: false });
+
+                            // Registrar Kardex ENTRADA
                             await api.registerKardexEntry({
                                 productId: item.productId,
-                                productName: currentData.name,
+                                productName: currentProduct.name,
                                 type: 'ENTRADA',
                                 quantity: addedQty,
                                 concept: `Compra - Factura #${data.invoiceNumber || data.title || 'S/N'}`,
@@ -158,59 +167,75 @@ export const api = {
                             });
                         }
                     } else {
-                        // New product: create it in inventory
+                        // Nuevo producto
                         const autoCode = await api.getNextProductCode();
                         const newItem = {
                             code: autoCode,
                             name: item.name.trim().toUpperCase(),
+                            brand: (item.brand || '').trim().toUpperCase(),
                             description: item.description?.trim() || 'Creado desde factura de compra',
                             quantity: parseInt(item.quantity) || 0,
                             costPrice: parseFloat(item.costPrice) || 0,
                             marginPercentage: parseFloat(item.marginPercentage) || 0,
                             sellingPrice: parseFloat(item.sellingPrice) || 0,
-                            image: '',
                             taxPercentage: parseFloat(item.taxPercentage) || 16,
-                            createdAt: new Date(),
-                            unitsPerPackage: parseInt(item.unitsPerPackage) || 1
+                            unitsPerPackage: parseInt(item.unitsPerPackage) || 1,
+                            image: ''
                         };
-                        const docRef = await addDoc(collection(db, 'inventory'), newItem);
-                        itemsToSave.push({
-                            ...item,
-                            productId: docRef.id,
-                            isNew: false
-                        });
 
-                        // Register Kardex ENTRADA for new product
-                        await api.registerKardexEntry({
-                            productId: docRef.id,
-                            productName: newItem.name,
-                            type: 'ENTRADA',
-                            quantity: newItem.quantity,
-                            concept: `Compra (Nuevo Producto) - Factura #${data.invoiceNumber || data.title || 'S/N'}`,
-                            user: data.username || 'Sistema'
-                        });
+                        const { data: createdProduct, error: prodErr } = await supabase
+                            .from('inventory')
+                            .insert([newItem])
+                            .select()
+                            .single();
+
+                        if (!prodErr && createdProduct) {
+                            itemsToSave.push({
+                                ...item,
+                                productId: createdProduct.id,
+                                isNew: false
+                            });
+
+                            await api.registerKardexEntry({
+                                productId: createdProduct.id,
+                                productName: newItem.name,
+                                type: 'ENTRADA',
+                                quantity: newItem.quantity,
+                                concept: `Compra (Nuevo Producto) - Factura #${data.invoiceNumber || data.title || 'S/N'}`,
+                                user: data.username || 'Sistema'
+                            });
+                        }
                     }
-                });
-                await Promise.all(itemPromises);
+                }
             }
 
-            // 2. Create the bill
+            // 2. Crear la factura en bills
             const newBill = {
                 title: data.title || '',
                 provider: data.provider || '',
-                amount: parseFloat(data.amount),
-                dueDate: data.dueDate, // Save as string "YYYY-MM-DD" directly
+                amount: parseFloat(data.amount) || 0,
+                paidAmount: parseFloat(data.paidAmount) || 0,
+                dueDate: data.dueDate,
                 invoiceDate: data.invoiceDate || null,
                 invoiceNumber: data.invoiceNumber || null,
-                status: 'PENDING',
+                status: data.status || 'PENDING',
                 type: data.type || 'PAYABLE',
+                category: data.category || null,
                 items: data.type === 'PAYABLE' ? itemsToSave : [],
                 supportFile: data.supportFile || null,
                 supportFileName: data.supportFileName || null,
-                createdAt: new Date()
+                recurringId: data.recurringId || null,
+                recurringPeriod: data.recurringPeriod || null
             };
-            const docRef = await addDoc(collection(db, 'bills'), newBill);
-            return { id: docRef.id, ...newBill };
+
+            const { data: createdBill, error } = await supabase
+                .from('bills')
+                .insert([newBill])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return createdBill;
         } catch (error) {
             console.error("Error creating bill:", error);
             throw error;
@@ -220,102 +245,75 @@ export const api = {
     getUpcomingBill: async () => {
         try {
             const today = new Date().toISOString().split('T')[0];
+            const { data, error } = await supabase
+                .from('bills')
+                .select('*')
+                .eq('status', 'PENDING')
+                .gte('dueDate', today)
+                .neq('type', 'RECEIVABLE')
+                .order('dueDate', { ascending: true })
+                .limit(1)
+                .maybeSingle();
 
-            const q = query(
-                collection(db, 'bills'),
-                where('status', '==', 'PENDING'),
-                where('dueDate', '>=', today),
-                orderBy('dueDate', 'asc'),
-                limit(50)
-            );
-
-            const snapshot = await getDocs(q);
-            if (snapshot.empty) return null;
-
-            const billsData = snapshot.docs.map(doc => {
-                const data = doc.data();
-                let dueDate = data.dueDate;
-                if (data.dueDate?.toDate) {
-                    dueDate = data.dueDate.toDate().toISOString().split('T')[0];
-                } else if (typeof data.dueDate === 'object' || (typeof data.dueDate === 'string' && data.dueDate.includes('T'))) {
-                    dueDate = new Date(data.dueDate).toISOString().split('T')[0];
-                }
-                return {
-                    id: doc.id,
-                    ...data,
-                    dueDate
-                };
-            });
-
-            // Find the first bill that is not a client receivable
-            const nextPayable = billsData.find(b => b.type !== 'RECEIVABLE');
-            return nextPayable || null;
+            if (error) throw error;
+            return data || null;
         } catch (error) {
             console.error("Error fetching upcoming bill:", error);
             return null;
         }
     },
 
-    deleteTransaction: async (id) => {
-        await deleteDoc(doc(db, 'transactions', id));
-        return { message: 'Deleted' };
-    },
-
     deleteBill: async (id) => {
         try {
-            // 1. Delete the bill document
-            await deleteDoc(doc(db, 'bills', id));
+            // Eliminar transacciones asociadas por billId
+            await supabase
+                .from('transactions')
+                .delete()
+                .eq('billId', id);
 
-            // 2. Query and delete all transactions with matching billId
-            const q = query(collection(db, 'transactions'), where('billId', '==', id));
-            const snapshot = await getDocs(q);
-            const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'transactions', docSnap.id)));
-            await Promise.all(deletePromises);
+            // Eliminar la factura
+            const { error } = await supabase
+                .from('bills')
+                .delete()
+                .eq('id', id);
 
-            // 3. Cleanup legacy/existing test transactions whose notes contain the bill ID or short ID
-            const shortId = id.substring(0, 6);
-            const allSnap = await getDocs(collection(db, 'transactions'));
-            const extraDeletePromises = [];
-            
-            allSnap.forEach(docSnap => {
-                const data = docSnap.data();
-                if (data.note && typeof data.note === 'string' && (data.note.includes(id) || data.note.includes(shortId))) {
-                    // Avoid duplicate deletion if already deleted above
-                    if (!snapshot.docs.some(d => d.id === docSnap.id)) {
-                        extraDeletePromises.push(deleteDoc(doc(db, 'transactions', docSnap.id)));
-                    }
-                }
-            });
-            await Promise.all(extraDeletePromises);
-
+            if (error) throw error;
             return { message: 'Bill and associated transactions deleted successfully' };
         } catch (error) {
-            console.error("Error in cascading deleteBill:", error);
+            console.error("Error in deleteBill:", error);
             throw error;
         }
     },
 
     updateBill: async (id, data) => {
-        const updateData = { ...data };
-        // Do NOT convert dueDate to Date object
+        try {
+            const { data: updated, error } = await supabase
+                .from('bills')
+                .update(data)
+                .eq('id', id)
+                .select()
+                .single();
 
-        await updateDoc(doc(db, 'bills', id), updateData);
-        return { id, ...updateData };
+            if (error) throw error;
+            return updated;
+        } catch (error) {
+            console.error("Error updating bill:", error);
+            throw error;
+        }
     },
 
-    // Inventory
+    // ==========================================
+    // INVENTORY
+    // ==========================================
     getInventory: async () => {
         try {
-            const q = query(collection(db, 'inventory'), orderBy('createdAt', 'desc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-                };
-            });
+            const { data, error } = await supabase
+                .from('inventory')
+                .select('*')
+                .order('createdAt', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching inventory:", error);
             return [];
@@ -324,25 +322,32 @@ export const api = {
 
     createInventoryItem: async (data) => {
         try {
-            const autoCode = await api.getNextProductCode();
+            const autoCode = data.code || await api.getNextProductCode();
             const newItem = {
-                ...data,
                 code: autoCode,
                 name: (data.name || '').trim().toUpperCase(),
                 brand: (data.brand || '').trim().toUpperCase(),
+                description: (data.description || '').trim(),
                 quantity: parseInt(data.quantity) || 0,
                 costPrice: parseFloat(data.costPrice) || 0,
                 marginPercentage: parseFloat(data.marginPercentage) || 0,
                 sellingPrice: parseFloat(data.sellingPrice) || 0,
-                createdAt: new Date(),
-                unitsPerPackage: parseInt(data.unitsPerPackage) || 1
+                taxPercentage: parseFloat(data.taxPercentage) || 16,
+                unitsPerPackage: parseInt(data.unitsPerPackage) || 1,
+                image: data.image || ''
             };
-            const docRef = await addDoc(collection(db, 'inventory'), newItem);
-            
-            // Register Kardex ENTRADA if quantity > 0
+
+            const { data: created, error } = await supabase
+                .from('inventory')
+                .insert([newItem])
+                .select()
+                .single();
+
+            if (error) throw error;
+
             if (newItem.quantity > 0) {
                 await api.registerKardexEntry({
-                    productId: docRef.id,
+                    productId: created.id,
                     productName: newItem.name,
                     type: 'ENTRADA',
                     quantity: newItem.quantity,
@@ -350,8 +355,8 @@ export const api = {
                     user: data.username || 'Sistema'
                 });
             }
-            
-            return { id: docRef.id, ...newItem };
+
+            return created;
         } catch (error) {
             console.error("Error creating inventory item:", error);
             throw error;
@@ -362,17 +367,23 @@ export const api = {
         try {
             const updateData = {
                 ...data,
-                quantity: data.quantity !== undefined ? parseInt(data.quantity) || 0 : undefined,
-                costPrice: data.costPrice !== undefined ? parseFloat(data.costPrice) || 0 : undefined,
-                marginPercentage: data.marginPercentage !== undefined ? parseFloat(data.marginPercentage) || 0 : undefined,
-                sellingPrice: data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) || 0 : undefined,
-                updatedAt: new Date()
+                updatedAt: new Date().toISOString()
             };
-            // Clean undefined keys
-            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-            await updateDoc(doc(db, 'inventory', id), updateData);
-            return { id, ...updateData };
+            if (updateData.quantity !== undefined) updateData.quantity = parseInt(updateData.quantity) || 0;
+            if (updateData.costPrice !== undefined) updateData.costPrice = parseFloat(updateData.costPrice) || 0;
+            if (updateData.marginPercentage !== undefined) updateData.marginPercentage = parseFloat(updateData.marginPercentage) || 0;
+            if (updateData.sellingPrice !== undefined) updateData.sellingPrice = parseFloat(updateData.sellingPrice) || 0;
+
+            const { data: updated, error } = await supabase
+                .from('inventory')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return updated;
         } catch (error) {
             console.error("Error updating inventory item:", error);
             throw error;
@@ -381,7 +392,12 @@ export const api = {
 
     deleteInventoryItem: async (id) => {
         try {
-            await deleteDoc(doc(db, 'inventory', id));
+            const { error } = await supabase
+                .from('inventory')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
             return { message: 'Deleted' };
         } catch (error) {
             console.error("Error deleting inventory item:", error);
@@ -389,16 +405,40 @@ export const api = {
         }
     },
 
-    // Clients
+    getNextProductCode: async () => {
+        try {
+            const { data } = await supabase
+                .from('inventory')
+                .select('code');
+
+            let nextCodeNum = 1;
+            (data || []).forEach(row => {
+                if (row.code) {
+                    const parsed = parseInt(row.code, 10);
+                    if (!isNaN(parsed) && parsed >= nextCodeNum) {
+                        nextCodeNum = parsed + 1;
+                    }
+                }
+            });
+            return String(nextCodeNum).padStart(4, '0');
+        } catch (error) {
+            console.error("Error generating product code:", error);
+            return '0001';
+        }
+    },
+
+    // ==========================================
+    // CLIENTS
+    // ==========================================
     getClients: async () => {
         try {
-            const q = query(collection(db, 'clients'), orderBy('name', 'asc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
-            }));
+            const { data, error } = await supabase
+                .from('clients')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching clients:", error);
             return [];
@@ -412,11 +452,17 @@ export const api = {
                 documentId: data.documentId?.trim() || '',
                 phone: data.phone?.trim() || '',
                 email: data.email?.trim() || '',
-                address: data.address?.trim() || '',
-                createdAt: new Date()
+                address: data.address?.trim() || ''
             };
-            const docRef = await addDoc(collection(db, 'clients'), newClient);
-            return { id: docRef.id, ...newClient };
+
+            const { data: created, error } = await supabase
+                .from('clients')
+                .insert([newClient])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return created;
         } catch (error) {
             console.error("Error creating client:", error);
             throw error;
@@ -431,11 +477,19 @@ export const api = {
                 phone: data.phone?.trim(),
                 email: data.email?.trim(),
                 address: data.address?.trim(),
-                updatedAt: new Date()
+                updatedAt: new Date().toISOString()
             };
-            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
-            await updateDoc(doc(db, 'clients', id), updateData);
-            return { id, ...updateData };
+            Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
+            const { data: updated, error } = await supabase
+                .from('clients')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return updated;
         } catch (error) {
             console.error("Error updating client:", error);
             throw error;
@@ -444,7 +498,12 @@ export const api = {
 
     deleteClient: async (id) => {
         try {
-            await deleteDoc(doc(db, 'clients', id));
+            const { error } = await supabase
+                .from('clients')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
             return { message: 'Client deleted' };
         } catch (error) {
             console.error("Error deleting client:", error);
@@ -452,19 +511,18 @@ export const api = {
         }
     },
 
-    // Client Invoices
+    // ==========================================
+    // CLIENT INVOICES (Facturas de Clientes)
+    // ==========================================
     getClientInvoices: async () => {
         try {
-            const q = query(collection(db, 'client_invoices'), orderBy('createdAt', 'desc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-                };
-            });
+            const { data, error } = await supabase
+                .from('client_invoices')
+                .select('*')
+                .order('createdAt', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching client invoices:", error);
             return [];
@@ -474,44 +532,61 @@ export const api = {
     createClientInvoice: async (data) => {
         try {
             const invoiceNumber = data.invoiceNumber?.trim() || `FAC-${String(Math.floor(1000 + Math.random() * 9000))}`;
-            
-            // 1. Descontar existencias del inventario (Quantity reduction) & Kardex
-            const itemPromises = data.items.map(async (item) => {
-                const productRef = doc(db, 'inventory', item.productId);
-                const productSnap = await getDoc(productRef);
-                if (productSnap.exists()) {
-                    const currentData = productSnap.data();
-                    const currentQty = currentData.quantity || 0;
-                    const newQty = Math.max(0, currentQty - item.quantity);
-                    await updateDoc(productRef, { quantity: newQty });
 
-                    // Register Kardex SALIDA
-                    await api.registerKardexEntry({
-                        productId: item.productId,
-                        productName: currentData.name,
-                        type: 'SALIDA',
-                        quantity: item.quantity,
-                        concept: `Venta - Factura #${invoiceNumber}`,
-                        user: data.username || 'Sistema'
-                    });
+            // 1. Descontar existencias de inventario y registrar en Kardex
+            if (data.items && data.items.length > 0) {
+                for (const item of data.items) {
+                    const { data: product } = await supabase
+                        .from('inventory')
+                        .select('*')
+                        .eq('id', item.productId)
+                        .single();
+
+                    if (product) {
+                        const currentQty = product.quantity || 0;
+                        const newQty = Math.max(0, currentQty - (item.quantity || 0));
+
+                        await supabase
+                            .from('inventory')
+                            .update({ quantity: newQty, updatedAt: new Date().toISOString() })
+                            .eq('id', item.productId);
+
+                        await api.registerKardexEntry({
+                            productId: item.productId,
+                            productName: product.name,
+                            type: 'SALIDA',
+                            quantity: item.quantity,
+                            concept: `Venta - Factura #${invoiceNumber}`,
+                            user: data.username || 'Sistema'
+                        });
+                    }
                 }
-            });
-            await Promise.all(itemPromises);
+            }
 
             // 2. Registrar la factura
             const newInvoice = {
-                ...data,
                 invoiceNumber,
+                clientId: data.clientId || null,
+                clientName: data.clientName || '',
+                items: data.items || [],
                 subtotal: parseFloat(data.subtotal) || 0,
                 total: parseFloat(data.total) || 0,
                 isCredit: !!data.isCredit,
                 creditDays: parseInt(data.creditDays) || 0,
                 status: data.isCredit ? 'PENDING' : 'PAID',
-                createdAt: new Date()
+                paymentMethod: data.paymentMethod || 'Efectivo',
+                date: data.date || new Date().toISOString().split('T')[0]
             };
-            const docRef = await addDoc(collection(db, 'client_invoices'), newInvoice);
 
-            // 3. Si no es a crédito, registrar en caja (Transactions) inmediatamente
+            const { data: created, error } = await supabase
+                .from('client_invoices')
+                .insert([newInvoice])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // 3. Si no es a crédito, registrar en caja inmediatamente
             if (!data.isCredit) {
                 await api.createTransaction({
                     amount: parseFloat(data.total),
@@ -524,7 +599,7 @@ export const api = {
                 });
             }
 
-            return { id: docRef.id, ...newInvoice };
+            return created;
         } catch (error) {
             console.error("Error creating client invoice:", error);
             throw error;
@@ -533,25 +608,30 @@ export const api = {
 
     payClientInvoice: async (invoiceId, paymentMethod) => {
         try {
-            const invoiceRef = doc(db, 'client_invoices', invoiceId);
-            const invoiceSnap = await getDoc(invoiceRef);
-            if (!invoiceSnap.exists()) throw new Error("Factura no encontrada");
-            
-            const invoiceData = invoiceSnap.data();
-            
-            // Actualizar estado de la factura a PAID
-            await updateDoc(invoiceRef, { 
-                status: 'PAID',
-                paymentMethod: paymentMethod,
-                updatedAt: new Date()
-            });
+            const { data: invoice, error: fetchErr } = await supabase
+                .from('client_invoices')
+                .select('*')
+                .eq('id', invoiceId)
+                .single();
 
-            // Registrar transacción de ingreso en caja
+            if (fetchErr || !invoice) throw new Error("Factura no encontrada");
+
+            const { error: updateErr } = await supabase
+                .from('client_invoices')
+                .update({
+                    status: 'PAID',
+                    paymentMethod,
+                    updatedAt: new Date().toISOString()
+                })
+                .eq('id', invoiceId);
+
+            if (updateErr) throw updateErr;
+
             await api.createTransaction({
-                amount: parseFloat(invoiceData.total),
+                amount: parseFloat(invoice.total),
                 method: paymentMethod,
-                date: new Date().toLocaleDateString('en-CA'),
-                note: `Cobro Factura ${invoiceData.invoiceNumber} - Cliente: ${invoiceData.clientName}`,
+                date: new Date().toISOString().split('T')[0],
+                note: `Cobro Factura ${invoice.invoiceNumber} - Cliente: ${invoice.clientName}`,
                 type: 'INCOME',
                 category: 'Venta',
                 status: 'COMPLETED'
@@ -566,28 +646,33 @@ export const api = {
 
     updateClientInvoice: async (id, data) => {
         try {
-            const updateData = { ...data, updatedAt: new Date() };
-            await updateDoc(doc(db, 'client_invoices', id), updateData);
-            return { id, ...updateData };
+            const { data: updated, error } = await supabase
+                .from('client_invoices')
+                .update({ ...data, updatedAt: new Date().toISOString() })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return updated;
         } catch (error) {
             console.error("Error updating client invoice:", error);
             throw error;
         }
     },
 
-    // Investments
+    // ==========================================
+    // INVESTMENTS
+    // ==========================================
     getInvestments: async () => {
         try {
-            const q = query(collection(db, 'investments'), orderBy('date', 'desc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-                };
-            });
+            const { data, error } = await supabase
+                .from('investments')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching investments:", error);
             return [];
@@ -596,7 +681,6 @@ export const api = {
 
     createInvestment: async (data) => {
         try {
-            // 1. Registrar el movimiento en caja (transacciones)
             const transactionNote = `Inyección de capital - Inversionista: ${data.investor} ${data.note ? `(${data.note})` : ''}`;
             const newTx = await api.createTransaction({
                 amount: parseFloat(data.amount),
@@ -608,18 +692,23 @@ export const api = {
                 status: 'COMPLETED'
             });
 
-            // 2. Registrar el documento de inversión con la referencia a la transacción
             const newInvestment = {
                 investor: data.investor.trim(),
                 amount: parseFloat(data.amount),
                 method: data.method,
                 date: data.date,
                 note: data.note?.trim() || '',
-                transactionId: newTx.id,
-                createdAt: new Date()
+                transactionId: newTx.id
             };
-            const docRef = await addDoc(collection(db, 'investments'), newInvestment);
-            return { id: docRef.id, ...newInvestment };
+
+            const { data: created, error } = await supabase
+                .from('investments')
+                .insert([newInvestment])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return created;
         } catch (error) {
             console.error("Error creating investment:", error);
             throw error;
@@ -628,19 +717,18 @@ export const api = {
 
     deleteInvestment: async (id) => {
         try {
-            const investmentRef = doc(db, 'investments', id);
-            const investmentSnap = await getDoc(investmentRef);
-            if (!investmentSnap.exists()) throw new Error("Inversión no encontrada");
+            const { data: investment } = await supabase
+                .from('investments')
+                .select('*')
+                .eq('id', id)
+                .single();
 
-            const investmentData = investmentSnap.data();
-
-            // 1. Eliminar la inversión de la colección
-            await deleteDoc(investmentRef);
-
-            // 2. Eliminar el movimiento de caja asociado
-            if (investmentData.transactionId) {
-                await deleteDoc(doc(db, 'transactions', investmentData.transactionId));
+            if (investment?.transactionId) {
+                await supabase.from('transactions').delete().eq('id', investment.transactionId);
             }
+
+            const { error } = await supabase.from('investments').delete().eq('id', id);
+            if (error) throw error;
 
             return { message: 'Investment and associated transaction deleted successfully' };
         } catch (error) {
@@ -651,27 +739,33 @@ export const api = {
 
     createDirectExpense: async (data) => {
         try {
-            // 1. Registrar el egreso en la colección de facturas (bills) como ya pagado (PAID)
+            // 1. Registrar el egreso en bills como pagado
             const newBill = {
                 title: data.concept.trim(),
                 provider: data.beneficiary.trim(),
                 amount: parseFloat(data.amount),
-                dueDate: data.date, // Se paga hoy
+                dueDate: data.date,
                 invoiceDate: data.date,
                 invoiceNumber: data.invoiceNumber || null,
                 status: 'PAID',
                 type: 'PAYABLE',
-                category: data.category, // e.g., 'Nómina / Sueldos', etc.
-                items: [], // Sin ítems de inventario
+                category: data.category,
+                items: [],
                 supportFile: data.supportFile || null,
                 supportFileName: data.supportFileName || null,
                 recurringId: data.recurringId || null,
-                recurringPeriod: data.recurringPeriod || null,
-                createdAt: new Date()
+                recurringPeriod: data.recurringPeriod || null
             };
-            const docRef = await addDoc(collection(db, 'bills'), newBill);
 
-            // 2. Registrar el egreso en caja (transacciones) inmediatamente
+            const { data: createdBill, error: billErr } = await supabase
+                .from('bills')
+                .insert([newBill])
+                .select()
+                .single();
+
+            if (billErr) throw billErr;
+
+            // 2. Registrar el egreso en caja
             const txNote = `Gasto (${data.category}) - Beneficiario: ${data.beneficiary} | Concepto: ${data.concept}`;
             await api.createTransaction({
                 amount: parseFloat(data.amount),
@@ -681,45 +775,33 @@ export const api = {
                 type: 'EXPENSE',
                 category: data.category,
                 status: 'COMPLETED',
-                billId: docRef.id // Relacionados
+                billId: createdBill.id
             });
 
-            return { id: docRef.id, ...newBill };
+            return createdBill;
         } catch (error) {
             console.error("Error creating direct expense:", error);
             throw error;
         }
     },
 
-    getNextProductCode: async () => {
-        try {
-            const q = query(collection(db, 'inventory'));
-            const snapshot = await getDocs(q);
-            let nextCodeNum = 1;
-            snapshot.forEach(docSnap => {
-                const codeStr = docSnap.data().code;
-                if (codeStr) {
-                    const parsed = parseInt(codeStr, 10);
-                    if (!isNaN(parsed) && parsed >= nextCodeNum) {
-                        nextCodeNum = parsed + 1;
-                    }
-                }
-            });
-            return String(nextCodeNum).padStart(4, '0');
-        } catch (error) {
-            console.error("Error generating product code:", error);
-            return '0001';
-        }
-    },
-
-    // Kardex
+    // ==========================================
+    // KARDEX
+    // ==========================================
     registerKardexEntry: async (entry) => {
         try {
-            const newEntry = {
-                ...entry,
-                date: new Date()
-            };
-            await addDoc(collection(db, 'kardex'), newEntry);
+            const { error } = await supabase
+                .from('kardex')
+                .insert([{
+                    productId: entry.productId,
+                    productName: entry.productName,
+                    type: entry.type,
+                    quantity: parseInt(entry.quantity) || 0,
+                    concept: entry.concept,
+                    user: entry.user || 'Sistema'
+                }]);
+
+            if (error) console.error("Error inserting kardex:", error);
         } catch (error) {
             console.error("Error registering Kardex entry:", error);
         }
@@ -727,16 +809,13 @@ export const api = {
 
     getKardex: async () => {
         try {
-            const q = query(collection(db, 'kardex'), orderBy('date', 'desc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    date: data.date?.toDate ? data.date.toDate().toISOString() : new Date().toISOString()
-                };
-            });
+            const { data, error } = await supabase
+                .from('kardex')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching Kardex:", error);
             return [];
@@ -745,23 +824,25 @@ export const api = {
 
     adjustInventory: async (productId, changeQty, concept, username) => {
         try {
-            const productRef = doc(db, 'inventory', productId);
-            const productSnap = await getDoc(productRef);
-            if (!productSnap.exists()) throw new Error("Producto no encontrado");
+            const { data: product, error: fetchErr } = await supabase
+                .from('inventory')
+                .select('*')
+                .eq('id', productId)
+                .single();
 
-            const currentData = productSnap.data();
-            const currentQty = parseInt(currentData.quantity) || 0;
+            if (fetchErr || !product) throw new Error("Producto no encontrado");
+
+            const currentQty = parseInt(product.quantity) || 0;
             const newQty = Math.max(0, currentQty + changeQty);
 
-            await updateDoc(productRef, {
-                quantity: newQty,
-                updatedAt: new Date()
-            });
+            await supabase
+                .from('inventory')
+                .update({ quantity: newQty, updatedAt: new Date().toISOString() })
+                .eq('id', productId);
 
-            // Register Kardex
             await api.registerKardexEntry({
                 productId,
-                productName: currentData.name,
+                productName: product.name,
                 type: changeQty > 0 ? 'ENTRADA' : 'SALIDA',
                 quantity: Math.abs(changeQty),
                 concept,
@@ -775,16 +856,18 @@ export const api = {
         }
     },
 
-    // Providers CRUD
+    // ==========================================
+    // PROVIDERS
+    // ==========================================
     getProviders: async () => {
         try {
-            const q = query(collection(db, 'providers'), orderBy('name', 'asc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
-            }));
+            const { data, error } = await supabase
+                .from('providers')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching providers:", error);
             return [];
@@ -799,11 +882,17 @@ export const api = {
                 phone: (data.phone || '').trim(),
                 email: (data.email || '').trim(),
                 address: (data.address || '').trim(),
-                info: (data.info || '').trim(),
-                createdAt: new Date()
+                info: (data.info || '').trim()
             };
-            const docRef = await addDoc(collection(db, 'providers'), newProvider);
-            return { id: docRef.id, ...newProvider };
+
+            const { data: created, error } = await supabase
+                .from('providers')
+                .insert([newProvider])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return created;
         } catch (error) {
             console.error("Error creating provider:", error);
             throw error;
@@ -819,11 +908,19 @@ export const api = {
                 email: data.email?.trim(),
                 address: data.address?.trim(),
                 info: data.info?.trim(),
-                updatedAt: new Date()
+                updatedAt: new Date().toISOString()
             };
-            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
-            await updateDoc(doc(db, 'providers', id), updateData);
-            return { id, ...updateData };
+            Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
+            const { data: updated, error } = await supabase
+                .from('providers')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return updated;
         } catch (error) {
             console.error("Error updating provider:", error);
             throw error;
@@ -832,7 +929,12 @@ export const api = {
 
     deleteProvider: async (id) => {
         try {
-            await deleteDoc(doc(db, 'providers', id));
+            const { error } = await supabase
+                .from('providers')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
             return { message: 'Provider deleted' };
         } catch (error) {
             console.error("Error deleting provider:", error);
@@ -840,16 +942,18 @@ export const api = {
         }
     },
 
-    // Users CRUD
+    // ==========================================
+    // USERS
+    // ==========================================
     getUsers: async () => {
         try {
-            const q = query(collection(db, 'users'), orderBy('name', 'asc'));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : new Date().toISOString()
-            }));
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching users:", error);
             return [];
@@ -863,12 +967,17 @@ export const api = {
                 username: usernameLower,
                 name: data.name.trim(),
                 password: data.password.trim(),
-                role: data.role,
-                createdAt: new Date()
+                role: data.role || 'cajero'
             };
-            const userRef = doc(db, 'users', usernameLower);
-            await setDoc(userRef, newUser);
-            return { id: usernameLower, ...newUser };
+
+            const { data: created, error } = await supabase
+                .from('users')
+                .insert([newUser])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return created;
         } catch (error) {
             console.error("Error creating user:", error);
             throw error;
@@ -881,11 +990,19 @@ export const api = {
                 name: data.name?.trim(),
                 password: data.password?.trim(),
                 role: data.role,
-                updatedAt: new Date()
+                updatedAt: new Date().toISOString()
             };
-            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
-            await updateDoc(doc(db, 'users', id), updateData);
-            return { id, ...updateData };
+            Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
+            const { data: updated, error } = await supabase
+                .from('users')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return updated;
         } catch (error) {
             console.error("Error updating user:", error);
             throw error;
@@ -894,7 +1011,12 @@ export const api = {
 
     deleteUser: async (id) => {
         try {
-            await deleteDoc(doc(db, 'users', id));
+            const { error } = await supabase
+                .from('users')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
             return { message: 'User deleted' };
         } catch (error) {
             console.error("Error deleting user:", error);
@@ -902,14 +1024,18 @@ export const api = {
         }
     },
 
-    // Recurring Expenses Templates
+    // ==========================================
+    // RECURRING EXPENSES
+    // ==========================================
     getRecurringExpenses: async () => {
         try {
-            const snapshot = await getDocs(collection(db, 'recurring_expenses'));
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            const { data, error } = await supabase
+                .from('recurring_expenses')
+                .select('*')
+                .order('scheduledDay', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
         } catch (error) {
             console.error("Error fetching recurring expenses:", error);
             return [];
@@ -918,16 +1044,23 @@ export const api = {
 
     createRecurringExpense: async (data) => {
         try {
-            const docRef = await addDoc(collection(db, 'recurring_expenses'), {
+            const newExp = {
                 beneficiary: data.beneficiary.trim(),
                 category: data.category,
                 concept: data.concept.trim(),
-                amount: parseFloat(data.amount),
+                amount: parseFloat(data.amount) || 0,
                 method: data.method,
-                scheduledDay: parseInt(data.scheduledDay) || 1,
-                createdAt: new Date()
-            });
-            return { id: docRef.id, ...data };
+                scheduledDay: parseInt(data.scheduledDay) || 1
+            };
+
+            const { data: created, error } = await supabase
+                .from('recurring_expenses')
+                .insert([newExp])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return created;
         } catch (error) {
             console.error("Error creating recurring expense:", error);
             throw error;
@@ -936,12 +1069,27 @@ export const api = {
 
     deleteRecurringExpense: async (id) => {
         try {
-            await deleteDoc(doc(db, 'recurring_expenses', id));
+            const { error } = await supabase
+                .from('recurring_expenses')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
             return { message: 'Recurring expense template deleted' };
         } catch (error) {
             console.error("Error deleting recurring expense:", error);
             throw error;
         }
+    },
+
+    // ==========================================
+    // SETTINGS (Global config & Exchange rates)
+    // ==========================================
+    getSettings: async (key = 'global_settings') => {
+        return await getSettingDoc(key);
+    },
+
+    updateSettings: async (key = 'global_settings', data) => {
+        return await setSettingDoc(key, data);
     }
 };
-

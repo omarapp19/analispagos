@@ -1,309 +1,270 @@
-import React, { useState, useEffect } from 'react';
-import { 
-    LayoutDashboard, FileText, Settings, LogOut, Calendar, Package, 
-    Receipt, ChevronDown, ChevronRight, Users, Coins, Layers, ClipboardList, Briefcase,
-    BarChart3
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    LayoutDashboard, Settings, LogOut, Package, Receipt, Users, BarChart3,
+    Boxes, ShoppingCart, Landmark, ChevronDown, X
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { db } from '../firebase'; 
-import { doc, onSnapshot } from 'firebase/firestore';
+import { api } from '../services/api';
+import { subscribeToTable } from '../supabase';
+
+export const logout = () => {
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('userDisplayName');
+    window.location.href = '/login';
+};
+
+const roleLabel = { administrador: 'Administrador', supervisor: 'Supervisor', cajero: 'Cajero' };
+
+const buildNav = ({ isAdmin, isManager }) => [
+    isManager && { to: '/', icon: LayoutDashboard, label: 'Resumen', end: true },
+    { to: '/pos', icon: Receipt, label: 'Punto de venta' },
+    isManager && {
+        id: 'ventas', icon: Users, label: 'Ventas',
+        match: ['/ventas', '/finanzas/cuentas-por-cobrar'],
+        children: [
+            { to: '/ventas/clientes', label: 'Clientes' },
+            { to: '/finanzas/cuentas-por-cobrar', label: 'Cuentas por cobrar' },
+        ],
+    },
+    isManager && {
+        id: 'inventario', icon: Boxes, label: 'Inventario',
+        match: ['/inventory'],
+        children: [
+            { to: '/inventory', label: 'Productos', end: true },
+            { to: '/inventory/kardex', label: 'Kardex' },
+            isAdmin && { to: '/inventory/adjustments', label: 'Ajustes de stock' },
+        ].filter(Boolean),
+    },
+    isManager && {
+        id: 'compras', icon: ShoppingCart, label: 'Compras',
+        match: ['/compras'],
+        children: [
+            { to: '/compras/facturas', label: 'Facturas y gastos' },
+            { to: '/compras/nueva', label: 'Registrar compra' },
+            { to: '/compras/proveedores', label: 'Proveedores' },
+        ],
+    },
+    isManager && {
+        id: 'finanzas', icon: Landmark, label: 'Finanzas',
+        match: ['/finanzas/cuentas-por-pagar', '/calendar', '/investments'],
+        children: [
+            { to: '/finanzas/cuentas-por-pagar', label: 'Cuentas por pagar' },
+            { to: '/calendar', label: 'Calendario de pagos' },
+            { to: '/investments', label: 'Inversiones' },
+        ],
+    },
+    isManager && { to: '/analytics', icon: BarChart3, label: 'Estadísticas' },
+].filter(Boolean);
+
+const groupForPath = (nav, path) =>
+    nav.find((n) => n.children && n.match.some((m) => path === m || path.startsWith(m + '/')))?.id || null;
 
 const Sidebar = ({ isOpen, onClose }) => {
     const location = useLocation();
-    
-    // User Session States
     const userRole = localStorage.getItem('userRole') || 'cajero';
     const userDisplayName = localStorage.getItem('userDisplayName') || 'Usuario';
-    const username = localStorage.getItem('adminUser') || 'usuario';
+    const isAdmin = userRole === 'administrador';
+    const isManager = isAdmin || userRole === 'supervisor';
+    const nav = buildNav({ isAdmin, isManager });
 
-    const [settings, setSettings] = useState({
-        storeName: 'ANÁLISIS PAGOS',
-    });
+    const [storeName, setStoreName] = useState('Mi negocio');
+    const [openGroup, setOpenGroup] = useState(() => groupForPath(nav, location.pathname));
+    const [confirmOut, setConfirmOut] = useState(false);
+    const confirmTimer = useRef(null);
 
-    // Submenu toggles
-    const [comprasOpen, setComprasOpen] = useState(false);
-    const [inventarioOpen, setInventarioOpen] = useState(false);
-    const [finanzasOpen, setFinanzasOpen] = useState(false);
-
+    // Follow navigation: the active section opens itself, others close.
     useEffect(() => {
-        // Suscribirse a cambios en tiempo real
-        const unsub = onSnapshot(doc(db, 'settings', 'global_settings'), (doc) => {
-            if (doc.exists()) {
-                setSettings(doc.data());
-            }
-        });
-        return () => unsub();
-    }, []);
-
-    // Auto-open parent accordion if subroute is active
-    useEffect(() => {
-        if (location.pathname.startsWith('/compras')) {
-            setComprasOpen(true);
-        }
-        if (location.pathname.startsWith('/inventory')) {
-            setInventarioOpen(true);
-        }
-        if (location.pathname.startsWith('/finanzas')) {
-            setFinanzasOpen(true);
-        }
+        const g = groupForPath(nav, location.pathname);
+        if (g) setOpenGroup(g);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname]);
 
+    useEffect(() => {
+        let alive = true;
+        api.getSettings('global_settings').then((data) => {
+            if (alive && data?.storeName) setStoreName(data.storeName);
+        });
+        const unsub = subscribeToTable('settings', (payload) => {
+            if (payload.new?.id === 'global_settings' && payload.new.data?.storeName) {
+                setStoreName(payload.new.data.storeName);
+            }
+        });
+        return () => { alive = false; unsub(); clearTimeout(confirmTimer.current); };
+    }, []);
+
     const handleLogout = () => {
-        if (window.confirm('¿Cerrar sesión en el sistema?')) {
-            localStorage.removeItem('isAuthenticated');
-            localStorage.removeItem('userRole');
-            localStorage.removeItem('adminUser');
-            localStorage.removeItem('userDisplayName');
-            window.location.href = '/login';
-        }
+        if (confirmOut) return logout();
+        setConfirmOut(true);
+        clearTimeout(confirmTimer.current);
+        confirmTimer.current = setTimeout(() => setConfirmOut(false), 3500);
     };
+
+    const initials = userDisplayName.split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase() || 'US';
+    const activeGroup = groupForPath(nav, location.pathname);
 
     return (
         <>
-            {/* Overlay for mobile */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden glass"
-                    onClick={onClose}
-                ></div>
-            )}
+            <div
+                onClick={onClose}
+                className={`fixed inset-0 z-40 bg-[rgba(10,17,40,0.5)] md:hidden transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                aria-hidden="true"
+            />
 
-            <div className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:h-screen flex flex-col
-                ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-            `}>
+            <aside
+                className={`fixed inset-y-0 left-0 z-50 w-[264px] md:w-[248px] bg-shell text-white flex flex-col
+                    transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
+                    md:static md:translate-x-0 md:h-screen
+                    ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                aria-label="Navegación principal"
+            >
                 {/* Brand */}
-                <div className="p-6 flex items-center justify-between border-b border-gray-100/50 pb-6">
-                    <h1 className="text-xl font-bold text-navy flex items-center gap-2 truncate">
-                        <span className="text-primary truncate">{settings.storeName}</span>
-                    </h1>
+                <div className="h-16 px-5 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#2F64F5,#1FC0E8)] shadow-[0_6px_16px_-6px_rgba(47,100,245,0.8)]">
+                            <Package size={16} strokeWidth={2.4} />
+                        </div>
+                        <span className="font-extrabold text-[16px] tracking-[-0.01em] truncate">{storeName}</span>
+                    </div>
+                    <button onClick={onClose} className="md:hidden p-1.5 -mr-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10" aria-label="Cerrar menú">
+                        <X size={18} />
+                    </button>
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto font-sans">
-                    
-                    {/* 1. Dashboard (Admin and Supervisor only) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" onClick={onClose} end />
-                    )}
-
-                    {/* 1b. Estadísticas (Admin and Supervisor only) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Estadísticas" onClick={onClose} />
-                    )}
-
-                    {/* 2. POS (All roles) */}
-                    <NavItem to="/pos" icon={<Receipt size={18} />} label="POS" onClick={onClose} />
-
-                    {/* 3. Inventario Submenu (Admin and Supervisor) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <div className="flex flex-col">
-                            <button
-                                onClick={() => setInventarioOpen(!inventarioOpen)}
-                                className={`flex items-center justify-between w-full px-4 py-2.5 my-0.5 rounded-lg text-[15px] font-bold transition-all text-slate-700 hover:bg-slate-50/70 ${
-                                    location.pathname.startsWith('/inventory') ? 'text-primary font-extrabold bg-teal-50/30' : ''
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Package size={18} className={location.pathname.startsWith('/inventory') ? 'text-primary' : ''} />
-                                    <span>Inventario</span>
-                                </div>
-                                {inventarioOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </button>
-                            {inventarioOpen && (
-                                <div className="pl-6 flex flex-col gap-0.5 border-l-2 border-gray-100 ml-6 mt-0.5 mb-1 animate-in slide-in-from-top-1 duration-150">
-                                    <SubNavItem to="/inventory" label="Productos" onClick={onClose} end />
-                                    {userRole === 'administrador' && (
-                                        <SubNavItem to="/inventory/adjustments" label="Ajuste Inventario" onClick={onClose} />
-                                    )}
-                                    <SubNavItem to="/inventory/kardex" label="Kardex Inventario" onClick={onClose} />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* 4. Compras Submenu (Admin and Supervisor) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <div className="flex flex-col">
-                            <button
-                                onClick={() => setComprasOpen(!comprasOpen)}
-                                className={`flex items-center justify-between w-full px-4 py-2.5 my-0.5 rounded-lg text-[15px] font-bold transition-all text-slate-700 hover:bg-slate-50/70 ${
-                                    location.pathname.startsWith('/compras') ? 'text-primary font-extrabold bg-teal-50/30' : ''
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Briefcase size={18} className={location.pathname.startsWith('/compras') ? 'text-primary' : ''} />
-                                    <span>Compras</span>
-                                </div>
-                                {comprasOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </button>
-                            {comprasOpen && (
-                                <div className="pl-6 flex flex-col gap-0.5 border-l-2 border-gray-100 ml-6 mt-0.5 mb-1 animate-in slide-in-from-top-1 duration-150">
-                                    <SubNavItem to="/compras/proveedores" label="Proveedores" onClick={onClose} />
-                                    <SubNavItem to="/compras/facturas" label="Facturas" onClick={onClose} />
-                                    <SubNavItem to="/compras/nueva" label="Nueva Compra" onClick={onClose} />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* 5. Ventas Submenu (Admin and Supervisor) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <div className="flex flex-col">
-                            <NavItem to="/ventas/clientes" icon={<Users size={18} />} label="Clientes" onClick={onClose} />
-                        </div>
-                    )}
-
-                    {/* 6. Calendario (Admin and Supervisor) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <NavItem to="/calendar" icon={<Calendar size={18} />} label="Calendario" onClick={onClose} />
-                    )}
-
-                    {/* 7. Finanzas Submenu (Admin and Supervisor) */}
-                    {(userRole === 'administrador' || userRole === 'supervisor') && (
-                        <div className="flex flex-col">
-                            <button
-                                onClick={() => setFinanzasOpen(!finanzasOpen)}
-                                className={`flex items-center justify-between w-full px-4 py-2.5 my-0.5 rounded-lg text-[15px] font-bold transition-all text-slate-700 hover:bg-slate-50/70 ${
-                                    location.pathname.startsWith('/finanzas') ? 'text-primary font-extrabold bg-teal-50/30' : ''
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Coins size={18} className={location.pathname.startsWith('/finanzas') ? 'text-primary' : ''} />
-                                    <span>Finanzas</span>
-                                </div>
-                                {finanzasOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </button>
-                            {finanzasOpen && (
-                                <div className="pl-6 flex flex-col gap-0.5 border-l-2 border-gray-100 ml-6 mt-0.5 mb-1 animate-in slide-in-from-top-1 duration-150">
-                                    <SubNavItem to="/finanzas/cuentas-por-cobrar" label="Cuentas por Cobrar" onClick={onClose} />
-                                    <SubNavItem to="/finanzas/cuentas-por-pagar" label="Cuentas por Pagar" onClick={onClose} />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Spacer */}
-                    <div className="flex-1"></div>
-                    
-                    {/* Logout item for mobile/cajeros when profile card is not visible or as backup */}
-                    {userRole === 'cajero' && (
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-3 px-4 py-2.5 my-1 rounded-lg text-sm font-medium text-rose-600 hover:bg-rose-50/50 cursor-pointer w-full text-left transition-all"
-                        >
-                            <LogOut size={18} />
-                            <span>Cerrar Sesión</span>
-                        </button>
-                    )}
+                <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-4 [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+                    <ul className="flex flex-col gap-1">
+                        {nav.map((item) =>
+                            item.children ? (
+                                <li key={item.id}>
+                                    <NavGroup
+                                        item={item}
+                                        open={openGroup === item.id}
+                                        active={activeGroup === item.id}
+                                        onToggle={() => setOpenGroup((g) => (g === item.id ? null : item.id))}
+                                        onNavigate={onClose}
+                                    />
+                                </li>
+                            ) : (
+                                <li key={item.to}>
+                                    <NavItem {...item} onClick={onClose} />
+                                </li>
+                            )
+                        )}
+                    </ul>
                 </nav>
 
-                {/* User Profile Card */}
-                {userRole === 'administrador' ? (
-                    <NavLink 
-                        to="/settings"
-                        onClick={onClose}
-                        className="p-4 mx-4 mb-4 rounded-2xl bg-gradient-to-br from-[#868CFF] to-[#4318FF] text-white shadow-2xl shadow-blue-500/30 relative overflow-hidden block hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer group"
-                    >
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-white opacity-[0.08] rounded-full -mr-6 -mt-6 group-hover:scale-110 transition-transform duration-350"></div>
-                        
-                        <div className="flex items-center justify-between relative z-10 gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-black text-sm shadow-inner flex-shrink-0">
-                                    {userDisplayName ? userDisplayName.substring(0, 2).toUpperCase() : 'AD'}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-sm font-bold text-white leading-tight truncate">{userDisplayName}</p>
-                                    <p className="text-[9px] text-white/80 font-medium tracking-wide mt-0.5 uppercase">
-                                        Administrador
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white group-hover:bg-white/20 transition-all duration-300 flex-shrink-0">
-                                <Settings size={15} className="transition-transform duration-500 ease-out group-hover:rotate-90 text-white" />
-                            </div>
+                {/* User */}
+                <div className="p-3 border-t border-white/[0.07] flex-shrink-0">
+                    <div className="flex items-center gap-3 p-2 rounded-xl">
+                        <div className="w-9 h-9 rounded-full bg-shell-2 ring-1 ring-white/10 flex items-center justify-center text-[12px] font-bold flex-shrink-0">
+                            {initials}
                         </div>
-                    </NavLink>
-                ) : (
-                    /* Simple Supervisor profile layout with logout button */
-                    userRole !== 'cajero' && (
-                        <div className="p-4 mx-4 mb-4 rounded-2xl bg-slate-50 border border-gray-100 flex flex-col gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-navy font-black text-sm shadow-sm flex-shrink-0">
-                                    {userDisplayName.substring(0, 2).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-xs font-bold text-navy leading-tight truncate">{userDisplayName}</p>
-                                    <p className="text-[8px] text-secondary font-black tracking-wide mt-0.5 uppercase opacity-65">
-                                        {userRole}
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={handleLogout}
-                                className="w-full py-1.5 bg-rose-50 hover:bg-rose-100/50 text-rose-600 rounded-xl text-xs font-bold transition-all border border-rose-100 cursor-pointer flex items-center justify-center gap-1.5"
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[13.5px] font-bold leading-tight truncate">{userDisplayName}</p>
+                            <p className="text-[12px] text-[#8E9AC0] leading-tight mt-0.5">{roleLabel[userRole] || userRole}</p>
+                        </div>
+                        {isAdmin && (
+                            <NavLink
+                                to="/settings"
+                                onClick={onClose}
+                                title="Configuración"
+                                aria-label="Configuración"
+                                className={({ isActive }) => `w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${isActive ? 'bg-primary text-white' : 'text-[#8E9AC0] hover:text-white hover:bg-white/10'}`}
                             >
-                                <LogOut size={12} />
-                                Cerrar Sesión
-                            </button>
-                        </div>
-                    )
-                )}
-            </div>
+                                <Settings size={17} />
+                            </NavLink>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className={`mt-1 w-full h-9 rounded-lg flex items-center justify-center gap-2 text-[13px] font-semibold transition-colors ${
+                            confirmOut ? 'bg-danger text-white' : 'text-[#8E9AC0] hover:text-white hover:bg-white/[0.06]'
+                        }`}
+                    >
+                        <LogOut size={15} />
+                        {confirmOut ? 'Toca de nuevo para salir' : 'Cerrar sesión'}
+                    </button>
+                </div>
+            </aside>
         </>
     );
 };
 
-const NavItem = ({ to, icon, label, onClick, end }) => {
-    return (
-        <NavLink
-            to={to}
-            onClick={onClick}
-            end={end}
-            className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 my-0.5 rounded-lg transition-all text-[15px] font-bold relative ${isActive
-                    ? 'text-primary font-extrabold bg-teal-50/40 shadow-sm'
-                    : 'text-slate-700 hover:bg-slate-50/70 hover:text-navy'
-                }`
-            }
-        >
-            {({ isActive }) => (
-                <>
-                    <span className={`${isActive ? 'text-primary' : 'text-slate-500'}`}>
-                        {icon}
-                    </span>
-                    <span>
-                        {label}
-                    </span>
-                    {isActive && (
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-primary rounded-l-lg"></div>
-                    )}
-                </>
-            )}
-        </NavLink>
-    );
-};
+const rowBase = 'group w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[14px] font-semibold transition-colors duration-150';
 
-const SubNavItem = ({ to, label, onClick, end }) => {
+const NavItem = ({ to, icon: Icon, label, onClick, end }) => (
+    <NavLink
+        to={to}
+        end={end}
+        onClick={onClick}
+        className={({ isActive }) =>
+            `${rowBase} ${
+                isActive
+                    ? 'bg-primary text-white shadow-[0_6px_16px_-8px_rgba(47,100,245,0.9)]'
+                    : 'text-[#B4BDD8] hover:text-white hover:bg-white/[0.06]'
+            }`
+        }
+    >
+        {({ isActive }) => (
+            <>
+                <Icon size={18} strokeWidth={2} className={isActive ? 'text-white' : 'text-[#7F8BB0] group-hover:text-white transition-colors'} />
+                <span className="truncate">{label}</span>
+            </>
+        )}
+    </NavLink>
+);
+
+const NavGroup = ({ item, open, active, onToggle, onNavigate }) => {
+    const Icon = item.icon;
+    const panelId = `nav-${item.id}`;
     return (
-        <NavLink
-            to={to}
-            onClick={onClick}
-            end={end}
-            className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 my-0.5 rounded-md transition-all text-sm font-bold relative ${isActive
-                    ? 'text-primary font-extrabold bg-teal-50/20'
-                    : 'text-slate-600 hover:bg-slate-50/45 hover:text-navy'
-                }`
-            }
-        >
-            {({ isActive }) => (
-                <>
-                    <span className={`w-1.5 h-1.5 rounded-full transition-transform ${isActive ? 'bg-primary scale-125' : 'bg-slate-400 opacity-60'}`}></span>
-                    <span>{label}</span>
-                </>
-            )}
-        </NavLink>
+        <div>
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                aria-controls={panelId}
+                className={`${rowBase} ${active ? 'text-white' : 'text-[#B4BDD8] hover:text-white hover:bg-white/[0.06]'} ${active && !open ? 'bg-white/[0.06]' : ''}`}
+            >
+                <Icon size={18} strokeWidth={2} className={active ? 'text-[#6FA0FF]' : 'text-[#7F8BB0] group-hover:text-white transition-colors'} />
+                <span className="flex-1 text-left truncate">{item.label}</span>
+                <ChevronDown
+                    size={15}
+                    className={`text-[#7F8BB0] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${open ? 'rotate-180' : ''}`}
+                />
+            </button>
+
+            {/* Height animates via grid rows; content stays in the DOM for a smooth close */}
+            <div
+                id={panelId}
+                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+            >
+                <ul className="overflow-hidden min-h-0" inert={!open ? '' : undefined}>
+                    <div className="relative ml-[21px] pl-3 py-1 border-l border-white/[0.09] flex flex-col gap-0.5">
+                        {item.children.map((c) => (
+                            <li key={c.to}>
+                                <NavLink
+                                    to={c.to}
+                                    end={c.end}
+                                    onClick={onNavigate}
+                                    className={({ isActive }) =>
+                                        `relative flex items-center h-9 px-3 rounded-lg text-[13.5px] font-semibold transition-colors duration-150 ${
+                                            isActive
+                                                ? 'bg-primary text-white shadow-[0_6px_16px_-8px_rgba(47,100,245,0.9)]'
+                                                : 'text-[#98A3C4] hover:text-white hover:bg-white/[0.06]'
+                                        }`
+                                    }
+                                >
+                                    {c.label}
+                                </NavLink>
+                            </li>
+                        ))}
+                    </div>
+                </ul>
+            </div>
+        </div>
     );
 };
 

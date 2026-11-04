@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 
 const NextPaymentCard = ({ bill }) => {

@@ -1,14 +1,14 @@
 :root {
   /* Colors - Based on Horizon UI (common template matching this style) */
-  --color-primary: #4318FF;
+  --color-primary: #2F64F5;
   --color-primary-light: #E9E3FF;
   /* Light purple tag background */
   --color-secondary: #2B3674;
   /* Dark Blue Text */
-  --color-secondary-grey: #A3AED0;
+  --color-secondary-grey: #9AA3B8;
   /* Muted Text */
 
-  --color-success: #05CD99;
+  --color-success: #12B76A;
   --color-success-light: #E6FDF9;
 
   --color-danger: #EE5D50;
@@ -17,17 +17,17 @@
   --color-warning: #FFCE20;
   --color-warning-light: #FFF9E5;
 
-  --color-info: #11CDEF;
+  --color-info: #1FC0E8;
 
   --color-background: #F4F7FE;
   /* user background */
   --color-surface: #FFFFFF;
 
   --color-text-primary: #2B3674;
-  --color-text-secondary: #A3AED0;
-  --color-text-disabled: #E0E5F2;
+  --color-text-secondary: #9AA3B8;
+  --color-text-disabled: #E3E7F0;
 
-  --color-border: #E0E5F2;
+  --color-border: #E3E7F0;
 
   /* Typography */
   --font-family: 'DM Sans', sans-serif;

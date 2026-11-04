@@ -26,3 +26,16 @@ dist-ssr
 
 
 
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Contains seed passwords
+supabase_schema.sql
+
+# Impeccable working files (keep design.json + surfaces)
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/review/

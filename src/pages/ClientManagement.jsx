@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, User, Phone, Mail, MapPin, X, Shield, Landmark } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -75,7 +75,7 @@ const ClientManagement = () => {
 
     const handleSave = async (e) => {
         e.preventDefault();
-        if (!formData.name.trim()) return;
+        if (!formData.name.trim() || !formData.documentId.trim()) return;
 
         setSaving(true);
         setError(null);
@@ -114,7 +114,7 @@ const ClientManagement = () => {
     );
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     if (loading) {
@@ -302,9 +302,10 @@ const ClientManagement = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cédula / RIF</label>
+                                    <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Cédula / RIF *</label>
                                     <input
                                         type="text"
+                                        required
                                         value={formData.documentId}
                                         onChange={(e) => setFormData(prev => ({ ...prev, documentId: e.target.value }))}
                                         placeholder="ej: V-12345678"
@@ -312,9 +313,9 @@ const ClientManagement = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Teléfono</label>
+                                    <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Teléfono (opcional)</label>
                                     <input
-                                        type="text"
+                                        type="tel"
                                         value={formData.phone}
                                         onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                                         placeholder="ej: 0412-1234567"
@@ -324,18 +325,7 @@ const ClientManagement = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Correo Electrónico</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                                    placeholder="ej: cliente@correo.com"
-                                    className="w-full p-3 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Dirección de Despacho</label>
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Dirección (opcional)</label>
                                 <input
                                     type="text"
                                     value={formData.address}

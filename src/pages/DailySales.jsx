@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, DollarSign, ArrowUpRight, ArrowDownRight, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../services/api';
-import { db } from '../firebase';
-import { writeBatch, doc } from 'firebase/firestore';
 
 const DailySales = () => {
     const [transactions, setTransactions] = useState([]);
@@ -37,20 +35,7 @@ const DailySales = () => {
     const handleDeleteDay = async (dateStr, count) => {
         if (window.confirm(`¿Estás seguro de eliminar TODAS las ${count} ventas del día ${dateStr}? Esta acción no se puede deshacer.`)) {
             try {
-                // Find all transactions for this dateStr (re-filtering from current state to be safe)
-                // Note: dateStr is the key from grouping "YYYY-MM-DD"
-                const txsToDelete = transactions.filter(tx => {
-                    const txDateStr = typeof tx.date === 'string' ? tx.date.split('T')[0] : '';
-                    return txDateStr === dateStr;
-                });
-
-                const batch = writeBatch(db);
-                txsToDelete.forEach(tx => {
-                    const docRef = doc(db, 'transactions', tx.id);
-                    batch.delete(docRef);
-                });
-
-                await batch.commit();
+                await api.deleteTransactionsByDate(dateStr);
                 fetchTransactions();
             } catch (error) {
                 console.error('Error deleting day:', error);
@@ -60,7 +45,7 @@ const DailySales = () => {
     }
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     // Group transactions by date

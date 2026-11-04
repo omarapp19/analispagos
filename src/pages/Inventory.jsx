@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
     Plus, Search, Edit, Trash2, Package, AlertTriangle, 
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
-    ArrowUpDown, Check, X, Loader2, DollarSign
-} from 'lucide-react';
+    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench } from 'lucide-react';
 import { api } from '../services/api';
-import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { subscribeToTable } from '../supabase';
 
 const Inventory = () => {
     const userRole = localStorage.getItem('userRole') || 'cajero';
@@ -43,26 +41,32 @@ const Inventory = () => {
         taxPercentage: '16' // Default IVA 16%
     });
 
-    // Subscriptions to Firestore (realtime)
+    // Subscriptions to Supabase (realtime)
     useEffect(() => {
-        const q = query(collection(db, 'inventory'), orderBy('createdAt', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const items = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
-                };
-            });
-            setProducts(items);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error subscribing to inventory:", error);
-            setLoading(false);
+        let isMounted = true;
+        const fetchInventory = async () => {
+            try {
+                const items = await api.getInventory();
+                if (isMounted) {
+                    setProducts(items);
+                    setLoading(false);
+                }
+            } catch (error) {
+                console.error("Error loading inventory:", error);
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchInventory();
+
+        const unsubscribe = subscribeToTable('inventory', () => {
+            fetchInventory();
         });
 
-        return () => unsubscribe();
+        return () => {
+            isMounted = false;
+            unsubscribe();
+        };
     }, []);
 
     // Form Calculations
@@ -316,7 +320,7 @@ const Inventory = () => {
     }, [products, searchTerm, statusFilter, sortBy, sortOrder]);
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     return (
@@ -364,9 +368,6 @@ const Inventory = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Cost Value Card */}
                 <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <Coins size={90} className="text-primary" />
-                    </div>
                     <div>
                         <p className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">Costo Invertido</p>
                         <h3 className="text-2xl font-bold text-navy">{formatCurrency(kpis.totalCostValue)}</h3>
@@ -379,9 +380,6 @@ const Inventory = () => {
 
                 {/* Estimated Value Card */}
                 <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <TrendingUp size={90} className="text-success" />
-                    </div>
                     <div>
                         <p className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">Venta Proyectada</p>
                         <h3 className="text-2xl font-bold text-navy">{formatCurrency(kpis.totalSaleValue)}</h3>
@@ -394,9 +392,6 @@ const Inventory = () => {
 
                 {/* Margen Promedio Card */}
                 <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <TrendingUp size={90} className="text-blue-500" />
-                    </div>
                     <div>
                         <p className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">Margen Promedio</p>
                         <h3 className="text-2xl font-bold text-navy">
@@ -411,9 +406,6 @@ const Inventory = () => {
 
                 {/* Low Stock Card */}
                 <div className="card bg-white p-6 rounded-2xl shadow-card border-none flex flex-col justify-between relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <AlertTriangle size={90} className="text-danger" />
-                    </div>
                     <div>
                         <p className="text-xs font-bold text-secondary uppercase tracking-wider mb-2">Alertas de Stock</p>
                         <h3 className="text-2xl font-bold text-navy">
@@ -784,7 +776,7 @@ const Inventory = () => {
                                     <Package size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-navy text-lg">{editingProduct ? 'Editar Producto' : 'Crear Producto'}</h3>
+                                    <h3 className="font-bold text-navy text-lg">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h3>
                                     <p className="text-xs text-secondary opacity-60">
                                         {editingProduct ? 'Modifica los detalles del producto' : 'Agrega un producto nuevo a tu catálogo'}
                                     </p>
@@ -806,24 +798,24 @@ const Inventory = () => {
                                 <button
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, productType: 'product' }))}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${
                                         formData.productType === 'product'
                                             ? 'bg-white text-primary shadow-sm'
                                             : 'text-secondary opacity-60 hover:opacity-100'
                                     }`}
                                 >
-                                    📦 Producto
+                                    <Package size={15} className="inline -mt-0.5 mr-1.5" />Producto
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setFormData(prev => ({ ...prev, productType: 'service' }))}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    className={`flex-1 h-10 rounded-lg text-sm font-bold transition-all ${
                                         formData.productType === 'service'
                                             ? 'bg-white text-primary shadow-sm'
                                             : 'text-secondary opacity-60 hover:opacity-100'
                                     }`}
                                 >
-                                    🛠️ Servicio
+                                    <Wrench size={15} className="inline -mt-0.5 mr-1.5" />Servicio
                                 </button>
                             </div>
 
@@ -1179,7 +1171,7 @@ const Inventory = () => {
                                     className="bg-primary hover:bg-primary/95 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
                                 >
                                     {savingForm ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                                    {editingProduct ? 'Guardar Cambios' : 'Registrar Producto'}
+                                    {editingProduct ? 'Guardar cambios' : 'Crear producto'}
                                 </button>
                             </div>
                         </form>

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BarChart3 } from 'lucide-react';
 
 const PerformanceCard = ({ stats = { income: 0, expenses: 0, salePercentage: 0, expensePercentage: 0 } }) => {

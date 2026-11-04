@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Calendar, FileText, CheckCircle, Clock, AlertTriangle, Landmark, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import AbonoFormModal from '../components/AbonoFormModal';
@@ -30,7 +30,7 @@ const CuentasPorPagar = () => {
     }, []);
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     // Calculate payable stats
@@ -77,18 +77,12 @@ const CuentasPorPagar = () => {
                         <p className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1">Total por Pagar</p>
                         <h3 className="text-2xl font-black text-danger">{formatCurrency(stats.totalPayable)}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-2xl bg-red-50 text-danger flex items-center justify-center">
-                        <Clock size={22} />
-                    </div>
                 </div>
 
                 <div className="card bg-white p-6 rounded-3xl flex items-center justify-between border border-transparent shadow-sm">
                     <div>
                         <p className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1">Facturas Pendientes</p>
                         <h3 className="text-2xl font-black text-navy">{stats.pendingBillsCount} compra(s)</h3>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-primary flex items-center justify-center">
-                        <FileText size={22} />
                     </div>
                 </div>
             </div>
@@ -145,9 +139,6 @@ const CuentasPorPagar = () => {
                                         <tr key={bill.id} className="hover:bg-gray-50/30 transition-colors align-middle">
                                             <td className="p-6">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold">
-                                                        <FileText size={16} />
-                                                    </div>
                                                     <div>
                                                         <span className="font-bold text-navy block">{bill.title}</span>
                                                         <span className="text-[10px] text-secondary opacity-50 block font-normal">

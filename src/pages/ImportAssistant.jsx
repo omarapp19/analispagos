@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Send, Bot, FileSpreadsheet, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from '../services/api';

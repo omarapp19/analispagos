@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { X, AlertCircle, Landmark, Clock, CheckCircle } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -58,7 +58,7 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, onAbonoClick
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     // Bulk payment logic
@@ -219,7 +219,7 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, onAbonoClick
                                                                 className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-[9px] font-bold border border-blue-100 cursor-pointer select-none"
                                                                 title="Ver documento de soporte"
                                                             >
-                                                                📎 Soporte
+                                                                Soporte
                                                             </button>
                                                         )}
                                                     </div>
@@ -327,7 +327,7 @@ const DayDetailsPanel = ({ onClose, date, bills = [], onBillUpdate, onAbonoClick
                         <div className="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold text-navy flex items-center gap-2">
-                                    📎 Documento de Soporte
+                                    Documento de Soporte
                                 </h3>
                                 <p className="text-xs text-secondary opacity-60 mt-0.5 truncate max-w-lg">
                                     {activeSupportFileName}

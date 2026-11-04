@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, User, Eye, EyeOff, Loader2, Landmark } from 'lucide-react';
-import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { Eye, EyeOff, Loader2, Package, ArrowRight, AlertCircle } from 'lucide-react';
+import { supabase, getSettingDoc } from '../supabase';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -11,8 +10,12 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const [storeName, setStoreName] = useState('');
 
-    // Check if already authenticated on mount
+    useEffect(() => {
+        getSettingDoc('global_settings').then((d) => d?.storeName && setStoreName(d.storeName)).catch(() => {});
+    }, []);
+
     useEffect(() => {
         if (localStorage.getItem('isAuthenticated') === 'true') {
             navigate('/', { replace: true });
@@ -27,152 +30,127 @@ const Login = () => {
         const inputUser = username.trim().toLowerCase();
 
         try {
-            // Check if users collection is empty
-            const usersColl = collection(db, 'users');
-            const usersSnap = await getDocs(usersColl);
-            
-            if (usersSnap.empty) {
-                // Seed default users
-                await setDoc(doc(db, 'users', 'omar'), {
-                    username: 'omar',
-                    password: 'omar123',
-                    name: 'Omar Pérez',
-                    role: 'administrador',
-                    createdAt: new Date()
-                });
-                await setDoc(doc(db, 'users', 'supervisor'), {
-                    username: 'supervisor',
-                    password: 'super123',
-                    name: 'Supervisor General',
-                    role: 'supervisor',
-                    createdAt: new Date()
-                });
-                await setDoc(doc(db, 'users', 'cajero'), {
-                    username: 'cajero',
-                    password: 'cajero123',
-                    name: 'Cajero Principal',
-                    role: 'cajero',
-                    createdAt: new Date()
-                });
-            }
+            const { data: user, error: queryErr } = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', inputUser)
+                .maybeSingle();
 
-            // Verify login credentials
-            const userDocRef = doc(db, 'users', inputUser);
-            const userDocSnap = await getDoc(userDocRef);
+            if (queryErr) throw queryErr;
 
-            if (userDocSnap.exists()) {
-                const userData = userDocSnap.data();
-                if (userData.password === password) {
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                    
-                    localStorage.setItem('isAuthenticated', 'true');
-                    localStorage.setItem('userRole', userData.role);
-                    localStorage.setItem('adminUser', userData.username);
-                    localStorage.setItem('userDisplayName', userData.name);
-                    
-                    navigate('/', { replace: true });
-                } else {
-                    setError('Usuario o contraseña incorrectos. Intente de nuevo.');
-                }
+            if (user && user.password === password) {
+                localStorage.setItem('isAuthenticated', 'true');
+                localStorage.setItem('userRole', user.role);
+                localStorage.setItem('adminUser', user.username);
+                localStorage.setItem('userDisplayName', user.name);
+                navigate(user.role === 'cajero' ? '/pos' : '/', { replace: true });
             } else {
-                setError('Usuario o contraseña incorrectos. Intente de nuevo.');
+                setError('Usuario o contraseña incorrectos. Revisa los datos e intenta de nuevo.');
             }
         } catch (err) {
-            console.error("Error validating credentials:", err);
-            setError('Error de conexión con la base de datos. Intente de nuevo.');
+            console.error('Error validating credentials:', err);
+            setError('No pudimos conectar con el servidor. Revisa tu conexión a internet e intenta de nuevo.');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900 overflow-hidden font-sans">
-            
-            {/* STUNNING PREMIUM BACKGROUND DECORATIVE GLOWS */}
-            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-primary/20 via-blue-500/5 to-transparent rounded-full filter blur-[80px] pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-teal-500/10 via-primary/5 to-transparent rounded-full filter blur-[80px] pointer-events-none"></div>
-            
-            {/* Grid structure background lines for corporate feel */}
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a_1px,transparent_1px),linear-gradient(to_bottom,#0f172a_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-35"></div>
+        <div className="min-h-screen w-full bg-shell text-white relative overflow-hidden flex">
+            {/* Atmosphere */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_70%_60%_at_30%_40%,#000_40%,transparent_100%)]" />
+            <div aria-hidden className="pointer-events-none absolute -top-40 -left-20 w-[720px] h-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(47,100,245,0.42),transparent)]" />
+            <div aria-hidden className="pointer-events-none absolute bottom-[-220px] right-[-120px] w-[640px] h-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(31,192,232,0.18),transparent)]" />
 
-            {/* LOGIN GLASSMORPHIC CARD */}
-            <div className="bg-slate-950/40 border border-slate-800/80 p-8 sm:p-10 rounded-3xl w-full max-w-md shadow-2xl backdrop-blur-xl relative z-10 animate-in zoom-in-95 duration-300 mx-4 flex flex-col items-center">
-                
-                {/* Brand / Logo */}
-                <div className="w-14 h-14 bg-gradient-to-br from-primary to-teal-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-teal-500/25 mb-6 hover:scale-105 active:scale-95 transition-transform duration-350">
-                    <Landmark size={28} className="animate-pulse" />
+            <div className="relative z-10 w-full max-w-[1200px] mx-auto px-5 sm:px-8 py-8 flex flex-col lg:flex-row lg:items-center gap-10 lg:gap-16">
+                {/* Message */}
+                <div className="flex-1 flex flex-col">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-[11px] flex items-center justify-center bg-[linear-gradient(135deg,#2F64F5,#1FC0E8)] shadow-[0_8px_20px_-8px_rgba(47,100,245,0.9)]">
+                            <Package size={18} strokeWidth={2.4} />
+                        </div>
+                        <span className="font-extrabold text-[17px] tracking-[-0.01em] min-h-[1em]">{storeName}</span>
+                    </div>
+
+                    <h1 className="text-white mt-10 lg:mt-16 text-[34px] sm:text-[46px] lg:text-[54px] leading-[1.04] font-extrabold tracking-[-0.035em] max-w-[560px]">
+                        Tu caja al día, en <span className="text-[#6FA0FF]">dólares</span> y <span className="text-[#5FD6F2]">bolívares</span>.
+                    </h1>
+                    <p className="mt-5 text-[16px] sm:text-[17px] leading-relaxed text-[#A9B6D9] max-w-[460px]">
+                        Ventas, inventario, compras y cuentas por cobrar y pagar en un solo lugar, con la tasa BCV sincronizada todos los días.
+                    </p>
+
+                    <ul className="hidden lg:flex mt-10 gap-8 text-[14px] text-[#A9B6D9]">
+                        {['Punto de venta', 'Inventario y kardex', 'Cuentas y vencimientos'].map((t) => (
+                            <li key={t} className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#4F86FF]" />{t}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
 
-                {/* Greeting Headers */}
-                <h2 className="text-xl sm:text-2xl font-black text-white text-center">Panel de Administración</h2>
-                <p className="text-xs text-slate-400 text-center mt-1.5 leading-relaxed max-w-[280px]">
-                    Ingresa tus credenciales personales para acceder al control de caja.
-                </p>
-
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="w-full mt-8 space-y-5">
-                    {error && (
-                        <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs font-bold text-center animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                            {error}
-                        </div>
-                    )}
-                    
-                    {/* Username Input */}
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Usuario *</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                required
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3.5 bg-slate-900/60 rounded-xl border border-slate-800 focus:border-primary outline-none font-bold text-white text-sm transition-all focus:ring-1 focus:ring-primary/30"
-                                placeholder="Ingresa tu usuario..."
-                            />
-                            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                        </div>
-                    </div>
+                <div className="w-full lg:w-[420px] flex-shrink-0">
+                    <div className="bg-white text-navy rounded-3xl p-7 sm:p-8 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.6)] animate-in">
+                        <h2 className="text-[22px] font-extrabold tracking-[-0.01em]">Iniciar sesión</h2>
+                        <p className="text-[14.5px] text-secondary mt-1">Entra con el usuario que te asignó el administrador.</p>
 
-                    {/* Password Input */}
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Contraseña *</label>
-                        <div className="relative">
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-10 pr-12 py-3.5 bg-slate-900/60 rounded-xl border border-slate-800 focus:border-primary outline-none font-bold text-white text-sm transition-all focus:ring-1 focus:ring-primary/30"
-                                placeholder="••••••••"
-                            />
-                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                            
-                            {/* Toggle Show/Hide password */}
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-800/50 rounded-lg text-slate-500 hover:text-white transition-colors cursor-pointer"
-                            >
-                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        <form onSubmit={handleSubmit} className="mt-7 space-y-4" noValidate>
+                            {error && (
+                                <div role="alert" className="flex gap-2.5 p-3 rounded-xl bg-[#FDECEC] text-[#B42328] text-[13.5px] font-semibold animate-fade-in">
+                                    <AlertCircle size={17} className="flex-shrink-0 mt-px" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <div>
+                                <label htmlFor="login-user" className="block text-[13.5px] font-semibold mb-1.5">Usuario</label>
+                                <input
+                                    id="login-user"
+                                    type="text"
+                                    autoComplete="username"
+                                    autoCapitalize="none"
+                                    required
+                                    autoFocus
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="field h-12"
+                                    placeholder="tu.usuario"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="login-pass" className="block text-[13.5px] font-semibold mb-1.5">Contraseña</label>
+                                <div className="relative">
+                                    <input
+                                        id="login-pass"
+                                        type={showPassword ? 'text' : 'password'}
+                                        autoComplete="current-password"
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="field h-12 pr-12"
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-secondary hover:text-navy hover:bg-gray-100"
+                                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                    >
+                                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button type="submit" disabled={loading || !username || !password} className="btn btn-primary w-full h-12 text-[15px] mt-2">
+                                {loading ? <Loader2 size={17} className="animate-spin" /> : null}
+                                {loading ? 'Verificando…' : 'Entrar'}
+                                {!loading && <ArrowRight size={17} />}
                             </button>
-                        </div>
+                        </form>
                     </div>
-
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-3.5 mt-4 bg-gradient-to-r from-primary to-teal-500 hover:from-teal-500 hover:to-primary text-white font-extrabold text-sm rounded-xl shadow-lg shadow-teal-500/10 hover:shadow-teal-500/20 active:scale-[0.98] transition-all duration-300 disabled:opacity-75 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                        {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-                        {loading ? 'Iniciando Sesión...' : 'Ingresar al Dashboard'}
-                    </button>
-                </form>
-            </div>
-            
-            {/* Subtle footer */}
-            <div className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-slate-600 font-medium">
-                Acceso Privado Administrador • Conexión Segura SSL
+                    <p className="mt-5 text-center text-[13px] text-[#7F8BB0]">¿Olvidaste tu contraseña? Pídele al administrador que la restablezca.</p>
+                </div>
             </div>
         </div>
     );

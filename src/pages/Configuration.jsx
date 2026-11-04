@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Trash2, Edit2, Shield, Eye, EyeOff } from 'lucide-react';
-import { db } from '../firebase'; 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { api } from '../services/api';
 
 const Configuration = () => {
@@ -39,9 +37,6 @@ const Configuration = () => {
     const [userError, setUserError] = useState(null);
     const [showPasswordMap, setShowPasswordMap] = useState({});
 
-    // Referencias
-    const settingsRef = doc(db, 'settings', 'global_settings');
-
     useEffect(() => {
         fetchSettings();
         if (currentUserRole === 'administrador') {
@@ -51,9 +46,9 @@ const Configuration = () => {
 
     const fetchSettings = async () => {
         try {
-            const docSnap = await getDoc(settingsRef);
-            if (docSnap.exists()) {
-                setSettings(docSnap.data());
+            const data = await api.getSettings('global_settings');
+            if (data) {
+                setSettings(data);
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -88,15 +83,12 @@ const Configuration = () => {
         setMessage(null);
 
         try {
-            await setDoc(settingsRef, {
-                ...settings,
-                updatedAt: new Date()
-            });
+            await api.updateSettings('global_settings', settings);
             setMessage({ type: 'success', text: 'Configuración guardada exitosamente' });
             setTimeout(() => window.location.reload(), 1500);
         } catch (error) {
             console.error('Error saving settings:', error);
-            setMessage({ type: 'error', text: 'Error al conectar con Firebase' });
+            setMessage({ type: 'error', text: 'Error al conectar con la base de datos' });
         } finally {
             setSaving(false);
         }

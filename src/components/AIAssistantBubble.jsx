@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { 
     Bot, Sparkles, X, UploadCloud, CheckCircle2, Loader2, 
     FileSpreadsheet, ChevronDown, ChevronUp, AlertCircle, Calendar
@@ -293,17 +293,17 @@ const AIAssistantBubble = () => {
     };
 
     const formatMoney = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-[9999] no-print select-none">
+        <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 no-print select-none">
             {/* FLOATING CHATBOX WINDOW */}
             {isOpen && (
                 <div className="absolute bottom-16 right-0 w-[calc(100vw-2.5rem)] sm:w-[400px] h-[540px] bg-white rounded-2xl shadow-xl border border-slate-200/90 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
                     
                     {/* Soft Vibrant Header (No harsh black) */}
-                    <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-3 text-white flex items-center justify-between shadow-sm relative overflow-hidden">
+                    <div className="bg-shell px-4 py-3 text-white flex items-center justify-between shadow-sm relative overflow-hidden">
                         <div className="flex items-center gap-2.5 relative z-10">
                             <div className="relative">
                                 <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20">
@@ -462,7 +462,7 @@ const AIAssistantBubble = () => {
                                     <Bot size={14} />
                                 </div>
                                 <div className="bg-white border border-slate-200 rounded-xl rounded-tl-xs px-3 py-2 shadow-xs flex gap-1 items-center">
-                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce"></span>
+                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>
                                     <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
                                     <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
                                     <span className="text-[10px] font-normal text-slate-400 ml-1">Analizando Excel...</span>
@@ -507,12 +507,10 @@ const AIAssistantBubble = () => {
 
             {/* MAIN FLOATING CIRCULAR TOGGLE BUTTON */}
             <div className="relative group">
-                {/* Soft Ambient Glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full blur-md opacity-70 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
                 
                 <button
                     onClick={() => setIsOpen(!isOpen)}
-                    className={`relative w-14 h-14 bg-gradient-to-tr from-indigo-600 to-violet-600 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all duration-300 border border-indigo-400/30 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
+                    className={`relative w-12 h-12 md:w-14 md:h-14 bg-shell text-white rounded-full flex items-center justify-center shadow-[0_10px_24px_-8px_rgba(10,17,40,0.55),0_2px_6px_rgba(10,17,40,0.2)] ring-1 ring-white/10 hover:bg-shell-2 transition-[transform,background-color] duration-200 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
                     title="Asistente de Conciliación IA"
                 >
                     {isOpen ? (

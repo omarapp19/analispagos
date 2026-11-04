@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 const PaymentMixChart = ({ transactions = [] }) => {
@@ -17,12 +17,12 @@ const PaymentMixChart = ({ transactions = [] }) => {
 
         // Map expected methods to colors
         const colors = {
-            'Efectivo': '#05CD99', // Success Green
-            'Tarjeta': '#4318FF',  // Primary Blue
-            'Transferencia': '#11CDEF', // Info Cyan
-            'Divisas': '#FFB547', // Orange
-            'Pago Móvil': '#E6007A', // Pink
-            'Otros': '#A3AED0'
+            'Efectivo': '#12B76A', // Success Green
+            'Tarjeta': '#2F64F5',  // Primary Blue
+            'Transferencia': '#1FC0E8', // Info Cyan
+            'Divisas': '#F5A524', // Orange
+            'Pago Móvil': '#E5484D', // Pink
+            'Otros': '#9AA3B8'
         };
 
         return Object.entries(mix).map(([name, value]) => ({
@@ -70,7 +70,7 @@ const PaymentMixChart = ({ transactions = [] }) => {
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
-                            data={data.length > 0 ? data : [{ name: 'Sin datos', value: 100, color: '#E0E5F2' }]}
+                            data={data.length > 0 ? data : [{ name: 'Sin datos', value: 100, color: '#E3E7F0' }]}
                             cx="50%"
                             cy="50%"
                             innerRadius={75}
@@ -82,7 +82,7 @@ const PaymentMixChart = ({ transactions = [] }) => {
                         >
                             {data.length > 0 ? data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
-                            )) : <Cell fill="#E0E5F2" />}
+                            )) : <Cell fill="#E3E7F0" />}
                         </Pie>
                     </PieChart>
                 </ResponsiveContainer>

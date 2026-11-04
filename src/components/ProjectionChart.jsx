@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const ProjectionChart = ({ balance, bills = [], dailyAverage = 0 }) => {
@@ -49,8 +49,8 @@ const ProjectionChart = ({ balance, bills = [], dailyAverage = 0 }) => {
                     <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#4318FF" stopOpacity={0.2} />
-                                <stop offset="95%" stopColor="#4318FF" stopOpacity={0} />
+                                <stop offset="5%" stopColor="#2F64F5" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#2F64F5" stopOpacity={0} />
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -58,14 +58,14 @@ const ProjectionChart = ({ balance, bills = [], dailyAverage = 0 }) => {
                             dataKey="date"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#A3AED0', fontSize: 12 }}
+                            tick={{ fill: '#9AA3B8', fontSize: 12 }}
                             interval={4}
                         />
                         <YAxis
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#A3AED0', fontSize: 12 }}
-                            tickFormatter={(value) => `$${value / 1000}k`}
+                            tick={{ fill: '#9AA3B8', fontSize: 12 }}
+                            tickFormatter={(value) => Math.abs(value) >= 1000 ? `$${(value / 1000).toLocaleString("es-VE", { maximumFractionDigits: 1 })}k` : `$${Math.round(value)}`}
                         />
                         <Tooltip
                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
@@ -74,7 +74,7 @@ const ProjectionChart = ({ balance, bills = [], dailyAverage = 0 }) => {
                         <Area
                             type="monotone"
                             dataKey="balance"
-                            stroke="#4318FF"
+                            stroke="#2F64F5"
                             strokeWidth={3}
                             fillOpacity={1}
                             fill="url(#colorBalance)"
@@ -85,7 +85,7 @@ const ProjectionChart = ({ balance, bills = [], dailyAverage = 0 }) => {
 
             <div className="flex gap-4 mt-4 justify-center">
                 <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#4318FF]"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#2F64F5]"></div>
                     <span className="text-xs font-bold text-secondary">Saldo Estimado</span>
                 </div>
             </div>

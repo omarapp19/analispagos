@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark, Filter, Search, X } from 'lucide-react';
 import { api } from '../services/api';
@@ -51,7 +51,7 @@ const Invoices = () => {
     }, []);
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     const handleDelete = async (id) => {
@@ -105,24 +105,25 @@ const Invoices = () => {
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <button
                         onClick={() => navigate('/compras/nueva')}
-                        className="btn btn-primary flex items-center gap-2 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
+                        className="btn btn-primary"
                     >
                         <Plus size={16} />
-                        Nueva Compra (Inventario)
+                        Nueva compra
                     </button>
                     <button
                         onClick={() => setShowExpenseModal(true)}
-                        className="btn bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-2 shadow-lg justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border-none"
+                        className="btn btn-outline"
+                        title="Nómina, servicios y otros gastos"
                     >
                         <Plus size={16} />
-                        Registrar Gasto (Nómina/Servicios)
+                        Registrar gasto
                     </button>
                     <button
                         onClick={() => setShowRecurringModal(true)}
-                        className="btn bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-2 shadow-lg justify-center text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border-none"
+                        className="btn btn-outline"
                     >
                         <CalendarIcon size={16} />
-                        Gastos Fijos Programados
+                        Gastos fijos
                     </button>
                 </div>
             </div>
@@ -154,7 +155,7 @@ const Invoices = () => {
                                 onChange={(e) => setFilter(e.target.value)}
                                 className="bg-transparent focus:outline-none pr-4 cursor-pointer text-navy font-bold w-full sm:w-auto"
                             >
-                                <option value="ALL">Todas (Pendientes primero de mayor a menor, Pagadas al final)</option>
+                                <option value="ALL">Todas · pendientes primero</option>
                                 <option value="PENDING_DESC">Pendientes (Mayor a Menor)</option>
                                 <option value="PAID">Pagadas</option>
                             </select>
@@ -212,7 +213,7 @@ const Invoices = () => {
                                                                 className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer select-none"
                                                                 title="Ver documento de soporte"
                                                             >
-                                                                📎 Soporte
+                                                                Soporte
                                                             </button>
                                                         )}
                                                     </div>
@@ -323,7 +324,7 @@ const Invoices = () => {
                         <div className="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold text-navy flex items-center gap-2">
-                                    📎 Documento de Soporte
+                                    Documento de Soporte
                                 </h3>
                                 <p className="text-xs text-secondary opacity-60 mt-0.5 truncate max-w-lg">
                                     {activeSupportFileName}

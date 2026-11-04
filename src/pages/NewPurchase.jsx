@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Search, Plus, Trash2, Save, FileText, Landmark, User, X, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -339,7 +339,7 @@ const NewPurchase = () => {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     return (
@@ -473,7 +473,7 @@ const NewPurchase = () => {
                                         onChange={handleFileChange}
                                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                     />
-                                    <span className="text-[9px] font-bold text-primary truncate block">📎 Cargar archivo</span>
+                                    <span className="text-[9px] font-bold text-primary truncate block">Cargar archivo</span>
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-between p-2 bg-blue-50 border border-blue-100 rounded-xl">
@@ -605,7 +605,7 @@ const NewPurchase = () => {
                                                                     onClick={() => handleCreateNewProductInline(index)}
                                                                     className="w-full p-2.5 px-3 text-left bg-teal-50 hover:bg-teal-100/70 text-[11px] font-black text-teal-600 border-none flex justify-between items-center cursor-pointer"
                                                                 >
-                                                                    <span>✨ Crear: "{item.searchQuery.toUpperCase()}"</span>
+                                                                    <span>Crear: "{item.searchQuery.toUpperCase()}"</span>
                                                                 </button>
                                                             </div>
                                                         )}

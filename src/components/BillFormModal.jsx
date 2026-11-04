@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Check, Loader2, Plus, Trash2, Search, Package, Info, Sparkles } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -313,7 +313,7 @@ const BillFormModal = ({ onClose, onBillAdded }) => {
                     {/* Support Document Upload */}
                     <div className="bg-slate-50 p-4 rounded-xl border border-gray-200/60 flex-shrink-0">
                         <label className="text-xs font-bold text-navy uppercase tracking-wider mb-1 block flex items-center gap-1.5">
-                            📎 Documento de Soporte (Opcional)
+                            Documento de Soporte (Opcional)
                         </label>
                         <p className="text-[11px] text-secondary opacity-65 mb-2.5">
                             Sube una foto (PNG, JPG) o un archivo PDF de la factura física como respaldo (Máx. 1MB).

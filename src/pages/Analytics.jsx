@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Download, Wallet, Banknote, AlertCircle } from 'lucide-react';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { api } from '../services/api';
 import StatCard from '../components/StatCard';
 import ProjectionChart from '../components/ProjectionChart';
@@ -22,10 +20,9 @@ const Analytics = () => {
             // Fetch Settings
             let settingsInclude = false;
             try {
-                const settingsRef = doc(db, 'settings', 'global_settings');
-                const settingsSnap = await getDoc(settingsRef);
-                if (settingsSnap.exists()) {
-                    settingsInclude = settingsSnap.data().includeDivisas || false;
+                const globalSettings = await api.getSettings('global_settings');
+                if (globalSettings) {
+                    settingsInclude = globalSettings.includeDivisas || false;
                 }
             } catch (err) {
                 console.warn("Could not fetch settings", err);
@@ -81,7 +78,7 @@ const Analytics = () => {
     }, []);
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     // --- Time Reference ---

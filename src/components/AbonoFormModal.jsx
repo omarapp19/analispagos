@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Check, Loader2, ArrowUpRight, ArrowDownRight, Landmark } from 'lucide-react';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { api } from '../services/api';
 
 const AbonoFormModal = ({ isOpen, onClose, bill, onAbonoAdded }) => {
@@ -17,12 +15,9 @@ const AbonoFormModal = ({ isOpen, onClose, bill, onAbonoAdded }) => {
         
         const fetchRates = async () => {
             try {
-                const docSnap = await getDoc(doc(db, 'settings', 'exchange_rates'));
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data.bcv) {
-                        setExchangeRate(data.bcv.toString());
-                    }
+                const data = await api.getSettings('exchange_rates');
+                if (data && data.bcv) {
+                    setExchangeRate(data.bcv.toString());
                 }
             } catch (err) {
                 console.error("Error loading exchange rates for abono:", err);
@@ -55,7 +50,7 @@ const AbonoFormModal = ({ isOpen, onClose, bill, onAbonoAdded }) => {
     if (!isOpen || !bill) return null;
 
     const formatCurrency = (val) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(val);
     };
 
     const formatBs = (val) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, TrendingUp, Calendar, Trash2, Search, X, Loader2, ArrowUpRight, Check } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -86,7 +86,7 @@ const Investments = () => {
     };
 
     const formatCurrency = (val) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(val);
     };
 
     // Filter Investments
@@ -153,9 +153,6 @@ const Investments = () => {
                         <p className="text-xs text-secondary font-bold opacity-60 uppercase mb-1">Total Inyectado (USD)</p>
                         <h3 className="text-3xl font-black text-teal-650">{formatCurrency(totalAmount)}</h3>
                     </div>
-                    <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center text-teal-600 shadow-sm">
-                        <TrendingUp size={24} />
-                    </div>
                 </div>
 
                 {/* Capital Injections Count */}
@@ -163,9 +160,6 @@ const Investments = () => {
                     <div>
                         <p className="text-xs text-secondary font-bold opacity-60 uppercase mb-1">Inyecciones Realizadas</p>
                         <h3 className="text-3xl font-black text-navy">{investments.length}</h3>
-                    </div>
-                    <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-primary shadow-sm">
-                        <ArrowUpRight size={24} />
                     </div>
                 </div>
 
@@ -185,9 +179,6 @@ const Investments = () => {
                         ) : (
                             <h3 className="text-sm font-semibold text-secondary italic">Sin registros</h3>
                         )}
-                    </div>
-                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-warning shadow-sm flex-shrink-0">
-                        <Calendar size={24} />
                     </div>
                 </div>
 

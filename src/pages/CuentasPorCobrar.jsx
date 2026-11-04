@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Calendar, FileText, CheckCircle, Clock, AlertTriangle, Landmark, X } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -30,7 +30,7 @@ const CuentasPorCobrar = () => {
     }, []);
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
 
     // Calculate receivable metrics
@@ -100,9 +100,6 @@ const CuentasPorCobrar = () => {
                         <p className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1">Total por Cobrar</p>
                         <h3 className="text-2xl font-black text-navy">{formatCurrency(stats.totalReceivables)}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-orange-500 flex items-center justify-center">
-                        <Clock size={22} />
-                    </div>
                 </div>
 
                 <div className="card bg-white p-6 rounded-3xl flex items-center justify-between border border-red-50 shadow-sm">
@@ -110,18 +107,12 @@ const CuentasPorCobrar = () => {
                         <p className="text-[10px] font-bold text-danger uppercase tracking-wider mb-1">Monto Vencido</p>
                         <h3 className="text-2xl font-black text-danger">{formatCurrency(stats.totalOverdue)}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-2xl bg-red-50 text-danger flex items-center justify-center animate-pulse">
-                        <AlertTriangle size={22} />
-                    </div>
                 </div>
 
                 <div className="card bg-white p-6 rounded-3xl flex items-center justify-between border border-transparent shadow-sm">
                     <div>
                         <p className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1 font-bold">Créditos Pendientes</p>
                         <h3 className="text-2xl font-black text-navy">{stats.pendingInvoicesCount} factura(s)</h3>
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-primary flex items-center justify-center">
-                        <FileText size={22} />
                     </div>
                 </div>
             </div>
@@ -277,11 +268,11 @@ const CuentasPorCobrar = () => {
                                     onChange={(e) => setPayMethod(e.target.value)}
                                     className="w-full p-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs font-bold text-navy focus:border-primary cursor-pointer"
                                 >
-                                    <option value="Efectivo">💵 Efectivo</option>
-                                    <option value="Pago Móvil">📱 Pago Móvil</option>
-                                    <option value="Tarjeta">💳 Tarjeta de Débito/Crédito</option>
-                                    <option value="Transferencia">🏛️ Transferencia Bancaria</option>
-                                    <option value="Divisas">💵 Divisas (Dólares)</option>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Pago Móvil">Pago Móvil</option>
+                                    <option value="Tarjeta">Tarjeta de Débito/Crédito</option>
+                                    <option value="Transferencia">Transferencia Bancaria</option>
+                                    <option value="Divisas">Divisas (Dólares)</option>
                                 </select>
                             </div>
 
