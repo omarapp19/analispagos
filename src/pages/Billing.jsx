@@ -47,7 +47,7 @@ const Billing = () => {
         storeName: 'Galpon',
         storeTaxId: 'J-12345678-9',
         storePhone: '0212-5555555',
-        storeAddress: 'Caracas, Venezuela'
+        storeAddress: 'Barrio Sur América, Maracaibo 4004, Zulia'
     });
 
     // POS Form States

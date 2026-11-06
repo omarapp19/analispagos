@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Trash2, Edit2, Shield } from 'lucide-react';
+import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Trash2, Edit2, Shield, ExternalLink } from 'lucide-react';
 import { api } from '../services/api';
 import { supabase } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
@@ -24,7 +24,9 @@ const Configuration = () => {
         adminName: 'Omar Pérez',
         storeTaxId: 'J-12345678-9',
         storePhone: '0212-5555555',
-        storeAddress: 'Caracas, Venezuela',
+        storeAddress: 'Barrio Sur América, Maracaibo 4004, Zulia',
+        mapUrl: 'https://maps.app.goo.gl/ARGBEvjYQHr4oFa76',
+        coordinates: { lat: 10.584552, lng: -71.657868 },
         includeDivisas: false 
     });
     const [loading, setLoading] = useState(true);
@@ -376,16 +378,53 @@ const Configuration = () => {
                                                 placeholder="Ej: 0212-5555555"
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-navy mb-2 uppercase tracking-wider">Dirección Física</label>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <label className="block text-xs font-bold text-navy uppercase tracking-wider">Dirección Física</label>
+                                                <a
+                                                    href={settings.mapUrl || "https://maps.app.goo.gl/ARGBEvjYQHr4oFa76"}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-xs text-primary font-bold hover:underline"
+                                                >
+                                                    <ExternalLink size={12} />
+                                                    Abrir en Google Maps
+                                                </a>
+                                            </div>
                                             <input
                                                 type="text"
                                                 name="storeAddress"
                                                 value={settings.storeAddress || ''}
                                                 onChange={handleChange}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-sm"
-                                                placeholder="Ej: Caracas, Venezuela"
+                                                placeholder="Ej: Barrio Sur América, Maracaibo 4004, Zulia"
                                             />
+
+                                            {/* Preview interactivo de la ubicación en Google Maps */}
+                                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-xs mt-2">
+                                                <div className="flex items-center justify-between px-3.5 py-2 bg-gray-100 border-b border-gray-200 text-xs font-bold text-navy">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <MapPin size={14} className="text-primary" />
+                                                        <span>Ubicación GPS: <strong className="font-mono text-primary">10.584552, -71.657868</strong></span>
+                                                    </span>
+                                                    <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">
+                                                        Barrio Sur América, Zulia
+                                                    </span>
+                                                </div>
+                                                <div className="w-full h-52 relative bg-gray-200">
+                                                    <iframe
+                                                        title="Ubicación comercial en Google Maps"
+                                                        src="https://maps.google.com/maps?q=10.584552,-71.657868&hl=es&z=17&output=embed"
+                                                        width="100%"
+                                                        height="100%"
+                                                        style={{ border: 0 }}
+                                                        allowFullScreen=""
+                                                        loading="lazy"
+                                                        referrerPolicy="no-referrer-when-downgrade"
+                                                        className="w-full h-full"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

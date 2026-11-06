@@ -12,7 +12,9 @@ const must = ({ data, error }) => {
 export const DEFAULT_TIENDA_PUBLICA = {
     storeOpen: false,
     whatsapp: '',
-    address: '',
+    address: 'Barrio Sur América, Maracaibo 4004, Zulia',
+    mapUrl: 'https://maps.app.goo.gl/ARGBEvjYQHr4oFa76',
+    coordinates: { lat: 10.584552, lng: -71.657868 },
     hours: 'Lun–Vie 8:00–17:00 · Sáb 8:00–13:00',
     payments: {
         pago_movil: { enabled: false, bank: '', phone: '', document: '' },

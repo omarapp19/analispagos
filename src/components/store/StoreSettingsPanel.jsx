@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Save, Plus, Trash2, Lock, Globe, Loader2, AlertTriangle } from 'lucide-react';
+import { Save, Plus, Trash2, Lock, Globe, Loader2, AlertTriangle, MapPin, ExternalLink } from 'lucide-react';
 import { getStoreSettings, saveStoreSettings } from '../../services/storeApi';
 
 // Configuración de la tienda web.
@@ -131,6 +131,8 @@ const StoreSettingsPanel = () => {
                 ...pub,
                 whatsapp: pub.whatsapp.trim(),
                 address: pub.address.trim(),
+                mapUrl: (pub.mapUrl || 'https://maps.app.goo.gl/ARGBEvjYQHr4oFa76').trim(),
+                coordinates: pub.coordinates || { lat: 10.584552, lng: -71.657868 },
                 hours: pub.hours.trim(),
                 igtfPct: num(pub.igtfPct),
                 reservationHours: Math.round(num(pub.reservationHours, 24)),
@@ -199,9 +201,71 @@ const StoreSettingsPanel = () => {
                         <input className="field" value={pub.hours} onChange={(e) => setAt(['hours'], e.target.value)} placeholder="Lun–Vie 8:00–17:00 · Sáb 8:00–13:00" />
                     </Field>
                 </div>
-                <Field label="Dirección de la tienda" hint="Para retiro en tienda y el pie de página.">
-                    <input className="field" value={pub.address} onChange={(e) => setAt(['address'], e.target.value)} placeholder="Av. 5 de Julio con calle 77, Maracaibo, Zulia" />
-                </Field>
+                <div className="space-y-4">
+                    <Field label="Dirección de la tienda" hint="Para retiro en tienda, facturación y pie de página.">
+                        <input className="field" value={pub.address} onChange={(e) => setAt(['address'], e.target.value)} placeholder="Barrio Sur América, Maracaibo 4004, Zulia" />
+                    </Field>
+
+                    <Field label="Ubicación exacta / Enlace de Google Maps" hint="Enlace directo compartido para que los clientes lleguen por GPS.">
+                        <div className="flex gap-2">
+                            <input
+                                className="field flex-1"
+                                value={pub.mapUrl || ''}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setAt(['mapUrl'], val);
+                                    const coordsMatch = val.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/);
+                                    if (coordsMatch) {
+                                        setAt(['coordinates'], { lat: parseFloat(coordsMatch[1]), lng: parseFloat(coordsMatch[2]) });
+                                    }
+                                }}
+                                placeholder="https://maps.app.goo.gl/ARGBEvjYQHr4oFa76"
+                            />
+                            {pub.mapUrl && (
+                                <a
+                                    href={pub.mapUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-secondary flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold shrink-0 text-primary hover:bg-primary/5 rounded-xl border border-line transition-colors"
+                                    title="Abrir en Google Maps"
+                                >
+                                    <ExternalLink size={14} />
+                                    <span>Ver en Google Maps</span>
+                                </a>
+                            )}
+                        </div>
+                    </Field>
+
+                    {/* Vista previa interactiva de la ubicación exacta en el mapa */}
+                    <div className="overflow-hidden rounded-xl border border-line bg-gray-50 shadow-xs">
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-gray-100/90 border-b border-line text-xs font-bold text-navy">
+                            <span className="flex items-center gap-2">
+                                <MapPin size={15} className="text-primary shrink-0" />
+                                <span>Coordenadas GPS: <strong className="font-mono text-primary">10.584552, -71.657868</strong></span>
+                            </span>
+                            <span className="text-[11.5px] text-secondary font-medium hidden sm:inline">
+                                Barrio Sur América, Zulia
+                            </span>
+                        </div>
+                        <div className="w-full h-64 relative bg-gray-200">
+                            <iframe
+                                title="Ubicación exacta de la tienda"
+                                src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                                    pub.coordinates?.lat && pub.coordinates?.lng
+                                        ? `${pub.coordinates.lat},${pub.coordinates.lng}`
+                                        : '10.584552,-71.657868'
+                                )}&hl=es&z=17&output=embed`}
+                                width="100%"
+                                height="100%"
+                                style={{ border: 0 }}
+                                allowFullScreen=""
+                                loading="lazy"
+                                referrerPolicy="no-referrer-when-downgrade"
+                                className="w-full h-full"
+                            />
+                        </div>
+                    </div>
+                </div>
             </Section>
 
             <Section privado title="Precios e impuestos" hint="Cómo calcula la base el precio final de cada pedido.">
