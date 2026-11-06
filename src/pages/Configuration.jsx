@@ -3,10 +3,16 @@ import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Tra
 import { api } from '../services/api';
 import { supabase } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
+import StoreSettingsPanel from '../components/store/StoreSettingsPanel';
 
+const TABS = [
+    ['general', 'Datos del Comercio'],
+    ['users', 'Gestión de Usuarios y Roles'],
+    ['tienda', 'Tienda web'],
+];
 
 const Configuration = () => {
-    const [activeTab, setActiveTab] = useState('general'); // 'general' | 'users'
+    const [activeTab, setActiveTab] = useState('general'); // 'general' | 'users' | 'tienda'
     
     // Check role
     const currentUserRole = getRole();
@@ -270,30 +276,27 @@ const Configuration = () => {
             </div>
 
             {/* Sub Tabs Navigation */}
-            <div className="flex border-b border-gray-200 gap-6">
-                <button
-                    onClick={() => setActiveTab('general')}
-                    className={`pb-3 font-bold text-sm transition-all relative ${
-                        activeTab === 'general' ? 'text-primary' : 'text-secondary opacity-60 hover:opacity-100'
-                    }`}
-                >
-                    Datos del Comercio
-                    {activeTab === 'general' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('users')}
-                    className={`pb-3 font-bold text-sm transition-all relative ${
-                        activeTab === 'users' ? 'text-primary' : 'text-secondary opacity-60 hover:opacity-100'
-                    }`}
-                >
-                    Gestión de Usuarios y Roles
-                    {activeTab === 'users' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
-                    )}
-                </button>
+            <div className="flex border-b border-gray-200 gap-6 overflow-x-auto" role="tablist">
+                {TABS.map(([key, label]) => (
+                    <button
+                        key={key}
+                        role="tab"
+                        aria-selected={activeTab === key}
+                        onClick={() => setActiveTab(key)}
+                        className={`pb-3 font-bold text-sm transition-all relative whitespace-nowrap ${
+                            activeTab === key ? 'text-primary' : 'text-secondary opacity-60 hover:opacity-100'
+                        }`}
+                    >
+                        {label}
+                        {activeTab === key && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
+                        )}
+                    </button>
+                ))}
             </div>
+
+            {/* Tienda web */}
+            {activeTab === 'tienda' && <StoreSettingsPanel />}
 
             {/* General Tab */}
             {activeTab === 'general' && (

@@ -2,10 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { 
     Plus, Search, Edit, Trash2, Package, AlertTriangle, 
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
-    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench } from 'lucide-react';
+    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe } from 'lucide-react';
 import { api } from '../services/api';
 import { subscribeToTable } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
+import ProductWebTab from '../components/store/ProductWebTab';
+import { emptyWebForm, webFormFromProduct, webColumns } from '../components/store/productWebForm';
+import { getCategories, getMakes, getModels, getFitments, replaceFitments, removeProductImage, imageUrl } from '../services/storeApi';
+
+// Producto publicado al que le falta algo que la tienda necesita para verse bien.
+const webIssues = (p) => {
+    if (!p.webPublished) return [];
+    const out = [];
+    if (!p.categoryId) out.push('categoría');
+    if (!(p.images?.length) && !/^https?:/i.test(p.image || '')) out.push('imagen');
+    return out;
+};
 
 
 const Inventory = () => {
@@ -42,6 +54,34 @@ const Inventory = () => {
         imageType: 'url', // 'url' | 'base64'
         taxPercentage: '16' // Default IVA 16%
     });
+
+    // Tienda web (pestaña del formulario). storeReady = las tablas de la tienda existen (migración 0003).
+    const [modalTab, setModalTab] = useState('datos'); // 'datos' | 'web'
+    const [webForm, setWebForm] = useState(emptyWebForm);
+    const [storeReady, setStoreReady] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [vehicles, setVehicles] = useState({ makes: [], models: [] });
+
+    useEffect(() => {
+        let alive = true;
+        Promise.all([getCategories(), getMakes(), getModels()])
+            .then(([cats, makes, models]) => {
+                if (!alive) return;
+                setCategories(cats);
+                setVehicles({ makes, models });
+                setStoreReady(true);
+            })
+            .catch((e) => console.warn('Tienda web no disponible (¿falta la migración 0003?):', e.message));
+        return () => { alive = false; };
+    }, []);
+
+    // Al abrir el formulario de un producto nuevo, la pestaña web arranca vacía.
+    useEffect(() => {
+        if (!isModalOpen) return;
+        setModalTab('datos');
+        if (!editingProduct) setWebForm(emptyWebForm());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isModalOpen]);
 
     // Subscriptions to Supabase (realtime)
     useEffect(() => {
@@ -160,13 +200,22 @@ const Inventory = () => {
                 image: (formData.image || '').trim(),
                 taxPercentage: parseFloat(formData.taxPercentage) || 0,
                 username: username,
-                unitsPerPackage: isService ? 1 : (parseInt(formData.unitsPerPackage) || 1)
+                unitsPerPackage: isService ? 1 : (parseInt(formData.unitsPerPackage) || 1),
+                // Los servicios nunca se publican en la tienda.
+                ...(storeReady ? (isService ? { webPublished: false } : webColumns(webForm)) : {})
             };
 
             if (editingProduct) {
                 await api.updateInventoryItem(editingProduct.id, productData);
+                if (storeReady && !isService && webForm.fitmentsDirty) {
+                    await replaceFitments(editingProduct.id, webForm.fitments);
+                }
             } else {
                 await api.createInventoryItem(productData);
+            }
+            // Imágenes quitadas en el formulario: se borran del bucket solo después de guardar.
+            for (const path of webForm.removedImages) {
+                if (!webForm.images.includes(path)) await removeProductImage(path);
             }
 
             // Reset Form and close modal
@@ -233,7 +282,22 @@ const Inventory = () => {
             packageQty: '0',
             looseQty: '0'
         });
+        setWebForm(webFormFromProduct(product));
         setIsModalOpen(true);
+        if (storeReady) {
+            getFitments(product.id)
+                .then((rows) => setWebForm((prev) => prev.fitmentsDirty ? prev : ({
+                    ...prev,
+                    fitments: rows.map((f) => ({
+                        makeId: vehicles.models.find((m) => m.id === f.modelId)?.makeId || '',
+                        modelId: f.modelId,
+                        yearFrom: f.yearFrom ?? '',
+                        yearTo: f.yearTo ?? '',
+                        engine: f.engine || '',
+                    })),
+                })))
+                .catch((e) => console.error('Error cargando compatibilidad:', e));
+        }
     };
 
     // Delete Product trigger
@@ -302,6 +366,10 @@ const Inventory = () => {
                     matchStatus = p.quantity > 0 && p.quantity <= 5;
                 } else if (statusFilter === 'empty') {
                     matchStatus = p.quantity === 0;
+                } else if (statusFilter === 'web') {
+                    matchStatus = !!p.webPublished;
+                } else if (statusFilter === 'webIssues') {
+                    matchStatus = webIssues(p).length > 0;
                 }
 
                 return matchSearch && matchStatus;
@@ -324,6 +392,14 @@ const Inventory = () => {
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
+
+    const webStats = React.useMemo(() => ({
+        published: products.filter((p) => p.webPublished).length,
+        issues: products.filter((p) => webIssues(p).length > 0).length,
+    }), [products]);
+
+    // Imagen para la lista: la principal de la tienda si existe, si no la del POS.
+    const thumbOf = (p) => (p.images?.length ? imageUrl(p.images[0]) : p.image);
 
     return (
         <div className="flex flex-col gap-8 h-full">
@@ -465,12 +541,20 @@ const Inventory = () => {
                         >
                             Stock Bajo (≤5)
                         </button>
-                        <button 
+                        <button
                             onClick={() => setStatusFilter('empty')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'empty' ? 'bg-white text-danger shadow-sm' : 'text-secondary opacity-60 hover:opacity-100'}`}
                         >
                             Sin existencias
                         </button>
+                        {storeReady && (
+                            <button
+                                onClick={() => setStatusFilter('web')}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'web' ? 'bg-white text-primary shadow-sm' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                            >
+                                Publicados ({webStats.published})
+                            </button>
+                        )}
                     </div>
 
                     {/* Sorting dropdown */}
@@ -515,6 +599,23 @@ const Inventory = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Aviso: publicados en la tienda sin imagen o sin categoría */}
+            {storeReady && webStats.issues > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3.5">
+                    <p className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                        <AlertTriangle size={16} className="shrink-0" />
+                        {webStats.issues === 1 ? '1 producto publicado en la tienda' : `${webStats.issues} productos publicados en la tienda`} sin imagen o sin categoría.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => setStatusFilter(statusFilter === 'webIssues' ? 'all' : 'webIssues')}
+                        className="btn btn-outline h-9 text-xs self-start sm:self-auto"
+                    >
+                        {statusFilter === 'webIssues' ? 'Ver todos' : 'Ver cuáles'}
+                    </button>
+                </div>
+            )}
 
             {/* Loading State */}
             {loading ? (
@@ -597,11 +698,22 @@ const Inventory = () => {
                                     )}
                                 </div>
 
+                                {p.webPublished && (
+                                    <div className="absolute top-4 right-4 z-10">
+                                        <span
+                                            title={webIssues(p).length ? `En la tienda, falta: ${webIssues(p).join(', ')}` : 'Publicado en la tienda web'}
+                                            className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-full uppercase tracking-wider shadow-sm ${webIssues(p).length ? 'bg-amber-100 text-amber-800' : 'bg-navy text-white'}`}
+                                        >
+                                            <Globe size={11} /> Web
+                                        </span>
+                                    </div>
+                                )}
+
                                 {/* Product Image or Fallback */}
                                 <div className="h-44 bg-slate-50 w-full flex items-center justify-center relative overflow-hidden flex-shrink-0 group-hover:scale-[1.01] transition-transform duration-300 border-b border-gray-100">
-                                    {p.image ? (
-                                        <img 
-                                            src={p.image} 
+                                    {thumbOf(p) ? (
+                                        <img
+                                            src={thumbOf(p)}
                                             alt={p.name} 
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
@@ -610,7 +722,7 @@ const Inventory = () => {
                                             }}
                                         />
                                     ) : null}
-                                    {!p.image && (
+                                    {!thumbOf(p) && (
                                         <div className="w-full h-full bg-gradient-to-tr from-slate-100 to-slate-200 flex flex-col items-center justify-center gap-2">
                                             <div className="w-12 h-12 bg-white/80 rounded-2xl flex items-center justify-center text-secondary shadow-sm">
                                                 <Package size={24} />
@@ -697,14 +809,20 @@ const Inventory = () => {
                                             <td className="py-4 px-6 flex items-center gap-3">
                                                 {/* Mini Image or Fallback */}
                                                 <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-100">
-                                                    {p.image ? (
-                                                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                                                    {thumbOf(p) ? (
+                                                        <img src={thumbOf(p)} alt={p.name} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <Package size={18} className="text-secondary opacity-50" />
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <span className="font-bold text-navy block max-w-xs truncate uppercase" title={p.name}>{p.name}</span>
+                                                    <span className="font-bold text-navy max-w-xs truncate uppercase flex items-center gap-1.5" title={p.name}>
+                                                        <span className="truncate">{p.name}</span>
+                                                        {p.webPublished && (
+                                                            <Globe size={13} className={`shrink-0 ${webIssues(p).length ? 'text-amber-600' : 'text-primary'}`}
+                                                                aria-label={webIssues(p).length ? `Publicado, falta ${webIssues(p).join(' y ')}` : 'Publicado en la tienda'} />
+                                                        )}
+                                                    </span>
                                                     <span className="text-xs text-secondary opacity-60 line-clamp-1 max-w-xs">{p.description || 'Sin descripción'}</span>
                                                 </div>
                                             </td>
@@ -770,7 +888,7 @@ const Inventory = () => {
             {/* Smart Product Form Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-fade-in backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className={`bg-white rounded-2xl w-full ${modalTab === 'web' ? 'max-w-2xl' : 'max-w-lg'} shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]`}>
                         {/* Modal Header */}
                         <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -795,6 +913,38 @@ const Inventory = () => {
                         {/* Modal Form body */}
                         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
 
+                            {/* Pestañas del formulario: datos del ERP y tienda web */}
+                            {storeReady && formData.productType === 'product' && (
+                                <div className="flex border-b border-gray-200 gap-5 -mt-1" role="tablist">
+                                    {[['datos', 'Datos', <Package size={15} />], ['web', 'Tienda web', <Globe size={15} />]].map(([key, label, icon]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={modalTab === key}
+                                            onClick={() => setModalTab(key)}
+                                            className={`pb-2.5 text-sm font-bold relative inline-flex items-center gap-1.5 transition-colors ${modalTab === key ? 'text-primary' : 'text-secondary opacity-60 hover:opacity-100'}`}
+                                        >
+                                            {icon}{label}
+                                            {key === 'web' && webForm.webPublished && <span className="w-1.5 h-1.5 rounded-full bg-primary" aria-label="publicado" />}
+                                            {modalTab === key && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {modalTab === 'web' && storeReady && formData.productType === 'product' && (
+                                <ProductWebTab
+                                    value={webForm}
+                                    onChange={setWebForm}
+                                    productId={editingProduct?.id || null}
+                                    categories={categories}
+                                    vehicles={vehicles}
+                                    setVehicles={setVehicles}
+                                />
+                            )}
+
+                            {(modalTab === 'datos' || formData.productType !== 'product' || !storeReady) && (<>
                             {/* Product Type Toggle */}
                             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-full">
                                 <button
@@ -1157,6 +1307,7 @@ const Inventory = () => {
                                     </div>
                                 )}
                             </div>
+                            </>)}
 
                             {/* Submit & Cancel Buttons */}
                             <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
