@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Settings, LogOut, Package, Receipt, Users, BarChart3,
-    Boxes, ShoppingCart, Landmark, ChevronDown, X
+    Boxes, ShoppingCart, Landmark, ChevronDown, X, Store
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import { supabase, subscribeToTable } from '../supabase';
 import { getRole, getDisplayName } from '../auth/session';
+import { countPending } from '../services/webOrdersApi';
 
 
 export const logout = async () => {
@@ -16,7 +17,7 @@ export const logout = async () => {
 
 const roleLabel = { administrador: 'Administrador', supervisor: 'Supervisor', cajero: 'Cajero' };
 
-const buildNav = ({ isAdmin, isManager }) => [
+const buildNav = ({ isAdmin, isManager, pending = { orders: 0, wholesale: 0 } }) => [
     isManager && { to: '/', icon: LayoutDashboard, label: 'Resumen', end: true },
     { to: '/pos', icon: Receipt, label: 'Punto de venta' },
     isManager && {
@@ -54,6 +55,18 @@ const buildNav = ({ isAdmin, isManager }) => [
             { to: '/investments', label: 'Inversiones' },
         ],
     },
+    isManager && {
+        id: 'tienda', icon: Store, label: 'Tienda web',
+        match: ['/tienda'],
+        badge: pending.orders + pending.wholesale,
+        children: [
+            { to: '/tienda/pedidos', label: 'Pedidos web', badge: pending.orders },
+            { to: '/tienda/mayoristas', label: 'Mayoristas', badge: pending.wholesale },
+            { to: '/tienda/reglas', label: 'Reglas de precio' },
+            { to: '/tienda/categorias', label: 'Categorías' },
+            { to: '/tienda/vehiculos', label: 'Vehículos' },
+        ],
+    },
     isManager && { to: '/analytics', icon: BarChart3, label: 'Estadísticas' },
 ].filter(Boolean);
 
@@ -66,7 +79,25 @@ const Sidebar = ({ isOpen, onClose }) => {
     const userDisplayName = getDisplayName('Usuario');
     const isAdmin = userRole === 'administrador';
     const isManager = isAdmin || userRole === 'supervisor';
-    const nav = buildNav({ isAdmin, isManager });
+    const [pending, setPending] = useState({ orders: 0, wholesale: 0 });
+    const nav = buildNav({ isAdmin, isManager, pending });
+
+    // Contador de la tienda web: pagos por verificar + pedidos por confirmar, y mayoristas por revisar.
+    useEffect(() => {
+        if (!isManager) return undefined;
+        let alive = true;
+        let timer;
+        const refresh = () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                countPending().then((p) => { if (alive) setPending(p); }).catch(() => { /* tienda aún no migrada */ });
+            }, 300);
+        };
+        refresh();
+        const u1 = subscribeToTable('web_orders', refresh);
+        const u2 = subscribeToTable('web_customers', refresh);
+        return () => { alive = false; clearTimeout(timer); u1(); u2(); };
+    }, [isManager]);
 
     const [storeName, setStoreName] = useState('Mi negocio');
     const [openGroup, setOpenGroup] = useState(() => groupForPath(nav, location.pathname));
@@ -193,6 +224,12 @@ const Sidebar = ({ isOpen, onClose }) => {
 
 const rowBase = 'group w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[14px] font-semibold transition-colors duration-150';
 
+const Badge = ({ n }) => (
+    <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold tabular-nums inline-flex items-center justify-center" aria-label={`${n} pendientes`}>
+        {n > 99 ? '99+' : n}
+    </span>
+);
+
 const NavItem = ({ to, icon: Icon, label, onClick, end }) => (
     <NavLink
         to={to}
@@ -229,6 +266,7 @@ const NavGroup = ({ item, open, active, onToggle, onNavigate }) => {
             >
                 <Icon size={18} strokeWidth={2} className={active ? 'text-[#FFB07A]' : 'text-[#8A9099] group-hover:text-white transition-colors'} />
                 <span className="flex-1 text-left truncate">{item.label}</span>
+                {item.badge > 0 && !open && <Badge n={item.badge} />}
                 <ChevronDown
                     size={15}
                     className={`text-[#8A9099] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${open ? 'rotate-180' : ''}`}
@@ -256,7 +294,8 @@ const NavGroup = ({ item, open, active, onToggle, onNavigate }) => {
                                         }`
                                     }
                                 >
-                                    {c.label}
+                                    <span className="flex-1 truncate">{c.label}</span>
+                                    {c.badge > 0 && <Badge n={c.badge} />}
                                 </NavLink>
                             </li>
                         ))}

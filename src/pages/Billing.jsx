@@ -11,6 +11,11 @@ import Money from '../components/ui/Money';
 import { useExchangeRates } from '../hooks/useExchangeRates';
 import { supabase, subscribeToTable } from '../supabase';
 import { getRole, getDisplayName } from '../auth/session';
+import { imageUrl } from '../services/storeApi';
+import { useSearchParams } from 'react-router-dom';
+
+// Imagen del producto: la principal de la tienda (Storage) o la antigua columna image.
+const productImage = (p) => (p.images?.length ? imageUrl(p.images[0]) : p.image);
 
 
 
@@ -89,6 +94,22 @@ const Billing = () => {
     // History Filter & Search States
     const [historySearch, setHistorySearch] = useState('');
     const [historyDateFilter, setHistoryDateFilter] = useState('');
+
+    // /pos?factura=FAC-001234 abre ese comprobante (lo usa Pedidos web al confirmar un pedido).
+    const [searchParams, setSearchParams] = useSearchParams();
+    useEffect(() => {
+        const num = searchParams.get('factura');
+        if (!num || loadingInvoices) return;
+        const inv = invoices.find((i) => i.invoiceNumber === num);
+        if (inv) {
+            setActiveTab('history');
+            setActiveReceipt(inv);
+            setShowReceiptModal(true);
+        }
+        const next = new URLSearchParams(searchParams);
+        next.delete('factura');
+        setSearchParams(next, { replace: true });
+    }, [searchParams, setSearchParams, invoices, loadingInvoices]);
 
     // Real-time subscriptions
     useEffect(() => {
@@ -910,9 +931,9 @@ ${itemsText}-------------------------------
                                                 cartQty > 0 ? 'border-primary ring-2 ring-primary/15' : 'border-line hover:border-primary/50 hover:shadow-md'
                                             } disabled:opacity-55 disabled:cursor-not-allowed`}
                                         >
-                                            <div className={`relative rounded-xl overflow-hidden flex items-center justify-center ${p.image ? 'aspect-[4/3] bg-gray-100' : 'h-[72px] bg-[linear-gradient(135deg,#FFEFE4,#F4F1EA)]'}`}>
-                                                {p.image ? (
-                                                    <img src={p.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                            <div className={`relative rounded-xl overflow-hidden flex items-center justify-center ${productImage(p) ? 'aspect-[4/3] bg-gray-100' : 'h-[72px] bg-[linear-gradient(135deg,#FFEFE4,#F4F1EA)]'}`}>
+                                                {productImage(p) ? (
+                                                    <img src={productImage(p)} alt="" className="w-full h-full object-cover" loading="lazy" />
                                                 ) : (
                                                     <span className="text-[22px] font-extrabold text-[#9DB8FF] select-none">{(p.name || '?').trim().charAt(0).toUpperCase()}</span>
                                                 )}

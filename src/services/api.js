@@ -1,5 +1,8 @@
 ﻿import { supabase, getSettingDoc, setSettingDoc } from '../supabase';
 
+const WEB_COLUMNS = ['webPublished', 'webFeatured', 'categoryId', 'reference', 'webDescription', 'specs', 'images',
+    'wholesaleEnabled', 'minWholesaleQty', 'maxDiscountPct', 'minMarginPct'];
+
 export const api = {
     // ==========================================
     // TRANSACTIONS
@@ -336,6 +339,8 @@ export const api = {
                 unitsPerPackage: parseInt(data.unitsPerPackage) || 1,
                 image: data.image || ''
             };
+            // Campos de la tienda web (migración 0003). Solo se envían si vienen en data.
+            for (const k of WEB_COLUMNS) if (data[k] !== undefined) newItem[k] = data[k];
 
             const { data: created, error } = await supabase
                 .from('inventory')
@@ -369,6 +374,7 @@ export const api = {
                 ...data,
                 updatedAt: new Date().toISOString()
             };
+            delete updateData.username; // dato de auditoría del formulario, no es columna de inventory
 
             if (updateData.quantity !== undefined) updateData.quantity = parseInt(updateData.quantity) || 0;
             if (updateData.costPrice !== undefined) updateData.costPrice = parseFloat(updateData.costPrice) || 0;
