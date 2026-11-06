@@ -5,6 +5,7 @@ import { BarChart, Bar, ResponsiveContainer, Tooltip, Cell, XAxis } from 'rechar
 import { api } from '../services/api';
 import ExchangeRatesCard from '../components/ExchangeRatesCard';
 import RecentActivity from '../components/RecentActivity';
+import SalesChannelChart from '../components/SalesChannelChart';
 import Money from '../components/ui/Money';
 import { formatUSD, useExchangeRates, formatBs } from '../hooks/useExchangeRates';
 import { getDisplayName } from '../auth/session';
@@ -262,6 +263,9 @@ const DashboardFlow = () => {
                     </div>
                 </section>
             </div>
+
+            {/* Ventas facturadas: web vs local */}
+            <SalesChannelChart variant="compact" />
 
             {/* Lower row */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
