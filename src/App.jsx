@@ -20,6 +20,8 @@ import NewPurchase from './pages/NewPurchase';
 import ClientManagement from './pages/ClientManagement';
 import CuentasPorCobrar from './pages/CuentasPorCobrar';
 import CuentasPorPagar from './pages/CuentasPorPagar';
+import StoreCategories from './pages/store/StoreCategories';
+import Vehicles from './pages/store/Vehicles';
 
 // Pantalla mientras se resuelve la sesión
 const AuthLoading = () => (
@@ -101,7 +103,13 @@ function App() {
               <Route path="cuentas-por-pagar" element={<CuentasPorPagar />} />
             </Route>
 
-            {/* 7. Configuration (Only Admin) */}
+            {/* 7. Tienda web (Admin and Supervisor) */}
+            <Route path="tienda" element={<RoleProtectedRoute allowedRoles={['administrador', 'supervisor']} />}>
+              <Route path="categorias" element={<StoreCategories />} />
+              <Route path="vehiculos" element={<Vehicles />} />
+            </Route>
+
+            {/* 8. Configuration (Only Admin) */}
             <Route element={<RoleProtectedRoute allowedRoles={['administrador']} />}>
               <Route path="settings" element={<Configuration />} />
             </Route>

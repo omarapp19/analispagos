@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     LayoutDashboard, Settings, LogOut, Package, Receipt, Users, BarChart3,
-    Boxes, ShoppingCart, Landmark, ChevronDown, X
+    Boxes, ShoppingCart, Landmark, ChevronDown, X, Store
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
@@ -52,6 +52,14 @@ const buildNav = ({ isAdmin, isManager }) => [
             { to: '/finanzas/cuentas-por-pagar', label: 'Cuentas por pagar' },
             { to: '/calendar', label: 'Calendario de pagos' },
             { to: '/investments', label: 'Inversiones' },
+        ],
+    },
+    isManager && {
+        id: 'tienda', icon: Store, label: 'Tienda web',
+        match: ['/tienda'],
+        children: [
+            { to: '/tienda/categorias', label: 'Categorías' },
+            { to: '/tienda/vehiculos', label: 'Vehículos' },
         ],
     },
     isManager && { to: '/analytics', icon: BarChart3, label: 'Estadísticas' },
