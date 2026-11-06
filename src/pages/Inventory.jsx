@@ -4,7 +4,7 @@ import {
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
     ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe, Camera } from 'lucide-react';
 import { api } from '../services/api';
-import { subscribeToTable } from '../supabase';
+import { supabase, subscribeToTable } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
 import ProductWebTab from '../components/store/ProductWebTab';
 import { emptyWebForm, webFormFromProduct, webColumns } from '../components/store/productWebForm';
@@ -209,8 +209,28 @@ const Inventory = () => {
 
         setSavingQuickImage(true);
         try {
-            await api.updateInventoryItem(quickImageProduct.id, { image: newImage });
-            setProducts(prev => prev.map(p => p.id === quickImageProduct.id ? { ...p, image: newImage } : p));
+            let images = quickImageProduct.images || [];
+            if (newImage.startsWith('data:')) {
+                try {
+                    const blobRes = await fetch(newImage);
+                    const blob = await blobRes.blob();
+                    const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
+                    const storagePath = `${quickImageProduct.id}/${crypto.randomUUID()}.${ext}`;
+                    const { error: upErr } = await supabase.storage
+                        .from('product-images')
+                        .upload(storagePath, blob, { contentType: blob.type, upsert: true });
+                    if (!upErr) {
+                        images = [storagePath];
+                    }
+                } catch (storageErr) {
+                    console.warn("No se pudo subir a Storage:", storageErr);
+                }
+            } else if (newImage.startsWith('http')) {
+                images = [newImage];
+            }
+
+            await api.updateInventoryItem(quickImageProduct.id, { image: newImage, images });
+            setProducts(prev => prev.map(p => p.id === quickImageProduct.id ? { ...p, image: newImage, images } : p));
             setQuickImageProduct(null);
             setQuickImageUrl('');
             setQuickImagePreview('');
