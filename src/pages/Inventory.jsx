@@ -162,13 +162,39 @@ const Inventory = () => {
     const handleQuickImageFileChange = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (file.size > 5 * 1024 * 1024) {
-            alert("La imagen no debe superar los 5MB");
+        if (file.size > 10 * 1024 * 1024) {
+            alert("La imagen no debe superar los 10MB");
             return;
         }
         const reader = new FileReader();
         reader.onloadend = () => {
-            setQuickImagePreview(reader.result);
+            const rawResult = reader.result;
+            // Downsample and compress to max 1200px width/height for fast web loading and lightweight database storage
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 1200;
+                let { width, height } = img;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const compressed = canvas.toDataURL('image/jpeg', 0.85);
+                setQuickImagePreview(compressed);
+            };
+            img.onerror = () => {
+                setQuickImagePreview(rawResult);
+            };
+            img.src = rawResult;
         };
         reader.readAsDataURL(file);
     };
@@ -495,7 +521,33 @@ const Inventory = () => {
                     <p className="text-secondary opacity-60">Supervisa tus existencias, márgenes de ganancia y valor del almacén</p>
                 </div>
                 {userRole !== 'cajero' && (
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handlePublishAllToWeb}
+                            disabled={publishingAll || products.length === 0}
+                            className={`btn ${
+                                products.filter(p => p.productType !== 'service').length > 0 &&
+                                products.filter(p => p.productType !== 'service').every(p => p.webPublished)
+                                    ? 'bg-navy text-white hover:bg-navy/90'
+                                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            } shadow-sm flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all`}
+                            title="Sincronizar y publicar todos los productos en el catálogo web"
+                        >
+                            {publishingAll ? (
+                                <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                                <Globe size={16} />
+                            )}
+                            <span>
+                                {products.filter(p => p.productType !== 'service').length > 0 &&
+                                products.filter(p => p.productType !== 'service').every(p => p.webPublished)
+                                    ? `Catálogo Web Activo (${webStats.published})`
+                                    : `Cargar todo a la Web (${webStats.published}/${products.filter(p => p.productType !== 'service').length})`
+                                }
+                            </span>
+                        </button>
+
                         <button 
                             onClick={() => {
                                 setEditingProduct(null);
@@ -783,14 +835,20 @@ const Inventory = () => {
                                     )}
                                 </div>
 
-                                {p.webPublished && (
+                                {p.productType !== 'service' && (
                                     <div className="absolute top-4 right-4 z-10">
-                                        <span
-                                            title={webIssues(p).length ? `En la tienda, falta: ${webIssues(p).join(', ')}` : 'Publicado en la tienda web'}
-                                            className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-1 rounded-full uppercase tracking-wider shadow-sm ${webIssues(p).length ? 'bg-amber-100 text-amber-800' : 'bg-navy text-white'}`}
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleToggleProductWeb(p, e)}
+                                            title={p.webPublished ? 'Publicado en la web. Haz clic para despublicar.' : 'No publicado. Haz clic para publicar en la web.'}
+                                            className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm transition-transform active:scale-95 ${
+                                                p.webPublished 
+                                                    ? 'bg-navy text-white hover:bg-navy/85' 
+                                                    : 'bg-slate-200/90 text-slate-700 hover:bg-slate-300'
+                                            }`}
                                         >
-                                            <Globe size={11} /> Web
-                                        </span>
+                                            <Globe size={11} /> {p.webPublished ? 'Web' : '+ Web'}
+                                        </button>
                                     </div>
                                 )}
 
@@ -814,6 +872,20 @@ const Inventory = () => {
                                             </div>
                                         </div>
                                     )}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setQuickImageProduct(p);
+                                            setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : '');
+                                            setQuickImagePreview(p.image || '');
+                                        }}
+                                        className="absolute bottom-2 right-2 z-10 bg-white/95 hover:bg-white text-navy px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-md flex items-center gap-1.5 transition-all opacity-85 group-hover:opacity-100 backdrop-blur-sm border border-slate-200/60"
+                                        title="Subir foto real de este producto"
+                                    >
+                                        <Camera size={13} className="text-primary" />
+                                        <span>Foto Real</span>
+                                    </button>
                                 </div>
 
                                 {/* Content */}
@@ -842,7 +914,21 @@ const Inventory = () => {
 
                                     {/* Footer Actions */}
                                     {userRole !== 'cajero' && (
-                                        <div className="flex items-center justify-end pt-2">
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setQuickImageProduct(p);
+                                                    setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : '');
+                                                    setQuickImagePreview(p.image || '');
+                                                }}
+                                                className="text-xs font-bold text-secondary hover:text-primary flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors"
+                                                title="Cargar o cambiar foto real"
+                                            >
+                                                <Camera size={14} className="text-primary" />
+                                                <span>Foto real</span>
+                                            </button>
+
                                             {/* Edit / Delete */}
                                             <div className="flex items-center gap-1">
                                                 <button 
@@ -901,13 +987,26 @@ const Inventory = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <span className="font-bold text-navy max-w-xs truncate uppercase flex items-center gap-1.5" title={p.name}>
-                                                        <span className="truncate">{p.name}</span>
-                                                        {p.webPublished && (
-                                                            <Globe size={13} className={`shrink-0 ${webIssues(p).length ? 'text-amber-600' : 'text-primary'}`}
-                                                                aria-label={webIssues(p).length ? `Publicado, falta ${webIssues(p).join(' y ')}` : 'Publicado en la tienda'} />
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-navy max-w-xs truncate uppercase" title={p.name}>
+                                                            {p.name}
+                                                        </span>
+                                                        {p.productType !== 'service' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleToggleProductWeb(p, e)}
+                                                                title={p.webPublished ? 'En la web (clic para ocultar)' : 'Oculto de la web (clic para publicar)'}
+                                                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase transition-transform active:scale-95 ${
+                                                                    p.webPublished 
+                                                                        ? 'bg-navy text-white hover:bg-navy/85' 
+                                                                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                                                                }`}
+                                                            >
+                                                                <Globe size={10} />
+                                                                <span>{p.webPublished ? 'Web' : '+ Web'}</span>
+                                                            </button>
                                                         )}
-                                                    </span>
+                                                    </div>
                                                     <span className="text-xs text-secondary opacity-60 line-clamp-1 max-w-xs">{p.description || 'Sin descripción'}</span>
                                                 </div>
                                             </td>
@@ -943,6 +1042,18 @@ const Inventory = () => {
                                                 {userRole !== 'cajero' ? (
                                                     <div className="flex items-center justify-center gap-1">
                                                         <button 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setQuickImageProduct(p);
+                                                                setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : '');
+                                                                setQuickImagePreview(p.image || '');
+                                                            }}
+                                                            className="p-1.5 rounded-lg text-secondary hover:bg-slate-100 hover:text-primary transition-colors"
+                                                            title="Subir foto real"
+                                                        >
+                                                            <Camera size={14} />
+                                                        </button>
+                                                        <button 
                                                             onClick={() => handleEditProduct(p)}
                                                             className="p-1.5 rounded-lg text-secondary hover:bg-gray-100 hover:text-primary transition-colors"
                                                             title="Editar"
@@ -970,7 +1081,141 @@ const Inventory = () => {
                 </div>
             )}
 
-            {/* Smart Product Form Modal */}
+            {/* Modal: Subir Foto Real del Producto */}
+            {quickImageProduct && (
+                <div className="fixed inset-0 bg-navy/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-gray-100 flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                                    Foto Real
+                                </span>
+                                <h3 className="text-xl font-bold text-navy mt-2 leading-snug">
+                                    {quickImageProduct.name}
+                                </h3>
+                                <p className="text-xs text-secondary opacity-70 mt-0.5">
+                                    {quickImageProduct.brand || quickImageProduct.code ? `Código/Marca: ${[quickImageProduct.code, quickImageProduct.brand].filter(Boolean).join(' • ')}` : 'Sube una foto real desde tu dispositivo o ingresa un enlace.'}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setQuickImageProduct(null);
+                                    setQuickImageUrl('');
+                                    setQuickImagePreview('');
+                                }}
+                                className="p-2 text-secondary hover:text-navy hover:bg-slate-100 rounded-xl transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Image Preview / Drop area */}
+                        <div className="flex flex-col gap-4">
+                            <div className="relative w-full h-56 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex flex-col items-center justify-center group">
+                                {quickImagePreview || quickImageUrl ? (
+                                    <>
+                                        <img
+                                            src={quickImagePreview || quickImageUrl}
+                                            alt="Vista previa"
+                                            className="w-full h-full object-contain"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                alert("No se pudo cargar la imagen desde la URL.");
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setQuickImagePreview('');
+                                                setQuickImageUrl('');
+                                            }}
+                                            className="absolute top-3 right-3 bg-red-600 text-white p-1.5 rounded-xl shadow-md hover:bg-red-700 transition-colors"
+                                            title="Eliminar foto seleccionada"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer p-4 text-center hover:bg-slate-100/50 transition-colors">
+                                        <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3">
+                                            <Camera size={28} />
+                                        </div>
+                                        <span className="text-sm font-bold text-navy">Toma una foto o selecciona un archivo</span>
+                                        <span className="text-xs text-secondary opacity-60 mt-1">Soporta JPG, PNG, WEBP (cámara directa en móvil)</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            onChange={handleQuickImageFileChange}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                )}
+                            </div>
+
+                            {/* Camera direct trigger & URL alternative */}
+                            <div className="flex flex-col gap-2">
+                                <label className="btn btn-outline flex items-center justify-center gap-2 cursor-pointer py-2.5 text-xs font-bold">
+                                    <Camera size={16} className="text-primary" />
+                                    <span>{quickImagePreview || quickImageUrl ? 'Cambiar archivo o tomar otra foto' : 'Tomar foto con la cámara / Examinar'}</span>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onChange={handleQuickImageFileChange}
+                                        className="hidden"
+                                    />
+                                </label>
+
+                                <div className="relative mt-2">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-secondary">
+                                        <ImageIcon size={15} />
+                                    </div>
+                                    <input
+                                        type="url"
+                                        value={quickImageUrl}
+                                        onChange={(e) => {
+                                            setQuickImageUrl(e.target.value);
+                                            if (!quickImagePreview) setQuickImagePreview(e.target.value);
+                                        }}
+                                        placeholder="O pega una URL directa de la imagen (https://...)"
+                                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-primary focus:bg-white transition-all font-medium"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer Actions */}
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setQuickImageProduct(null);
+                                    setQuickImageUrl('');
+                                    setQuickImagePreview('');
+                                }}
+                                disabled={savingQuickImage}
+                                className="px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-slate-50 text-xs font-bold text-secondary transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSaveQuickImage}
+                                disabled={savingQuickImage || (!quickImagePreview && !quickImageUrl.trim())}
+                                className="btn btn-primary flex items-center gap-2 px-6 py-2.5 text-xs font-bold shadow-md disabled:opacity-50"
+                            >
+                                {savingQuickImage ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                                <span>{savingQuickImage ? 'Guardando...' : 'Guardar Foto Real'}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit / Create Product Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 animate-fade-in backdrop-blur-sm">
                     <div className={`bg-white rounded-2xl w-full ${modalTab === 'web' ? 'max-w-2xl' : 'max-w-lg'} shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]`}>

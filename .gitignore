@@ -44,3 +44,4 @@ supabase_schema.sql
 supabase/.temp/
 supabase/.branches/
 erp_schema.sql
+.vercel
