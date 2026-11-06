@@ -5,6 +5,7 @@ import StatCard from '../components/StatCard';
 import ProjectionChart from '../components/ProjectionChart';
 import PaymentMixChart from '../components/PaymentMixChart';
 import DebtList from '../components/DebtList';
+import SalesChannelChart from '../components/SalesChannelChart';
 
 const Analytics = () => {
     const [balance, setBalance] = useState(0);
@@ -339,6 +340,9 @@ const Analytics = () => {
                     </div>
                 )}
             </div>
+
+            {/* Ventas facturadas: web vs local */}
+            <SalesChannelChart variant="full" />
 
             {/* Bottom Section: Donut & List */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
