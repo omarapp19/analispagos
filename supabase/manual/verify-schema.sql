@@ -38,6 +38,10 @@ from inventory
 order by "updatedAt" desc nulls last
 limit 5;
 
+-- 4b. Columna que el ERP y las funciones dan por hecha (si no sale ninguna fila, aplica 0002b).
+select column_name from information_schema.columns
+where table_schema = 'public' and table_name = 'inventory' and column_name = 'productType';
+
 -- 5. Números de factura duplicados (impiden crear el índice único de 0002a).
 select "invoiceNumber", count(*) from client_invoices group by 1 having count(*) > 1;
 

@@ -36,3 +36,9 @@ set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-000
 select erp_create_invoice(jsonb_build_object(
   'items', jsonb_build_array(jsonb_build_object('productId', (select id from inventory where code='0002'), 'quantity', 5)),
   'subtotal', 15, 'total', 15));
+
+-- @test 0002b: productType existe y los productos previos quedan como 'product'
+select "productType", count(*) as productos from inventory group by 1;
+
+-- @fails 0002b: productType solo admite product o service
+update inventory set "productType" = 'otro' where code = '0001';

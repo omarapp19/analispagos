@@ -41,6 +41,12 @@ El código de la fase 0 ya está en `main` (commit c75c2d4). La rama `seguridad/
 - POS: venta de contado (descuenta stock, kardex SALIDA, `transactions`), venta a crédito (sin `transactions`), venta sin stock suficiente (error claro, nada se descuenta), dos ventas simultáneas de la última unidad (una falla).
 - Tiempo real (Realtime) sigue actualizando listas.
 
+## Corrección posterior: 0002b
+La base de producción no tenía `inventory."productType"`, que usan el ERP (Inventario, POS), `erp_create_invoice`, `price_quote`
+y las vistas del catálogo. Sin ella fallaba `0007` (`42703: column i.productType does not exist`) y el POS no podía facturar
+(`record "v_prod" has no field "productType"`). `0002b_inventory_product_type.sql` la agrega con valor `product` para lo existente.
+Aplícala antes de la 0007. El entorno de pruebas ahora crea `inventory` sin esa columna, igual que producción.
+
 ## Desviaciones de la spec
 - La Edge Function se llama `staff-user` y cubre crear, editar y eliminar (la spec solo nombra `staff-create-user`), porque Configuración también edita y elimina.
 - `erp_create_invoice` rechaza ventas sin stock suficiente (antes el ERP dejaba el stock en 0 sin avisar) y no descuenta stock de servicios.

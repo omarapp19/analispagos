@@ -36,10 +36,11 @@ create function storage.foldername(name text) returns text[] language sql immuta
   select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'),1)-1] $$;
 grant execute on function storage.foldername(text) to anon, authenticated;
 
+-- Igual que la base real de producción: SIN "productType" (lo agrega la migración 0002b).
 create table public.inventory (${idCol}, code text, name text, brand text, description text,
   quantity int default 0, "costPrice" numeric default 0, "marginPercentage" numeric default 0,
   "sellingPrice" numeric default 0, "taxPercentage" numeric default 16, "unitsPerPackage" int default 1,
-  "productType" text default 'product', image text default '', "createdAt" timestamptz default now(),
+  image text default '', "createdAt" timestamptz default now(),
   "updatedAt" timestamptz default now());
 create table public.clients (${idCol}, name text, "documentId" text, phone text, email text, address text,
   "createdAt" timestamptz default now(), "updatedAt" timestamptz default now());
