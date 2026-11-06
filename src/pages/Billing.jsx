@@ -12,6 +12,7 @@ import { useExchangeRates } from '../hooks/useExchangeRates';
 import { supabase, subscribeToTable } from '../supabase';
 import { getRole, getDisplayName } from '../auth/session';
 import { imageUrl } from '../services/storeApi';
+import { useSearchParams } from 'react-router-dom';
 
 // Imagen del producto: la principal de la tienda (Storage) o la antigua columna image.
 const productImage = (p) => (p.images?.length ? imageUrl(p.images[0]) : p.image);
@@ -93,6 +94,22 @@ const Billing = () => {
     // History Filter & Search States
     const [historySearch, setHistorySearch] = useState('');
     const [historyDateFilter, setHistoryDateFilter] = useState('');
+
+    // /pos?factura=FAC-001234 abre ese comprobante (lo usa Pedidos web al confirmar un pedido).
+    const [searchParams, setSearchParams] = useSearchParams();
+    useEffect(() => {
+        const num = searchParams.get('factura');
+        if (!num || loadingInvoices) return;
+        const inv = invoices.find((i) => i.invoiceNumber === num);
+        if (inv) {
+            setActiveTab('history');
+            setActiveReceipt(inv);
+            setShowReceiptModal(true);
+        }
+        const next = new URLSearchParams(searchParams);
+        next.delete('factura');
+        setSearchParams(next, { replace: true });
+    }, [searchParams, setSearchParams, invoices, loadingInvoices]);
 
     // Real-time subscriptions
     useEffect(() => {

@@ -318,14 +318,12 @@ const StoreSettingsPanel = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="flex flex-wrap items-end gap-4">
-                                <button type="button" className="btn btn-outline" onClick={() => setZones([...zones, { name: '', feeUsd: 0 }])}>
-                                    <Plus size={16} /> Agregar zona
-                                </button>
-                                <Field label="Delivery gratis desde (USD)" hint="0 = nunca gratis." className="w-56">
-                                    <input className="field" type="number" min="0" step="1" value={pub.delivery.delivery.freeOverUsd} onChange={(e) => setAt(['delivery', 'delivery', 'freeOverUsd'], e.target.value)} />
-                                </Field>
-                            </div>
+                            <button type="button" className="btn btn-outline" onClick={() => setZones([...zones, { name: '', feeUsd: 0 }])}>
+                                <Plus size={16} /> Agregar zona
+                            </button>
+                            <Field label="Delivery gratis desde (USD)" hint="0 = nunca gratis." className="max-w-56">
+                                <input className="field" type="number" min="0" step="1" value={pub.delivery.delivery.freeOverUsd} onChange={(e) => setAt(['delivery', 'delivery', 'freeOverUsd'], e.target.value)} />
+                            </Field>
                         </div>
                     )}
                 </div>
