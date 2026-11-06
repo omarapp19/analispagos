@@ -4,6 +4,8 @@ import { Outlet, useLocation, Link } from 'react-router-dom';
 import { Menu, Receipt, ChevronRight } from 'lucide-react';
 import AIAssistantBubble from '../components/AIAssistantBubble';
 import { useExchangeRates } from '../hooks/useExchangeRates';
+import { getRole } from '../auth/session';
+
 
 const routeMeta = {
     '/': ['', 'Resumen'],
@@ -27,7 +29,7 @@ const fmtRate = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2
 
 const MainLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const userRole = localStorage.getItem('userRole') || 'cajero';
+    const userRole = getRole();
     const isCajero = userRole === 'cajero';
     const location = useLocation();
     const rates = useExchangeRates();

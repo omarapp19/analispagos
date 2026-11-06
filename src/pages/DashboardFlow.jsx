@@ -7,6 +7,8 @@ import ExchangeRatesCard from '../components/ExchangeRatesCard';
 import RecentActivity from '../components/RecentActivity';
 import Money from '../components/ui/Money';
 import { formatUSD, useExchangeRates, formatBs } from '../hooks/useExchangeRates';
+import { getDisplayName } from '../auth/session';
+
 
 const dayKey = (d) => d.toLocaleDateString('en-CA');
 const txDay = (tx) => (typeof tx.date === 'string' ? tx.date.split('T')[0] : '');
@@ -37,7 +39,7 @@ const DashboardFlow = () => {
             ]);
             setSettings({
                 storeName: sData?.storeName || '',
-                adminName: sData?.adminName || localStorage.getItem('userDisplayName') || '',
+                adminName: sData?.adminName || getDisplayName(''),
                 includeDivisas: !!sData?.includeDivisas,
             });
             setTransactions(txData || []);
@@ -113,13 +115,13 @@ const DashboardFlow = () => {
             {/* Hero row */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
                 {/* Balance panel */}
-                <section className="xl:col-span-8 relative overflow-hidden rounded-2xl bg-shell text-white p-6 md:p-7 shadow-[0_24px_48px_-24px_rgba(10,17,40,0.6)]">
-                    <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 w-[420px] h-[320px] rounded-full bg-[radial-gradient(closest-side,rgba(47,100,245,0.45),transparent)]" />
+                <section className="xl:col-span-8 relative overflow-hidden rounded-2xl bg-shell text-white p-6 md:p-7 shadow-[0_24px_48px_-24px_rgba(21,23,26,0.6)]">
+                    <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 w-[420px] h-[320px] rounded-full bg-[radial-gradient(closest-side,rgba(242,107,29,0.45),transparent)]" />
                     <div aria-hidden className="pointer-events-none absolute -bottom-32 left-1/3 w-[360px] h-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(31,192,232,0.16),transparent)]" />
 
                     <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
                         <div className="min-w-0">
-                            <p className="text-[13.5px] font-semibold text-[#9FB0DA] flex items-center gap-2">
+                            <p className="text-[13.5px] font-semibold text-[#B4B0A6] flex items-center gap-2">
                                 <Wallet size={15} /> Saldo disponible en caja
                             </p>
                             {loading ? (
@@ -130,31 +132,31 @@ const DashboardFlow = () => {
                                         {m.balance < 0 ? '− ' : ''}{formatUSD(Math.abs(m.balance))}
                                     </p>
                                     {rates?.bcv > 0 && (
-                                        <p className="mt-2 text-[15px] font-semibold text-[#9FB0DA] tabular-nums">{formatBs(Math.abs(m.balance) * rates.bcv)}</p>
+                                        <p className="mt-2 text-[15px] font-semibold text-[#B4B0A6] tabular-nums">{formatBs(Math.abs(m.balance) * rates.bcv)}</p>
                                     )}
                                 </>
                             )}
                             <div className="mt-4 inline-flex items-center gap-2 h-8 px-3 rounded-full bg-white/[0.08] text-[13px] font-semibold">
                                 <span className={`w-1.5 h-1.5 rounded-full ${m.todayNet >= 0 ? 'bg-[#3DDC97]' : 'bg-[#FF8A8E]'}`} />
                                 Hoy {m.todayNet >= 0 ? '+' : '−'} {formatUSD(Math.abs(m.todayNet))}
-                                <span className="text-[#9FB0DA] font-medium">· {m.todayCount} {m.todayCount === 1 ? 'movimiento' : 'movimientos'}</span>
+                                <span className="text-[#B4B0A6] font-medium">· {m.todayCount} {m.todayCount === 1 ? 'movimiento' : 'movimientos'}</span>
                             </div>
                         </div>
 
                         <dl className="grid grid-cols-3 lg:grid-cols-1 gap-x-6 gap-y-4 lg:min-w-[200px] lg:border-l lg:border-white/10 lg:pl-6">
                             <div>
-                                <dt className="text-[12.5px] font-semibold text-[#9FB0DA]">Divisas en efectivo</dt>
-                                <dd className="text-[19px] font-bold tabular-nums mt-0.5">{formatUSD(m.divisas)}{rates?.bcv > 0 && <span className="block text-[12.5px] font-semibold text-[#9FB0DA]">{formatBs(m.divisas * rates.bcv)}</span>}</dd>
+                                <dt className="text-[12.5px] font-semibold text-[#B4B0A6]">Divisas en efectivo</dt>
+                                <dd className="text-[19px] font-bold tabular-nums mt-0.5">{formatUSD(m.divisas)}{rates?.bcv > 0 && <span className="block text-[12.5px] font-semibold text-[#B4B0A6]">{formatBs(m.divisas * rates.bcv)}</span>}</dd>
                             </div>
                             <div>
-                                <dt className="text-[12.5px] font-semibold text-[#9FB0DA]">Ingresos del mes</dt>
-                                <dd className="text-[19px] font-bold tabular-nums mt-0.5">{formatUSD(m.income)}{rates?.bcv > 0 && <span className="block text-[12.5px] font-semibold text-[#9FB0DA]">{formatBs(m.income * rates.bcv)}</span>}</dd>
+                                <dt className="text-[12.5px] font-semibold text-[#B4B0A6]">Ingresos del mes</dt>
+                                <dd className="text-[19px] font-bold tabular-nums mt-0.5">{formatUSD(m.income)}{rates?.bcv > 0 && <span className="block text-[12.5px] font-semibold text-[#B4B0A6]">{formatBs(m.income * rates.bcv)}</span>}</dd>
                             </div>
                             <div>
-                                <dt className="text-[12.5px] font-semibold text-[#9FB0DA]">Gastos del mes</dt>
+                                <dt className="text-[12.5px] font-semibold text-[#B4B0A6]">Gastos del mes</dt>
                                 <dd className="text-[19px] font-bold tabular-nums mt-0.5">
                                     {formatUSD(m.expenses)}
-                                    <span className="block text-[12.5px] font-semibold text-[#9FB0DA]">
+                                    <span className="block text-[12.5px] font-semibold text-[#B4B0A6]">
                                         {rates?.bcv > 0 ? formatBs(m.expenses * rates.bcv) : ''}{m.income > 0 ? ` · margen ${margin}%` : ''}
                                     </span>
                                 </dd>
@@ -164,10 +166,10 @@ const DashboardFlow = () => {
 
                     {/* 30-day net */}
                     <div className="relative mt-6">
-                        <div className="flex items-center justify-between text-[12.5px] font-semibold text-[#9FB0DA] mb-2">
+                        <div className="flex items-center justify-between text-[12.5px] font-semibold text-[#B4B0A6] mb-2">
                             <span>Flujo neto · últimos 30 días</span>
                             <span className="flex items-center gap-3">
-                                <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-[#4F86FF]" />Entradas</span>
+                                <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-[#FA8D4A]" />Entradas</span>
                                 <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-[#FF8A8E]" />Salidas</span>
                             </span>
                         </div>
@@ -188,7 +190,7 @@ const DashboardFlow = () => {
                                     />
                                     <Bar dataKey="net" radius={[3, 3, 3, 3]} minPointSize={2}>
                                         {m.series.map((d) => (
-                                            <Cell key={d.k} fill={d.net < 0 ? '#FF8A8E' : d.net === 0 ? 'rgba(255,255,255,0.12)' : '#4F86FF'} />
+                                            <Cell key={d.k} fill={d.net < 0 ? '#FF8A8E' : d.net === 0 ? 'rgba(255,255,255,0.12)' : '#FA8D4A'} />
                                         ))}
                                     </Bar>
                                 </BarChart>

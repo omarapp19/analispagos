@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Phone, Mail, MapPin, Info, Users, Briefcase, FileText, X } from 'lucide-react';
 import { api } from '../services/api';
+import { getRole } from '../auth/session';
+
 
 const Providers = () => {
     const [providers, setProviders] = useState([]);
@@ -21,7 +23,7 @@ const Providers = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
 
-    const userRole = localStorage.getItem('userRole') || 'cajero';
+    const userRole = getRole();
 
     const fetchProviders = async () => {
         setLoading(true);

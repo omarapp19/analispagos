@@ -9,24 +9,23 @@ import { ChevronDown as ChevronDownIcon, Banknote, Wallet as WalletIcon, Clock3,
 import { api } from '../services/api';
 import Money from '../components/ui/Money';
 import { useExchangeRates } from '../hooks/useExchangeRates';
-import { subscribeToTable } from '../supabase';
+import { supabase, subscribeToTable } from '../supabase';
+import { getRole, getDisplayName } from '../auth/session';
+
 
 
 const Billing = () => {
     // Role Access
-    const userRole = localStorage.getItem('userRole') || 'cajero';
-    const userDisplayName = localStorage.getItem('userDisplayName') || 'Cajero';
+    const userRole = getRole();
+    const userDisplayName = getDisplayName('Cajero');
 
     // Tab State: 'new' (POS) | 'history' | 'receivables' | 'clients'
     const posRates = useExchangeRates();
     const [activeTab, setActiveTab] = useState('new');
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         if (window.confirm('¿Cerrar sesión en el sistema?')) {
-            localStorage.removeItem('isAuthenticated');
-            localStorage.removeItem('userRole');
-            localStorage.removeItem('adminUser');
-            localStorage.removeItem('userDisplayName');
+            await supabase.auth.signOut();
             window.location.href = '/login';
         }
     };
@@ -526,7 +525,7 @@ const Billing = () => {
         row2('IVA:', formatCurrency(r.tax ?? 0), cy); cy += lineH + 4;
 
         // Total destacado
-        ctx.fillStyle = '#1a1a2e';
+        ctx.fillStyle = '#15171A';
         ctx.fillRect(PAD, cy - 20, W - PAD * 2, 38);
         text('TOTAL:', PAD + 12, cy + 4, { size: 15, bold: true, color: '#ffffff' });
         text(formatCurrency(r.total ?? 0), W - PAD - 12, cy + 4, { size: 17, bold: true, align: 'right', color: '#ffffff' });
@@ -760,7 +759,7 @@ ${itemsText}-------------------------------
             {userRole === 'cajero' ? (
                 <div className="flex justify-between items-center gap-3 bg-shell text-white h-16 px-5 flex-shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center bg-[linear-gradient(135deg,#2F64F5,#1FC0E8)] flex-shrink-0">
+                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center bg-[linear-gradient(135deg,#F26B1D,#FFB81C)] flex-shrink-0">
                             <ShoppingCart size={16} />
                         </div>
                         <h1 className="text-white text-[16px] font-extrabold truncate">Punto de venta</h1>
@@ -768,15 +767,15 @@ ${itemsText}-------------------------------
                     <div className="flex items-center gap-2 sm:gap-3">
                         {posRates?.bcv > 0 && (
                             <span className="hidden sm:inline-flex items-center h-9 px-3 rounded-xl bg-white/[0.08] text-[13px] font-semibold tabular-nums">
-                                <span className="text-[#9FB0DA] mr-1.5">BCV</span> Bs {Number(posRates.bcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-[#B4B0A6] mr-1.5">BCV</span> Bs {Number(posRates.bcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         )}
-                        <span className="hidden sm:inline text-[13.5px] font-semibold text-[#B4BDD8]">
+                        <span className="hidden sm:inline text-[13.5px] font-semibold text-[#CBC8C0]">
                             {userDisplayName}
                         </span>
                         <button
                             onClick={handleLogout}
-                            className="h-9 px-3 rounded-xl text-[13px] font-semibold text-[#B4BDD8] hover:text-white hover:bg-white/10 flex items-center gap-1.5"
+                            className="h-9 px-3 rounded-xl text-[13px] font-semibold text-[#CBC8C0] hover:text-white hover:bg-white/10 flex items-center gap-1.5"
                         >
                             <LogOut size={15} />
                             Salir
@@ -911,7 +910,7 @@ ${itemsText}-------------------------------
                                                 cartQty > 0 ? 'border-primary ring-2 ring-primary/15' : 'border-line hover:border-primary/50 hover:shadow-md'
                                             } disabled:opacity-55 disabled:cursor-not-allowed`}
                                         >
-                                            <div className={`relative rounded-xl overflow-hidden flex items-center justify-center ${p.image ? 'aspect-[4/3] bg-gray-100' : 'h-[72px] bg-[linear-gradient(135deg,#EEF3FF,#F4F6FA)]'}`}>
+                                            <div className={`relative rounded-xl overflow-hidden flex items-center justify-center ${p.image ? 'aspect-[4/3] bg-gray-100' : 'h-[72px] bg-[linear-gradient(135deg,#FFEFE4,#F4F1EA)]'}`}>
                                                 {p.image ? (
                                                     <img src={p.image} alt="" className="w-full h-full object-cover" loading="lazy" />
                                                 ) : (
@@ -1106,7 +1105,7 @@ ${itemsText}-------------------------------
                     </aside>
 
                     {/* Phone: quick bar to jump to the ticket */}
-                    <div className={`lg:hidden fixed bottom-0 inset-x-0 z-30 p-3 bg-white/95 backdrop-blur border-t border-line shadow-[0_-8px_20px_-12px_rgba(15,26,51,0.25)] transition-transform duration-200 ${chargeVisible || invoiceItems.length === 0 ? 'translate-y-full' : ''}`}>
+                    <div className={`lg:hidden fixed bottom-0 inset-x-0 z-30 p-3 bg-white/95 backdrop-blur border-t border-line shadow-[0_-8px_20px_-12px_rgba(21,23,26,0.25)] transition-transform duration-200 ${chargeVisible || invoiceItems.length === 0 ? 'translate-y-full' : ''}`}>
                         <button
                             type="button"
                             onClick={goToPayment}
@@ -1183,11 +1182,11 @@ ${itemsText}-------------------------------
                         <section className="card p-5 flex flex-col gap-5 order-1 lg:order-2" aria-label="Pago">
                             <div className="rounded-2xl bg-shell text-white px-5 py-4 flex items-end justify-between gap-3">
                                 <div>
-                                    <p className="text-[13px] font-semibold text-[#9FB0DA]">Total a cobrar</p>
+                                    <p className="text-[13px] font-semibold text-[#B4B0A6]">Total a cobrar</p>
                                     <p className="text-[38px] leading-none font-extrabold tracking-[-0.03em] tabular-nums mt-1.5">{formatCurrency(invoiceTotals.total)}</p>
                                 </div>
                                 {posRates?.bcv > 0 && (
-                                    <p className="text-[15px] font-bold text-[#9FB0DA] tabular-nums text-right">
+                                    <p className="text-[15px] font-bold text-[#B4B0A6] tabular-nums text-right">
                                         Bs {(invoiceTotals.total * posRates.bcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </p>
                                 )}
@@ -1448,7 +1447,7 @@ ${itemsText}-------------------------------
                                                             cy+=6; dL(cy); cy+=20;
                                                             r2('Subtotal:',formatCurrency(r.subtotal??0),cy); cy+=lineH;
                                                             r2('IVA:',formatCurrency(r.tax??0),cy); cy+=lineH+4;
-                                                            ctx.fillStyle='#1a1a2e'; ctx.fillRect(PAD,cy-20,W-PAD*2,38);
+                                                            ctx.fillStyle='#15171A'; ctx.fillRect(PAD,cy-20,W-PAD*2,38);
                                                             tx('TOTAL:',PAD+12,cy+4,{size:15,bold:true,color:'#fff'}); tx(formatCurrency(r.total??0),W-PAD-12,cy+4,{size:17,bold:true,align:'right',color:'#fff'}); cy+=46;
                                                             tx('¡Gracias por su preferencia!',W/2,cy,{size:12,align:'center',color:'#888'});
                                                             const lnk=document.createElement('a');

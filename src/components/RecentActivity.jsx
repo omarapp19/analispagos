@@ -6,11 +6,11 @@ import { formatUSD } from '../hooks/useExchangeRates';
 const methodStyles = {
     'Divisas': 'bg-[#FFF4DB] text-[#8A5A00]',
     'Efectivo': 'bg-[#E7F7EE] text-[#0C7A45]',
-    'Pago Móvil': 'bg-[#EBF1FF] text-[#2453D9]',
-    'Tarjeta': 'bg-[#EEF1F6] text-[#3D475F]',
-    'Punto': 'bg-[#EEF1F6] text-[#3D475F]',
-    'Transferencia': 'bg-[#E6F7FB] text-[#0B7590]',
-    'Zelle': 'bg-[#E6F4FB] text-[#0B6BA8]',
+    'Pago Móvil': 'bg-[#FFEFE4] text-[#D95A12]',
+    'Tarjeta': 'bg-[#F0EDE6] text-[#3D475F]',
+    'Punto': 'bg-[#F0EDE6] text-[#3D475F]',
+    'Transferencia': 'bg-[#FFF3D1] text-[#0B7590]',
+    'Zelle': 'bg-[#FFF3D1] text-[#0B6BA8]',
 };
 
 const MethodPill = ({ method }) => (

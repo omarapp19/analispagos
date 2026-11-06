@@ -510,7 +510,7 @@ const AIAssistantBubble = () => {
                 
                 <button
                     onClick={() => setIsOpen(!isOpen)}
-                    className={`relative w-12 h-12 md:w-14 md:h-14 bg-shell text-white rounded-full flex items-center justify-center shadow-[0_10px_24px_-8px_rgba(10,17,40,0.55),0_2px_6px_rgba(10,17,40,0.2)] ring-1 ring-white/10 hover:bg-shell-2 transition-[transform,background-color] duration-200 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
+                    className={`relative w-12 h-12 md:w-14 md:h-14 bg-shell text-white rounded-full flex items-center justify-center shadow-[0_10px_24px_-8px_rgba(21,23,26,0.55),0_2px_6px_rgba(21,23,26,0.2)] ring-1 ring-white/10 hover:bg-shell-2 transition-[transform,background-color] duration-200 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
                     title="Asistente de Conciliación IA"
                 >
                     {isOpen ? (

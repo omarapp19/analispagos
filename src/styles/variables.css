@@ -1,11 +1,11 @@
 :root {
   /* Colors - Based on Horizon UI (common template matching this style) */
-  --color-primary: #2F64F5;
+  --color-primary: #F26B1D;
   --color-primary-light: #E9E3FF;
   /* Light purple tag background */
   --color-secondary: #2B3674;
   /* Dark Blue Text */
-  --color-secondary-grey: #9AA3B8;
+  --color-secondary-grey: #8A9099;
   /* Muted Text */
 
   --color-success: #12B76A;
@@ -17,17 +17,17 @@
   --color-warning: #FFCE20;
   --color-warning-light: #FFF9E5;
 
-  --color-info: #1FC0E8;
+  --color-info: #FFB81C;
 
   --color-background: #F4F7FE;
   /* user background */
   --color-surface: #FFFFFF;
 
   --color-text-primary: #2B3674;
-  --color-text-secondary: #9AA3B8;
-  --color-text-disabled: #E3E7F0;
+  --color-text-secondary: #8A9099;
+  --color-text-disabled: #E2DED5;
 
-  --color-border: #E3E7F0;
+  --color-border: #E2DED5;
 
   /* Typography */
   --font-family: 'DM Sans', sans-serif;
@@ -42,7 +42,7 @@
   /* Global softer shadow */
   --shadow-card: 0px 3px 20px rgba(112, 144, 176, 0.06);
   /* Card shadow */
-  --shadow-purple: 0px 10px 20px rgba(67, 24, 255, 0.18);
+  --shadow-purple: 0px 10px 20px rgba(242, 107, 29, 0.18);
   /* Primary button shadow */
 }
 

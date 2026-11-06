@@ -90,19 +90,19 @@ const LiquidityChart = ({ balance = 0, bills = [] }) => {
                                 <stop offset="95%" stopColor="#12B76A" stopOpacity={0} />
                             </linearGradient>
                         </defs>
-                        <CartesianGrid vertical={false} stroke="#E3E7F0" strokeDasharray="3 3" />
+                        <CartesianGrid vertical={false} stroke="#E2DED5" strokeDasharray="3 3" />
                         <XAxis
                             dataKey="name"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#9AA3B8', fontSize: 12, fontWeight: 500 }}
+                            tick={{ fill: '#8A9099', fontSize: 12, fontWeight: 500 }}
                             dy={15}
                             interval={0}
                         />
                         <YAxis
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#9AA3B8', fontSize: 12, fontWeight: 500 }}
+                            tick={{ fill: '#8A9099', fontSize: 12, fontWeight: 500 }}
                             tickFormatter={(value) => Math.abs(value) >= 1000 ? `$${(value / 1000).toLocaleString("es-VE", { maximumFractionDigits: 1 })}k` : `$${Math.round(value)}`}
                         />
                         <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#12B76A', strokeWidth: 2, strokeDasharray: '5 5' }} />

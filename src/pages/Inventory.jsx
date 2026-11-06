@@ -5,10 +5,12 @@ import {
     ArrowUpDown, Check, X, Loader2, DollarSign, Wrench } from 'lucide-react';
 import { api } from '../services/api';
 import { subscribeToTable } from '../supabase';
+import { getRole, getUsername } from '../auth/session';
+
 
 const Inventory = () => {
-    const userRole = localStorage.getItem('userRole') || 'cajero';
-    const username = localStorage.getItem('adminUser') || '';
+    const userRole = getRole();
+    const username = getUsername();
 
     // Inventory Data States
     const [products, setProducts] = useState([]);

@@ -9,72 +9,72 @@
    ────────────────────────────────────────────────────────────── */
 @theme {
     /* Brand */
-    --color-primary: #2F64F5;
-    --color-primary-hover: #2453D9;
-    --color-primary-soft: #EBF1FF;
-    --color-accent: #2F64F5;
-    --color-accent-2: #1FC0E8;
+    --color-primary: #F26B1D;
+    --color-primary-hover: #D95A12;
+    --color-primary-soft: #FFEFE4;
+    --color-accent: #F26B1D;
+    --color-accent-2: #FFB81C;
 
     /* Semantic (kept names used across the codebase) */
-    --color-navy: #0F1A33;          /* ink: headings, figures */
-    --color-secondary: #5B6680;     /* muted text */
-    --color-background: #F4F6FA;    /* work surface */
+    --color-navy: #15171A;          /* ink: headings, figures */
+    --color-secondary: #6F757E;     /* muted text */
+    --color-background: #F4F1EA;    /* work surface */
     --color-surface: #FFFFFF;
-    --color-line: #E3E7F0;
-    --color-shell: #0A1128;         /* sidebar */
-    --color-shell-2: #131D3B;
+    --color-line: #E2DED5;
+    --color-shell: #15171A;         /* sidebar */
+    --color-shell-2: #1F2226;
     --color-success: #12B76A;
-    --color-danger: #E5484D;
-    --color-warning: #F5A524;
-    --color-info: #3E8BFF;
+    --color-danger: #C2301F;
+    --color-warning: #FFB81C;
+    --color-info: #8A9099;
 
     /* Teal was the old primary family: it now resolves to the brand blue. */
-    --color-teal-50: #F0F5FF;
-    --color-teal-100: #E1EAFF;
-    --color-teal-200: #C5D6FF;
-    --color-teal-300: #9DB8FF;
-    --color-teal-400: #6D93FB;
-    --color-teal-500: #4777F7;
-    --color-teal-600: #2F64F5;
-    --color-teal-700: #2453D9;
-    --color-teal-800: #1E44AE;
-    --color-teal-900: #1C3A8A;
+    --color-teal-50: #FFF6EF;
+    --color-teal-100: #FFE8D6;
+    --color-teal-200: #FFCFA9;
+    --color-teal-300: #FFB07A;
+    --color-teal-400: #FA8D4A;
+    --color-teal-500: #F57A2F;
+    --color-teal-600: #F26B1D;
+    --color-teal-700: #D95A12;
+    --color-teal-800: #B24710;
+    --color-teal-900: #8A3810;
 
-    --color-indigo-50: #F0F5FF;
-    --color-indigo-100: #E1EAFF;
-    --color-indigo-200: #C5D6FF;
-    --color-indigo-300: #9DB8FF;
-    --color-indigo-400: #6D93FB;
-    --color-indigo-500: #4777F7;
-    --color-indigo-600: #2F64F5;
-    --color-indigo-700: #2453D9;
-    --color-indigo-800: #1E44AE;
-    --color-indigo-900: #1C3A8A;
+    --color-indigo-50: #FFF6EF;
+    --color-indigo-100: #FFE8D6;
+    --color-indigo-200: #FFCFA9;
+    --color-indigo-300: #FFB07A;
+    --color-indigo-400: #FA8D4A;
+    --color-indigo-500: #F57A2F;
+    --color-indigo-600: #F26B1D;
+    --color-indigo-700: #D95A12;
+    --color-indigo-800: #B24710;
+    --color-indigo-900: #8A3810;
 
     /* Blue-slate neutrals */
-    --color-gray-50: #F7F8FB;
-    --color-gray-100: #EEF1F6;
-    --color-gray-150: #E8EBF2;
-    --color-gray-200: #DFE3EC;
-    --color-gray-300: #C8CEDB;
-    --color-gray-400: #9AA3B8;
-    --color-gray-500: #727D96;
-    --color-gray-600: #556079;
-    --color-gray-700: #3D475F;
-    --color-gray-800: #1F2942;
-    --color-gray-900: #0F1A33;
+    --color-gray-50: #F8F6F1;
+    --color-gray-100: #F0EDE6;
+    --color-gray-150: #EAE6DE;
+    --color-gray-200: #E2DED5;
+    --color-gray-300: #CBC8C0;
+    --color-gray-400: #8A9099;
+    --color-gray-500: #6F757E;
+    --color-gray-600: #565B63;
+    --color-gray-700: #3D4147;
+    --color-gray-800: #25282C;
+    --color-gray-900: #15171A;
 
-    --color-slate-50: #F7F8FB;
-    --color-slate-100: #EEF1F6;
-    --color-slate-200: #DFE3EC;
-    --color-slate-300: #C8CEDB;
-    --color-slate-400: #9AA3B8;
-    --color-slate-500: #727D96;
-    --color-slate-600: #556079;
-    --color-slate-700: #3D475F;
-    --color-slate-800: #1F2942;
-    --color-slate-900: #0F1A33;
-    --color-slate-950: #080F22;
+    --color-slate-50: #F8F6F1;
+    --color-slate-100: #F0EDE6;
+    --color-slate-200: #E2DED5;
+    --color-slate-300: #CBC8C0;
+    --color-slate-400: #8A9099;
+    --color-slate-500: #6F757E;
+    --color-slate-600: #565B63;
+    --color-slate-700: #3D4147;
+    --color-slate-800: #25282C;
+    --color-slate-900: #15171A;
+    --color-slate-950: #0E1012;
 
     --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 
@@ -87,21 +87,31 @@
     --radius-3xl: 20px;
 
     /* Depth: offset + soft blur, tinted with the ink */
-    --shadow-xs: 0 1px 2px rgba(15, 26, 51, 0.05);
-    --shadow-sm: 0 1px 2px rgba(15, 26, 51, 0.06), 0 1px 3px rgba(15, 26, 51, 0.04);
-    --shadow: 0 1px 3px rgba(15, 26, 51, 0.07), 0 2px 6px rgba(15, 26, 51, 0.04);
-    --shadow-md: 0 4px 12px -2px rgba(15, 26, 51, 0.08), 0 2px 4px rgba(15, 26, 51, 0.04);
-    --shadow-lg: 0 12px 28px -8px rgba(15, 26, 51, 0.16), 0 4px 8px rgba(15, 26, 51, 0.04);
-    --shadow-xl: 0 20px 40px -12px rgba(15, 26, 51, 0.22);
-    --shadow-2xl: 0 28px 60px -16px rgba(15, 26, 51, 0.32);
-    --shadow-card: 0 1px 2px rgba(15, 26, 51, 0.04), 0 1px 0 rgba(15, 26, 51, 0.02);
-    --shadow-purple: 0 8px 20px -6px rgba(47, 100, 245, 0.45);
+    --shadow-xs: 0 1px 2px rgba(21, 23, 26, 0.05);
+    --shadow-sm: 0 1px 2px rgba(21, 23, 26, 0.06), 0 1px 3px rgba(21, 23, 26, 0.04);
+    --shadow: 0 1px 3px rgba(21, 23, 26, 0.07), 0 2px 6px rgba(21, 23, 26, 0.04);
+    --shadow-md: 0 4px 12px -2px rgba(21, 23, 26, 0.08), 0 2px 4px rgba(21, 23, 26, 0.04);
+    --shadow-lg: 0 12px 28px -8px rgba(21, 23, 26, 0.16), 0 4px 8px rgba(21, 23, 26, 0.04);
+    --shadow-xl: 0 20px 40px -12px rgba(21, 23, 26, 0.22);
+    --shadow-2xl: 0 28px 60px -16px rgba(21, 23, 26, 0.32);
+    --shadow-card: 0 1px 2px rgba(21, 23, 26, 0.04), 0 1px 0 rgba(21, 23, 26, 0.02);
+    --shadow-purple: 0 8px 20px -6px rgba(242, 107, 29, 0.45);
 
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
     --animate-enter: enter 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
     --animate-fade: fade 180ms ease-out both;
+    /* Valkar: blue ramp remapped to acero */
+    --color-teal-650: #E5600F;
+    --color-blue-50: #F3F4F5;
+    --color-blue-100: #E6E8EA;
+    --color-blue-200: #D3D6DA;
+    --color-blue-300: #B4B9C0;
+    --color-blue-400: #9AA0A8;
+    --color-blue-500: #8A9099;
+    --color-blue-600: #6F757E;
+    --color-blue-700: #565B63;
 }
 
 @keyframes enter {
@@ -142,8 +152,8 @@
     p { margin: 0; text-wrap: pretty; }
 
     ::selection {
-        background: #CFDDFF;
-        color: #0F1A33;
+        background: #FFD9BC;
+        color: #15171A;
     }
 
     /* Figures line up everywhere money is shown */
@@ -162,7 +172,7 @@
     }
 
     input::placeholder, textarea::placeholder {
-        color: #8E98AE;
+        color: #8A9099;
         font-weight: 500;
     }
 
@@ -170,7 +180,7 @@
         font-size: 11.5px !important;
         font-weight: 700 !important;
         letter-spacing: 0.04em;
-        color: #5B6680;
+        color: #6F757E;
     }
 
     table td {
@@ -194,7 +204,7 @@
     input:focus-visible, select:focus-visible, textarea:focus-visible {
         outline: none;
         border-color: var(--color-primary) !important;
-        box-shadow: 0 0 0 3px rgba(47, 100, 245, 0.14);
+        box-shadow: 0 0 0 3px rgba(242, 107, 29, 0.14);
     }
 
     a {
@@ -219,7 +229,7 @@
     .btn-accent {
         @apply text-white;
         background-image: linear-gradient(100deg, var(--color-accent), var(--color-accent-2));
-        box-shadow: 0 8px 20px -8px rgba(47, 100, 245, 0.6);
+        box-shadow: 0 8px 20px -8px rgba(242, 107, 29, 0.6);
     }
 
     .btn-accent:hover {
@@ -251,7 +261,7 @@
     }
 
     .skeleton {
-        background: linear-gradient(90deg, #EDF0F5 0%, #F6F8FB 50%, #EDF0F5 100%);
+        background: linear-gradient(90deg, #EEEAE2 0%, #F8F6F1 50%, #EEEAE2 100%);
         background-size: 800px 100%;
         animation: shimmer 1.3s linear infinite;
         border-radius: 8px;
@@ -282,7 +292,7 @@
 /* Modal scrims: one consistent ink veil instead of black blur */
 .fixed.inset-0[class*="bg-black/"],
 .fixed.inset-0[class*="bg-navy/"] {
-    background-color: rgba(10, 17, 40, 0.52) !important;
+    background-color: rgba(21, 23, 26, 0.52) !important;
     backdrop-filter: blur(3px);
     animation: fade 160ms ease-out both;
 }
@@ -294,18 +304,18 @@
 /* Scrollbars */
 * {
     scrollbar-width: thin;
-    scrollbar-color: #CDD4E2 transparent;
+    scrollbar-color: #CBC8C0 transparent;
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: #CDD4E2;
+    background: #CBC8C0;
     border-radius: 8px;
     border: 2px solid transparent;
     background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #A7B1C6; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #8A9099; background-clip: content-box; }
 
 /* Readability floor: the codebase uses many micro sizes; lift them. */
 .text-\[8px\] { font-size: 11px !important; }
@@ -381,9 +391,9 @@ main h1.text-2xl { font-size: 26px !important; font-weight: 800; letter-spacing:
 main h1.text-2xl + p, main h1 + p.text-secondary { font-size: 14.5px; margin-top: 4px; font-weight: 500; }
 
 /* Tables: calmer headers, clearer rows */
-main table thead th, main table thead tr { background-color: #F7F8FB; }
+main table thead th, main table thead tr { background-color: #F8F6F1; }
 main table tbody tr { transition: background-color 120ms ease; }
-main table tbody tr:hover { background-color: #F7F8FB; }
+main table tbody tr:hover { background-color: #F8F6F1; }
 
 /* Legacy shouting labels -> calm sentence-style labels */
 main label.uppercase, main h3.uppercase, main h4.uppercase,
@@ -417,8 +427,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
 /* Empty states: readable, not ghosted */
-main td[colspan] { color: #5B6680 !important; }
-main td[colspan] p, main td[colspan] span { color: #5B6680; opacity: 1 !important; }
+main td[colspan] { color: #6F757E !important; }
+main td[colspan] p, main td[colspan] span { color: #6F757E; opacity: 1 !important; }
 main td[colspan] svg { opacity: 0.45; }
 
 /* ══ Modal system ════════════════════════════════════════════════
@@ -429,7 +439,7 @@ main td[colspan] svg { opacity: 0.45; }
 .fixed.inset-0:is([class*="bg-black/5"], [class*="bg-black/6"]) > div:not(.absolute) {
     border-radius: 20px;
     max-height: calc(100dvh - 32px);
-    box-shadow: 0 32px 64px -24px rgba(10, 17, 40, 0.45), 0 0 0 1px rgba(15, 26, 51, 0.06);
+    box-shadow: 0 32px 64px -24px rgba(21, 23, 26, 0.45), 0 0 0 1px rgba(21, 23, 26, 0.06);
 }
 
 /* Header titles inside modals */
@@ -468,7 +478,7 @@ main td[colspan] svg { opacity: 0.45; }
 }
 .fixed.inset-0:is([class*="bg-black/5"], [class*="bg-black/6"]) :is(input, select, textarea):disabled,
 .fixed.inset-0:is([class*="bg-black/5"], [class*="bg-black/6"]) input[readonly] {
-    background-color: #F4F6FA !important;
+    background-color: #F4F1EA !important;
     color: #556079;
 }
 
@@ -481,7 +491,7 @@ main td[colspan] svg { opacity: 0.45; }
     margin-top: 8px;
     padding-top: 14px;
     padding-bottom: 2px;
-    box-shadow: 0 -10px 14px -12px rgba(15, 26, 51, 0.18);
+    box-shadow: 0 -10px 14px -12px rgba(21, 23, 26, 0.18);
 }
 /* A bare submit button as the form's last child: pin it, keep its own colors */
 .fixed.inset-0:is([class*="bg-black/5"], [class*="bg-black/6"]) form > button[type="submit"]:last-child {
@@ -489,7 +499,7 @@ main td[colspan] svg { opacity: 0.45; }
     bottom: 0;
     z-index: 5;
     margin-top: 12px;
-    box-shadow: 0 0 0 10px #fff, 0 -14px 16px -6px rgba(15, 26, 51, 0.16);
+    box-shadow: 0 0 0 10px #fff, 0 -14px 16px -6px rgba(21, 23, 26, 0.16);
 }
 .fixed.inset-0:is([class*="bg-black/5"], [class*="bg-black/6"]) button[type="submit"] {
     min-height: 44px;

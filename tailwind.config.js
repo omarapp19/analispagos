@@ -7,21 +7,21 @@ export default {
     theme: {
         extend: {
             colors: {
-                primary: '#11998E', // Teal from screenshot
-                secondary: '#2B3674',
-                success: '#05CD99',
-                danger: '#EE5D50',
-                warning: '#FFCE20',
-                info: '#11CDEF',
-                background: '#F4F7FE',
-                navy: '#2B3674',
+                primary: '#F26B1D', // Naranja Valkar
+                secondary: '#6F757E',
+                success: '#12B76A',
+                danger: '#C2301F',
+                warning: '#FFB81C',
+                info: '#8A9099',
+                background: '#F4F1EA',
+                navy: '#15171A',
             },
             fontFamily: {
                 sans: ['DM Sans', 'sans-serif'],
             },
             boxShadow: {
-                'card': '0px 3px 20px rgba(112, 144, 176, 0.08)',
-                'purple': '0px 10px 20px rgba(67, 24, 255, 0.18)',
+                'card': '0px 3px 20px rgba(21, 23, 26, 0.08)',
+                'purple': '0px 10px 20px rgba(242, 107, 29, 0.18)',
             },
             borderRadius: {
                 'xl': '20px',

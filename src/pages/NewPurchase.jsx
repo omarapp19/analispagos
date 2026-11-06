@@ -2,10 +2,12 @@
 import { Search, Plus, Trash2, Save, FileText, Landmark, User, X, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { getUsername } from '../auth/session';
+
 
 const NewPurchase = () => {
     const navigate = useNavigate();
-    const username = localStorage.getItem('adminUser') || 'Sistema';
+    const username = (getUsername() || 'Sistema');
 
     const [loading, setLoading] = useState(false);
     const [availableProducts, setAvailableProducts] = useState([]);

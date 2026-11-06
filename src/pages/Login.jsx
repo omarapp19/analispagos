@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, Package, ArrowRight, AlertCircle } from 'lucide-react';
-import { supabase, getSettingDoc } from '../supabase';
+import { getSettingDoc } from '../supabase';
+import { useAuth } from '../auth/AuthContext';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -10,6 +11,7 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const { signIn, profile } = useAuth();
     const [storeName, setStoreName] = useState('');
 
     useEffect(() => {
@@ -17,39 +19,23 @@ const Login = () => {
     }, []);
 
     useEffect(() => {
-        if (localStorage.getItem('isAuthenticated') === 'true') {
-            navigate('/', { replace: true });
-        }
-    }, [navigate]);
+        if (profile) navigate(profile.role === 'cajero' ? '/pos' : '/', { replace: true });
+    }, [profile, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        const inputUser = username.trim().toLowerCase();
-
         try {
-            const { data: user, error: queryErr } = await supabase
-                .from('users')
-                .select('*')
-                .eq('username', inputUser)
-                .maybeSingle();
-
-            if (queryErr) throw queryErr;
-
-            if (user && user.password === password) {
-                localStorage.setItem('isAuthenticated', 'true');
-                localStorage.setItem('userRole', user.role);
-                localStorage.setItem('adminUser', user.username);
-                localStorage.setItem('userDisplayName', user.name);
-                navigate(user.role === 'cajero' ? '/pos' : '/', { replace: true });
-            } else {
-                setError('Usuario o contraseña incorrectos. Revisa los datos e intenta de nuevo.');
-            }
+            await signIn(username.trim().toLowerCase(), password);
+            // La navegación ocurre en el efecto de arriba cuando se carga el perfil.
         } catch (err) {
-            console.error('Error validating credentials:', err);
-            setError('No pudimos conectar con el servidor. Revisa tu conexión a internet e intenta de nuevo.');
+            console.error('Error de inicio de sesión:', err);
+            const invalid = err?.status === 400 || /invalid login/i.test(err?.message || '');
+            setError(invalid
+                ? 'Usuario o contraseña incorrectos. Revisa los datos e intenta de nuevo.'
+                : 'No pudimos conectar con el servidor. Revisa tu conexión a internet e intenta de nuevo.');
         } finally {
             setLoading(false);
         }
@@ -59,30 +45,30 @@ const Login = () => {
         <div className="min-h-screen w-full bg-shell text-white relative overflow-hidden flex">
             {/* Atmosphere */}
             <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_70%_60%_at_30%_40%,#000_40%,transparent_100%)]" />
-            <div aria-hidden className="pointer-events-none absolute -top-40 -left-20 w-[720px] h-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(47,100,245,0.42),transparent)]" />
+            <div aria-hidden className="pointer-events-none absolute -top-40 -left-20 w-[720px] h-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(242,107,29,0.42),transparent)]" />
             <div aria-hidden className="pointer-events-none absolute bottom-[-220px] right-[-120px] w-[640px] h-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(31,192,232,0.18),transparent)]" />
 
             <div className="relative z-10 w-full max-w-[1200px] mx-auto px-5 sm:px-8 py-8 flex flex-col lg:flex-row lg:items-center gap-10 lg:gap-16">
                 {/* Message */}
                 <div className="flex-1 flex flex-col">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-[11px] flex items-center justify-center bg-[linear-gradient(135deg,#2F64F5,#1FC0E8)] shadow-[0_8px_20px_-8px_rgba(47,100,245,0.9)]">
+                        <div className="w-9 h-9 rounded-[11px] flex items-center justify-center bg-[linear-gradient(135deg,#F26B1D,#FFB81C)] shadow-[0_8px_20px_-8px_rgba(242,107,29,0.9)]">
                             <Package size={18} strokeWidth={2.4} />
                         </div>
                         <span className="font-extrabold text-[17px] tracking-[-0.01em] min-h-[1em]">{storeName}</span>
                     </div>
 
                     <h1 className="text-white mt-10 lg:mt-16 text-[34px] sm:text-[46px] lg:text-[54px] leading-[1.04] font-extrabold tracking-[-0.035em] max-w-[560px]">
-                        Tu caja al día, en <span className="text-[#6FA0FF]">dólares</span> y <span className="text-[#5FD6F2]">bolívares</span>.
+                        Tu caja al día, en <span className="text-[#FFB07A]">dólares</span> y <span className="text-[#5FD6F2]">bolívares</span>.
                     </h1>
-                    <p className="mt-5 text-[16px] sm:text-[17px] leading-relaxed text-[#A9B6D9] max-w-[460px]">
+                    <p className="mt-5 text-[16px] sm:text-[17px] leading-relaxed text-[#B4B0A6] max-w-[460px]">
                         Ventas, inventario, compras y cuentas por cobrar y pagar en un solo lugar, con la tasa BCV sincronizada todos los días.
                     </p>
 
-                    <ul className="hidden lg:flex mt-10 gap-8 text-[14px] text-[#A9B6D9]">
+                    <ul className="hidden lg:flex mt-10 gap-8 text-[14px] text-[#B4B0A6]">
                         {['Punto de venta', 'Inventario y kardex', 'Cuentas y vencimientos'].map((t) => (
                             <li key={t} className="flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#4F86FF]" />{t}
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#FA8D4A]" />{t}
                             </li>
                         ))}
                     </ul>
@@ -149,7 +135,7 @@ const Login = () => {
                             </button>
                         </form>
                     </div>
-                    <p className="mt-5 text-center text-[13px] text-[#7F8BB0]">¿Olvidaste tu contraseña? Pídele al administrador que la restablezca.</p>
+                    <p className="mt-5 text-center text-[13px] text-[#8A9099]">¿Olvidaste tu contraseña? Pídele al administrador que la restablezca.</p>
                 </div>
             </div>
         </div>

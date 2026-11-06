@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import MainLayout from './layout/MainLayout';
 import DashboardFlow from './pages/DashboardFlow';
@@ -10,6 +10,7 @@ import Inventory from './pages/Inventory';
 import Billing from './pages/Billing';
 import Login from './pages/Login'; 
 import Investments from './pages/Investments';
+import { AuthProvider, useAuth } from './auth/AuthContext';
 
 // Import new pages
 import Providers from './pages/Providers';
@@ -20,21 +21,27 @@ import ClientManagement from './pages/ClientManagement';
 import CuentasPorCobrar from './pages/CuentasPorCobrar';
 import CuentasPorPagar from './pages/CuentasPorPagar';
 
-// Route protector for authentication
+// Pantalla mientras se resuelve la sesión
+const AuthLoading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background text-secondary text-sm">Verificando sesión…</div>
+);
+
+// Route protector for authentication: sesión de Supabase Auth + perfil activo de staff_profiles
 const ProtectedRoute = () => {
-  const isAuth = localStorage.getItem('isAuthenticated') === 'true';
-  if (!isAuth) {
+  const { session, profile, loading } = useAuth();
+  if (loading) return <AuthLoading />;
+  if (!session || !profile) {
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;
 };
 
-// Route protector for roles
+// Route protector for roles: el rol sale de staff_profiles (contexto), no de localStorage
 const RoleProtectedRoute = ({ allowedRoles }) => {
-  const role = localStorage.getItem('userRole') || 'cajero';
-  
-  if (!allowedRoles.includes(role)) {
-    // If not allowed, redirect to their home page
+  const { profile } = useAuth();
+  const role = profile?.role;
+
+  if (!role || !allowedRoles.includes(role)) {
     return <Navigate to={role === 'cajero' ? '/pos' : '/'} replace />;
   }
   return <Outlet />;
@@ -42,6 +49,7 @@ const RoleProtectedRoute = ({ allowedRoles }) => {
 
 function App() {
   return (
+    <AuthProvider>
     <Router>
       <Routes>
         {/* Public Login Route */}
@@ -105,6 +113,7 @@ function App() {
         <Route path="*" element={<Navigate to="/pos" replace />} />
       </Routes>
     </Router>
+    </AuthProvider>
   );
 }
 

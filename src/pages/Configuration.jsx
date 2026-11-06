@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Trash2, Edit2, Shield, Eye, EyeOff } from 'lucide-react';
+import { Save, Building2, User, FileText, Phone, MapPin, Lock, LogOut, Plus, Trash2, Edit2, Shield } from 'lucide-react';
 import { api } from '../services/api';
+import { supabase } from '../supabase';
+import { getRole, getUsername } from '../auth/session';
+
 
 const Configuration = () => {
     const [activeTab, setActiveTab] = useState('general'); // 'general' | 'users'
     
     // Check role
-    const currentUserRole = localStorage.getItem('userRole') || 'cajero';
-    const currentUsername = localStorage.getItem('adminUser') || '';
+    const currentUserRole = getRole();
+    const currentUsername = getUsername();
 
     // Settings State
     const [settings, setSettings] = useState({
@@ -35,7 +38,6 @@ const Configuration = () => {
     });
     const [savingUser, setSavingUser] = useState(false);
     const [userError, setUserError] = useState(null);
-    const [showPasswordMap, setShowPasswordMap] = useState({});
 
     useEffect(() => {
         fetchSettings();
@@ -166,7 +168,7 @@ const Configuration = () => {
         setUserForm({
             username: u.username,
             name: u.name,
-            password: u.password,
+            password: '',
             role: u.role
         });
         setUserError(null);
@@ -179,14 +181,20 @@ const Configuration = () => {
         setUserError(null);
 
         try {
-            if (!userForm.username.trim() || !userForm.name.trim() || !userForm.password.trim()) {
+            if (!userForm.username.trim() || !userForm.name.trim()) {
                 throw new Error("Por favor completa todos los campos.");
+            }
+            if (!editingUser && userForm.password.length < 8) {
+                throw new Error("La contraseña debe tener al menos 8 caracteres.");
+            }
+            if (editingUser && userForm.password && userForm.password.length < 8) {
+                throw new Error("La nueva contraseña debe tener al menos 8 caracteres.");
             }
 
             if (editingUser) {
                 await api.updateUser(editingUser.id, {
                     name: userForm.name,
-                    password: userForm.password,
+                    password: userForm.password || undefined, // vacío = no cambiar
                     role: userForm.role
                 });
             } else {
@@ -223,13 +231,6 @@ const Configuration = () => {
         }
     };
 
-    const togglePasswordVisibility = (username) => {
-        setShowPasswordMap(prev => ({
-            ...prev,
-            [username]: !prev[username]
-        }));
-    };
-
     if (loading) {
         return <div className="p-8 text-center text-secondary">Cargando configuración...</div>;
     }
@@ -255,12 +256,9 @@ const Configuration = () => {
                 </div>
                 
                 <button
-                    onClick={() => {
+                    onClick={async () => {
                         if (window.confirm('¿Cerrar sesión en el sistema?')) {
-                            localStorage.removeItem('isAuthenticated');
-                            localStorage.removeItem('userRole');
-                            localStorage.removeItem('adminUser');
-                            localStorage.removeItem('userDisplayName');
+                            await supabase.auth.signOut();
                             window.location.href = '/login';
                         }
                     }}
@@ -438,7 +436,7 @@ const Configuration = () => {
                                         <th className="py-4 px-6">Nombre de Usuario</th>
                                         <th className="py-4 px-6">Nombre Completo</th>
                                         <th className="py-4 px-6">Rol</th>
-                                        <th className="py-4 px-6">Contraseña</th>
+                                        <th className="py-4 px-6">Acceso</th>
                                         <th className="py-4 px-6 text-center">Acciones</th>
                                     </tr>
                                 </thead>
@@ -475,17 +473,7 @@ const Configuration = () => {
                                                         {u.role.toUpperCase()}
                                                     </span>
                                                 </td>
-                                                <td className="py-4 px-6 font-mono text-xs font-bold text-secondary">
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{showPasswordMap[u.username] ? u.password : '••••••••'}</span>
-                                                        <button 
-                                                            onClick={() => togglePasswordVisibility(u.username)}
-                                                            className="p-1 hover:bg-gray-100 rounded text-secondary"
-                                                        >
-                                                            {showPasswordMap[u.username] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                <td className="py-4 px-6 text-xs font-bold text-secondary">Contraseña cifrada</td>
                                                 <td className="py-4 px-6">
                                                     <div className="flex items-center justify-center gap-2">
                                                         <button
@@ -567,13 +555,15 @@ const Configuration = () => {
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">Contraseña *</label>
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-1.5 block">{editingUser ? 'Nueva contraseña (opcional)' : 'Contraseña * (mín. 8)'}</label>
                                 <input
-                                    type="text"
-                                    required
+                                    type="password"
+                                    autoComplete="new-password"
+                                    required={!editingUser}
+                                    minLength={editingUser ? undefined : 8}
                                     value={userForm.password}
                                     onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
-                                    placeholder="ej: contrasena123"
+                                    placeholder={editingUser ? "Dejar vacío para no cambiarla" : "Mínimo 8 caracteres"}
                                     className="w-full p-3 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all font-mono"
                                 />
                             </div>

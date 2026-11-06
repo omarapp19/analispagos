@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { subscribeToTable } from '../supabase';
 import { Pencil, RefreshCw } from 'lucide-react';
+import { getRole } from '../auth/session';
+
 
 const ExchangeRatesCard = () => {
     const [loading, setLoading] = useState(true);
@@ -13,7 +15,7 @@ const ExchangeRatesCard = () => {
         lastUpdated: ''
     });
 
-    const userRole = localStorage.getItem('userRole') || 'cajero';
+    const userRole = getRole();
     const [calcUsd, setCalcUsd] = useState('');
 
     // Manual Edit States

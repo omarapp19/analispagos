@@ -529,43 +529,12 @@ export const api = {
         }
     },
 
+    // Venta atómica: una sola transacción en la base (bloqueo de stock, kardex, factura y caja).
+    // Ver supabase/migrations/0002a_erp_create_invoice.sql
     createClientInvoice: async (data) => {
         try {
-            const invoiceNumber = data.invoiceNumber?.trim() || `FAC-${String(Math.floor(1000 + Math.random() * 9000))}`;
-
-            // 1. Descontar existencias de inventario y registrar en Kardex
-            if (data.items && data.items.length > 0) {
-                for (const item of data.items) {
-                    const { data: product } = await supabase
-                        .from('inventory')
-                        .select('*')
-                        .eq('id', item.productId)
-                        .single();
-
-                    if (product) {
-                        const currentQty = product.quantity || 0;
-                        const newQty = Math.max(0, currentQty - (item.quantity || 0));
-
-                        await supabase
-                            .from('inventory')
-                            .update({ quantity: newQty, updatedAt: new Date().toISOString() })
-                            .eq('id', item.productId);
-
-                        await api.registerKardexEntry({
-                            productId: item.productId,
-                            productName: product.name,
-                            type: 'SALIDA',
-                            quantity: item.quantity,
-                            concept: `Venta - Factura #${invoiceNumber}`,
-                            user: data.username || 'Sistema'
-                        });
-                    }
-                }
-            }
-
-            // 2. Registrar la factura
-            const newInvoice = {
-                invoiceNumber,
+            const payload = {
+                invoiceNumber: data.invoiceNumber?.trim() || undefined,
                 clientId: data.clientId || null,
                 clientName: data.clientName || '',
                 items: data.items || [],
@@ -573,32 +542,12 @@ export const api = {
                 total: parseFloat(data.total) || 0,
                 isCredit: !!data.isCredit,
                 creditDays: parseInt(data.creditDays) || 0,
-                status: data.isCredit ? 'PENDING' : 'PAID',
                 paymentMethod: data.paymentMethod || 'Efectivo',
-                date: data.date || new Date().toISOString().split('T')[0]
+                date: data.date || undefined,
+                kardexConcept: data.kardexConcept || undefined
             };
-
-            const { data: created, error } = await supabase
-                .from('client_invoices')
-                .insert([newInvoice])
-                .select()
-                .single();
-
+            const { data: created, error } = await supabase.rpc('erp_create_invoice', { payload });
             if (error) throw error;
-
-            // 3. Si no es a crédito, registrar en caja inmediatamente
-            if (!data.isCredit) {
-                await api.createTransaction({
-                    amount: parseFloat(data.total),
-                    method: data.paymentMethod,
-                    date: data.date,
-                    note: `Factura ${invoiceNumber} - Cliente: ${data.clientName}`,
-                    type: 'INCOME',
-                    category: 'Venta',
-                    status: 'COMPLETED'
-                });
-            }
-
             return created;
         } catch (error) {
             console.error("Error creating client invoice:", error);
@@ -945,83 +894,60 @@ export const api = {
     // ==========================================
     // USERS
     // ==========================================
+    // Personal del ERP: perfiles en staff_profiles; las credenciales viven en Supabase Auth.
+    // Altas, cambios y bajas pasan por la Edge Function `staff-user` (solo administradores).
     getUsers: async () => {
         try {
             const { data, error } = await supabase
-                .from('users')
-                .select('*')
+                .from('staff_profiles')
+                .select('userId, username, name, role, active')
                 .order('name', { ascending: true });
 
             if (error) throw error;
-            return data || [];
+            return (data || []).map((u) => ({ ...u, id: u.userId }));
         } catch (error) {
             console.error("Error fetching users:", error);
             return [];
         }
     },
 
-    createUser: async (data) => {
-        try {
-            const usernameLower = data.username.trim().toLowerCase();
-            const newUser = {
-                username: usernameLower,
-                name: data.name.trim(),
-                password: data.password.trim(),
-                role: data.role || 'cajero'
-            };
-
-            const { data: created, error } = await supabase
-                .from('users')
-                .insert([newUser])
-                .select()
-                .single();
-
-            if (error) throw error;
-            return created;
-        } catch (error) {
-            console.error("Error creating user:", error);
-            throw error;
+    _staffUser: async (body) => {
+        const { data, error } = await supabase.functions.invoke('staff-user', { body });
+        if (error) {
+            // supabase-js entrega el cuerpo de la respuesta de error en error.context
+            let msg = error.message;
+            try { const j = await error.context?.json?.(); if (j?.error) msg = j.error; } catch { /* sin cuerpo */ }
+            throw new Error(msg);
         }
+        if (data?.error) throw new Error(data.error);
+        return data;
+    },
+
+    createUser: async (data) => {
+        const res = await api._staffUser({
+            action: 'create',
+            username: data.username,
+            name: data.name,
+            password: data.password,
+            role: data.role || 'cajero'
+        });
+        return { ...res.profile, id: res.profile.userId };
     },
 
     updateUser: async (id, data) => {
-        try {
-            const updateData = {
-                name: data.name?.trim(),
-                password: data.password?.trim(),
-                role: data.role,
-                updatedAt: new Date().toISOString()
-            };
-            Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
-
-            const { data: updated, error } = await supabase
-                .from('users')
-                .update(updateData)
-                .eq('id', id)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return updated;
-        } catch (error) {
-            console.error("Error updating user:", error);
-            throw error;
-        }
+        const res = await api._staffUser({
+            action: 'update',
+            userId: id,
+            name: data.name,
+            role: data.role,
+            password: data.password || undefined
+        });
+        return { ...res.profile, id: res.profile.userId };
     },
 
     deleteUser: async (id) => {
-        try {
-            const { error } = await supabase
-                .from('users')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-            return { message: 'User deleted' };
-        } catch (error) {
-            console.error("Error deleting user:", error);
-            throw error;
-        }
+        await api._staffUser({ action: 'delete', userId: id });
+        return { message: 'User deleted' };
     },
 
     // ==========================================

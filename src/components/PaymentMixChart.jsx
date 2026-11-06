@@ -18,11 +18,11 @@ const PaymentMixChart = ({ transactions = [] }) => {
         // Map expected methods to colors
         const colors = {
             'Efectivo': '#12B76A', // Success Green
-            'Tarjeta': '#2F64F5',  // Primary Blue
-            'Transferencia': '#1FC0E8', // Info Cyan
-            'Divisas': '#F5A524', // Orange
-            'Pago Móvil': '#E5484D', // Pink
-            'Otros': '#9AA3B8'
+            'Tarjeta': '#F26B1D',  // Primary Blue
+            'Transferencia': '#FFB81C', // Info Cyan
+            'Divisas': '#FFB81C', // Orange
+            'Pago Móvil': '#C2301F', // Pink
+            'Otros': '#8A9099'
         };
 
         return Object.entries(mix).map(([name, value]) => ({
@@ -70,7 +70,7 @@ const PaymentMixChart = ({ transactions = [] }) => {
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
-                            data={data.length > 0 ? data : [{ name: 'Sin datos', value: 100, color: '#E3E7F0' }]}
+                            data={data.length > 0 ? data : [{ name: 'Sin datos', value: 100, color: '#E2DED5' }]}
                             cx="50%"
                             cy="50%"
                             innerRadius={75}
@@ -82,7 +82,7 @@ const PaymentMixChart = ({ transactions = [] }) => {
                         >
                             {data.length > 0 ? data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
-                            )) : <Cell fill="#E3E7F0" />}
+                            )) : <Cell fill="#E2DED5" />}
                         </Pie>
                     </PieChart>
                 </ResponsiveContainer>

@@ -39,3 +39,8 @@ supabase_schema.sql
 .impeccable/mocks/
 .impeccable/questions/
 .impeccable/review/
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+erp_schema.sql

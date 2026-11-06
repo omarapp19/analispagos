@@ -5,13 +5,12 @@ import {
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import { subscribeToTable } from '../supabase';
+import { supabase, subscribeToTable } from '../supabase';
+import { getRole, getDisplayName } from '../auth/session';
 
-export const logout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('adminUser');
-    localStorage.removeItem('userDisplayName');
+
+export const logout = async () => {
+    try { await supabase.auth.signOut(); } catch (e) { console.warn('signOut:', e); }
     window.location.href = '/login';
 };
 
@@ -63,8 +62,8 @@ const groupForPath = (nav, path) =>
 
 const Sidebar = ({ isOpen, onClose }) => {
     const location = useLocation();
-    const userRole = localStorage.getItem('userRole') || 'cajero';
-    const userDisplayName = localStorage.getItem('userDisplayName') || 'Usuario';
+    const userRole = getRole();
+    const userDisplayName = getDisplayName('Usuario');
     const isAdmin = userRole === 'administrador';
     const isManager = isAdmin || userRole === 'supervisor';
     const nav = buildNav({ isAdmin, isManager });
@@ -108,7 +107,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         <>
             <div
                 onClick={onClose}
-                className={`fixed inset-0 z-40 bg-[rgba(10,17,40,0.5)] md:hidden transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 z-40 bg-[rgba(21,23,26,0.5)] md:hidden transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 aria-hidden="true"
             />
 
@@ -122,7 +121,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 {/* Brand */}
                 <div className="h-16 px-5 flex items-center justify-between flex-shrink-0">
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#2F64F5,#1FC0E8)] shadow-[0_6px_16px_-6px_rgba(47,100,245,0.8)]">
+                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0 bg-[linear-gradient(135deg,#F26B1D,#FFB81C)] shadow-[0_6px_16px_-6px_rgba(242,107,29,0.8)]">
                             <Package size={16} strokeWidth={2.4} />
                         </div>
                         <span className="font-extrabold text-[16px] tracking-[-0.01em] truncate">{storeName}</span>
@@ -163,7 +162,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-[13.5px] font-bold leading-tight truncate">{userDisplayName}</p>
-                            <p className="text-[12px] text-[#8E9AC0] leading-tight mt-0.5">{roleLabel[userRole] || userRole}</p>
+                            <p className="text-[12px] text-[#8A9099] leading-tight mt-0.5">{roleLabel[userRole] || userRole}</p>
                         </div>
                         {isAdmin && (
                             <NavLink
@@ -171,7 +170,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                                 onClick={onClose}
                                 title="Configuración"
                                 aria-label="Configuración"
-                                className={({ isActive }) => `w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${isActive ? 'bg-primary text-white' : 'text-[#8E9AC0] hover:text-white hover:bg-white/10'}`}
+                                className={({ isActive }) => `w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${isActive ? 'bg-primary text-white' : 'text-[#8A9099] hover:text-white hover:bg-white/10'}`}
                             >
                                 <Settings size={17} />
                             </NavLink>
@@ -180,7 +179,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <button
                         onClick={handleLogout}
                         className={`mt-1 w-full h-9 rounded-lg flex items-center justify-center gap-2 text-[13px] font-semibold transition-colors ${
-                            confirmOut ? 'bg-danger text-white' : 'text-[#8E9AC0] hover:text-white hover:bg-white/[0.06]'
+                            confirmOut ? 'bg-danger text-white' : 'text-[#8A9099] hover:text-white hover:bg-white/[0.06]'
                         }`}
                     >
                         <LogOut size={15} />
@@ -202,14 +201,14 @@ const NavItem = ({ to, icon: Icon, label, onClick, end }) => (
         className={({ isActive }) =>
             `${rowBase} ${
                 isActive
-                    ? 'bg-primary text-white shadow-[0_6px_16px_-8px_rgba(47,100,245,0.9)]'
-                    : 'text-[#B4BDD8] hover:text-white hover:bg-white/[0.06]'
+                    ? 'bg-primary text-white shadow-[0_6px_16px_-8px_rgba(242,107,29,0.9)]'
+                    : 'text-[#CBC8C0] hover:text-white hover:bg-white/[0.06]'
             }`
         }
     >
         {({ isActive }) => (
             <>
-                <Icon size={18} strokeWidth={2} className={isActive ? 'text-white' : 'text-[#7F8BB0] group-hover:text-white transition-colors'} />
+                <Icon size={18} strokeWidth={2} className={isActive ? 'text-white' : 'text-[#8A9099] group-hover:text-white transition-colors'} />
                 <span className="truncate">{label}</span>
             </>
         )}
@@ -226,13 +225,13 @@ const NavGroup = ({ item, open, active, onToggle, onNavigate }) => {
                 onClick={onToggle}
                 aria-expanded={open}
                 aria-controls={panelId}
-                className={`${rowBase} ${active ? 'text-white' : 'text-[#B4BDD8] hover:text-white hover:bg-white/[0.06]'} ${active && !open ? 'bg-white/[0.06]' : ''}`}
+                className={`${rowBase} ${active ? 'text-white' : 'text-[#CBC8C0] hover:text-white hover:bg-white/[0.06]'} ${active && !open ? 'bg-white/[0.06]' : ''}`}
             >
-                <Icon size={18} strokeWidth={2} className={active ? 'text-[#6FA0FF]' : 'text-[#7F8BB0] group-hover:text-white transition-colors'} />
+                <Icon size={18} strokeWidth={2} className={active ? 'text-[#FFB07A]' : 'text-[#8A9099] group-hover:text-white transition-colors'} />
                 <span className="flex-1 text-left truncate">{item.label}</span>
                 <ChevronDown
                     size={15}
-                    className={`text-[#7F8BB0] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${open ? 'rotate-180' : ''}`}
+                    className={`text-[#8A9099] transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${open ? 'rotate-180' : ''}`}
                 />
             </button>
 
@@ -252,7 +251,7 @@ const NavGroup = ({ item, open, active, onToggle, onNavigate }) => {
                                     className={({ isActive }) =>
                                         `relative flex items-center h-9 px-3 rounded-lg text-[13.5px] font-semibold transition-colors duration-150 ${
                                             isActive
-                                                ? 'bg-primary text-white shadow-[0_6px_16px_-8px_rgba(47,100,245,0.9)]'
+                                                ? 'bg-primary text-white shadow-[0_6px_16px_-8px_rgba(242,107,29,0.9)]'
                                                 : 'text-[#98A3C4] hover:text-white hover:bg-white/[0.06]'
                                         }`
                                     }

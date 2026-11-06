@@ -1,9 +1,11 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, User, Phone, Mail, MapPin, X, Shield, Landmark } from 'lucide-react';
 import { api } from '../services/api';
+import { getRole } from '../auth/session';
+
 
 const ClientManagement = () => {
-    const userRole = localStorage.getItem('userRole') || 'cajero';
+    const userRole = getRole();
 
     const [clients, setClients] = useState([]);
     const [invoices, setInvoices] = useState([]);
