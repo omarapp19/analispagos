@@ -433,6 +433,48 @@ export const api = {
         }
     },
 
+publishAllProductsToWeb: async (publish = true) => {
+        try {
+            const { data, error } = await supabase
+                .from('inventory')
+                .update({
+                    webPublished: publish,
+                    webPublishedAt: publish ? new Date().toISOString() : null,
+                    updatedAt: new Date().toISOString()
+                })
+                .neq('productType', 'service')
+                .select('id, webPublished');
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error("Error updating webPublished on all products:", error);
+            throw error;
+        }
+    },
+
+    toggleProductWebPublish: async (id, currentState) => {
+        try {
+            const nextState = !currentState;
+            const { data, error } = await supabase
+                .from('inventory')
+                .update({
+                    webPublished: nextState,
+                    webPublishedAt: nextState ? new Date().toISOString() : null,
+                    updatedAt: new Date().toISOString()
+                })
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error("Error toggling product web status:", error);
+            throw error;
+        }
+    },
+
     // ==========================================
     // CLIENTS
     // ==========================================

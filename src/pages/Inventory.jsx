@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Plus, Search, Edit, Trash2, Package, AlertTriangle, 
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
-    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe } from 'lucide-react';
+    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe, Camera } from 'lucide-react';
 import { api } from '../services/api';
 import { subscribeToTable } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
@@ -26,6 +26,11 @@ const Inventory = () => {
 
     // Inventory Data States
     const [products, setProducts] = useState([]);
+    const [publishingAll, setPublishingAll] = useState(false);
+    const [quickImageProduct, setQuickImageProduct] = useState(null);
+    const [quickImageUrl, setQuickImageUrl] = useState('');
+    const [quickImagePreview, setQuickImagePreview] = useState('');
+    const [savingQuickImage, setSavingQuickImage] = useState(false);
     const [loading, setLoading] = useState(true);
     const [savingForm, setSavingForm] = useState(false); // separate state for form save
     const [actionLoading, setActionLoading] = useState(null); // id of product being quick updated
@@ -110,6 +115,86 @@ const Inventory = () => {
             unsubscribe();
         };
     }, []);
+
+    // Publicación masiva a la web
+    const handlePublishAllToWeb = async () => {
+        const nonServices = products.filter(p => p.productType !== 'service');
+        const allPublished = nonServices.length > 0 && nonServices.every(p => p.webPublished);
+        const targetAction = !allPublished;
+
+        const confirmMsg = targetAction
+            ? `¿Estás seguro de publicar todos los productos (${nonServices.length}) en la tienda web? Se harán visibles en el catálogo inmediatamente.`
+            : `Todos los productos están publicados en la tienda web. ¿Deseas despublicarlos todos del catálogo?`;
+
+        if (!window.confirm(confirmMsg)) return;
+
+        setPublishingAll(true);
+        try {
+            await api.publishAllProductsToWeb(targetAction);
+            setProducts(prev => prev.map(p => ({
+                ...p,
+                webPublished: p.productType === 'service' ? false : targetAction,
+                webPublishedAt: targetAction ? new Date().toISOString() : null
+            })));
+            alert(targetAction 
+                ? `¡Éxito! Se han publicado ${nonServices.length} productos en la tienda web.` 
+                : `Se han despublicado los productos de la tienda web.`
+            );
+        } catch (err) {
+            console.error("Error al publicar productos en la web:", err);
+            alert("Ocurrió un error al actualizar los productos: " + (err.message || err));
+        } finally {
+            setPublishingAll(false);
+        }
+    };
+
+    const handleToggleProductWeb = async (product, e) => {
+        if (e) e.stopPropagation();
+        try {
+            const updated = await api.toggleProductWebPublish(product.id, product.webPublished);
+            setProducts(prev => prev.map(p => p.id === product.id ? { ...p, webPublished: updated.webPublished, webPublishedAt: updated.webPublishedAt } : p));
+        } catch (err) {
+            console.error("Error toggling product web:", err);
+            alert("No se pudo cambiar el estado web del producto");
+        }
+    };
+
+    const handleQuickImageFileChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            alert("La imagen no debe superar los 5MB");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setQuickImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleSaveQuickImage = async () => {
+        if (!quickImageProduct) return;
+        const newImage = quickImagePreview || quickImageUrl.trim();
+        if (!newImage) {
+            alert("Por favor selecciona un archivo o ingresa una URL de imagen.");
+            return;
+        }
+
+        setSavingQuickImage(true);
+        try {
+            await api.updateInventoryItem(quickImageProduct.id, { image: newImage });
+            setProducts(prev => prev.map(p => p.id === quickImageProduct.id ? { ...p, image: newImage } : p));
+            setQuickImageProduct(null);
+            setQuickImageUrl('');
+            setQuickImagePreview('');
+        } catch (err) {
+            console.error("Error actualizando imagen del producto:", err);
+            alert("No se pudo guardar la imagen: " + (err.message || err));
+        } finally {
+            setSavingQuickImage(false);
+        }
+    };
 
     // Form Calculations
     const handleCostChange = (costVal) => {
