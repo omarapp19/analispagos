@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
     Plus, Search, Edit, Trash2, Package, AlertTriangle, 
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
@@ -322,7 +322,10 @@ const Inventory = () => {
                     await replaceFitments(editingProduct.id, webForm.fitments);
                 }
             } else {
-                await api.createInventoryItem(productData);
+                const created = await api.createInventoryItem(productData);
+                if (storeReady && !isService && created?.id && webForm.fitments && webForm.fitments.length > 0) {
+                    await replaceFitments(created.id, webForm.fitments);
+                }
             }
             // Imágenes quitadas en el formulario: se borran del bucket solo después de guardar.
             for (const path of webForm.removedImages) {
@@ -568,6 +571,7 @@ const Inventory = () => {
                                     packageQty: '0',
                                     looseQty: '0'
                                 });
+                                setWebForm(emptyWebForm());
                                 setIsModalOpen(true);
                             }}
                             className="btn btn-primary shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
@@ -793,6 +797,7 @@ const Inventory = () => {
                                     packageQty: '0',
                                     looseQty: '0'
                                 });
+                                setWebForm(emptyWebForm());
                                 setIsModalOpen(true);
                             }}
                             className="btn btn-primary"

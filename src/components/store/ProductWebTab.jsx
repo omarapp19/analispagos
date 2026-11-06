@@ -227,58 +227,50 @@ const ProductWebTab = ({ value: w, onChange, productId, categories, vehicles, se
             {/* Compatibilidad */}
             <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
-                    <Label>Compatibilidad con vehículos</Label>
-                    {productId && (
-                        <button type="button" onClick={() => xlsRef.current?.click()} disabled={importing}
-                            className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 disabled:opacity-50">
-                            {importing ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Importar Excel
-                        </button>
-                    )}
+                    <Label>Compatibilidad con vehículos (Aplicación)</Label>
+                    <button type="button" onClick={() => xlsRef.current?.click()} disabled={importing}
+                        className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                        {importing ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Importar Excel
+                    </button>
                     <input ref={xlsRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importFitments} />
                 </div>
-                {!productId ? (
-                    <p className="text-xs text-secondary bg-background rounded-xl px-3 py-2.5 border border-gray-100">Guarda el producto primero para cargar compatibilidad.</p>
-                ) : (
-                    <>
-                        {w.fitments.length === 0 && (
-                            <p className="text-xs text-secondary mb-2">Sin vehículos. Si es universal (aceite, refrigerante), déjalo vacío y usa una categoría universal.</p>
-                        )}
-                        <div className="space-y-2">
-                            {w.fitments.map((f, i) => (
-                                <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
-                                    <select aria-label="Marca" className={`${inputCls} col-span-3 px-2`} value={f.makeId}
-                                        onChange={(e) => setFit(i, { makeId: e.target.value, modelId: '' })}>
-                                        <option value="">Marca</option>
-                                        {vehicles.makes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                    </select>
-                                    <select aria-label="Modelo" className={`${inputCls} col-span-3 px-2`} value={f.modelId} disabled={!f.makeId}
-                                        onChange={(e) => setFit(i, { modelId: e.target.value })}>
-                                        <option value="">Modelo</option>
-                                        {modelsOf(f.makeId).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                    </select>
-                                    <input aria-label="Año desde" type="number" min="1950" max="2100" placeholder="Desde" className={`${inputCls} col-span-2 px-2`} value={f.yearFrom}
-                                        onChange={(e) => setFit(i, { yearFrom: e.target.value })} />
-                                    <input aria-label="Año hasta" type="number" min="1950" max="2100" placeholder="Hasta" className={`${inputCls} col-span-2 px-2`} value={f.yearTo}
-                                        onChange={(e) => setFit(i, { yearTo: e.target.value })} />
-                                    <input aria-label="Motor" placeholder="Motor" className={`${inputCls} col-span-1 px-2`} value={f.engine}
-                                        onChange={(e) => setFit(i, { engine: e.target.value })} />
-                                    <button type="button" onClick={() => set({ fitmentsDirty: true, fitments: w.fitments.filter((_, j) => j !== i) })}
-                                        className="col-span-1 p-2 rounded-xl text-secondary hover:text-danger hover:bg-red-50 justify-self-center" aria-label="Quitar vehículo">
-                                        <Trash2 size={15} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        <button type="button" onClick={() => set({ fitmentsDirty: true, fitments: [...w.fitments, { makeId: '', modelId: '', yearFrom: '', yearTo: '', engine: '' }] })}
-                            className="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1">
-                            <Plus size={14} /> Agregar vehículo
-                        </button>
-                        <p className="text-[11px] text-secondary mt-1">
-                            Excel: columnas <strong>Marca</strong>, <strong>Modelo</strong>, <strong>Año desde</strong>, <strong>Año hasta</strong>, <strong>Motor</strong>. Las marcas y modelos nuevos se crean solos.
-                        </p>
-                        {importMsg && <p className="text-xs font-bold text-navy mt-1.5 flex items-center gap-1"><ArrowLeft size={12} className="rotate-90" />{importMsg}</p>}
-                    </>
+                {w.fitments.length === 0 && (
+                    <p className="text-xs text-secondary mb-2">Sin vehículos asignados. Si este repuesto aplica para varios carros (ej: Corolla, Yaris, Hilux), agrega cada uno con el botón de abajo.</p>
                 )}
+                <div className="space-y-2">
+                    {w.fitments.map((f, i) => (
+                        <div key={i} className="grid grid-cols-12 gap-1.5 items-center">
+                            <select aria-label="Marca" className={`${inputCls} col-span-3 px-2`} value={f.makeId}
+                                onChange={(e) => setFit(i, { makeId: e.target.value, modelId: '' })}>
+                                <option value="">Marca</option>
+                                {vehicles.makes.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                            <select aria-label="Modelo" className={`${inputCls} col-span-3 px-2`} value={f.modelId} disabled={!f.makeId}
+                                onChange={(e) => setFit(i, { modelId: e.target.value })}>
+                                <option value="">Modelo</option>
+                                {modelsOf(f.makeId).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                            <input aria-label="Año desde" type="number" min="1950" max="2100" placeholder="Desde" className={`${inputCls} col-span-2 px-2`} value={f.yearFrom}
+                                onChange={(e) => setFit(i, { yearFrom: e.target.value })} />
+                            <input aria-label="Año hasta" type="number" min="1950" max="2100" placeholder="Hasta" className={`${inputCls} col-span-2 px-2`} value={f.yearTo}
+                                onChange={(e) => setFit(i, { yearTo: e.target.value })} />
+                            <input aria-label="Motor" placeholder="Motor" className={`${inputCls} col-span-1 px-2`} value={f.engine}
+                                onChange={(e) => setFit(i, { engine: e.target.value })} />
+                            <button type="button" onClick={() => set({ fitmentsDirty: true, fitments: w.fitments.filter((_, j) => j !== i) })}
+                                className="col-span-1 p-2 rounded-xl text-secondary hover:text-danger hover:bg-red-50 justify-self-center" aria-label="Quitar vehículo">
+                                <Trash2 size={15} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+                <button type="button" onClick={() => set({ fitmentsDirty: true, fitments: [...w.fitments, { makeId: '', modelId: '', yearFrom: '', yearTo: '', engine: '' }] })}
+                    className="mt-2 text-xs font-bold text-primary hover:underline inline-flex items-center gap-1">
+                    <Plus size={14} /> Agregar vehículo / aplicación
+                </button>
+                <p className="text-[11px] text-secondary mt-1">
+                    Puedes agregar 1, 2 o todos los carros donde aplique el repuesto (con rango de años y motor opcional).
+                </p>
+                {importMsg && <p className="text-xs font-bold text-navy mt-1.5 flex items-center gap-1"><ArrowLeft size={12} className="rotate-90" />{importMsg}</p>}
             </div>
         </div>
     );
