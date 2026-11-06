@@ -1,6 +1,14 @@
 # Fase 0: seguridad del ERP
 
-Rama sugerida: `git switch -c seguridad/auth-rls` (antes de commitear estos cambios).
+El código de la fase 0 ya está en `main` (commit c75c2d4). La rama `seguridad/auth-rls` trae la revisión:
+- `0002_erp_rls.sql` ahora borra **toda** política previa de las tablas del ERP, no solo las de `anon`/`public`.
+  Una política vieja `to authenticated using (true)` habría dejado a los clientes de la tienda (que también
+  inician sesión) leer costos, clientes y finanzas.
+- `supabase/manual/verify-schema.sql`: consultas de solo lectura que reemplazan al dump si no puedes hacerlo
+  (tipos de `id`, columnas, RLS y políticas actuales, facturas duplicadas, extensiones).
+- Las migraciones 0001, 0002 y 0002a se probaron en un Postgres en memoria con `id` uuid, bigint y text:
+  anon y un cliente autenticado no ven `inventory` ni `clients`; el personal factura; sin stock falla.
+  Falta probarlas contra el esquema real de staging.
 
 ## Qué incluye
 - `supabase/migrations/0001_staff_auth.sql`: `staff_profiles`, `staff_role()`, `is_staff()`, `is_admin()`.
@@ -14,7 +22,7 @@ Rama sugerida: `git switch -c seguridad/auth-rls` (antes de commitear estos camb
 - Firebase fuera (dependencia y archivos vaciados).
 
 ## Orden de aplicación (staging primero)
-1. `npx supabase db dump --db-url "<conexión>" --schema public -f erp_schema.sql` y confirma: tipo de `id` en `inventory`, `clients`, `client_invoices`; si `sellingPrice` incluye IVA; RLS actual. Ajusta los SQL si hace falta.
+1. `npx supabase db dump --db-url "<conexión>" --schema public -f erp_schema.sql` (o ejecuta `supabase/manual/verify-schema.sql` en el SQL editor) y confirma: tipo de `id` en `inventory`, `clients`, `client_invoices`; si `sellingPrice` incluye IVA; RLS actual. Las migraciones 0001–0002a no dependen del tipo de `id`.
 2. `npx supabase db push` (o pega 0001, 0002, 0002a en el SQL editor, en ese orden).
    Desde este momento el ERP viejo deja de leer datos hasta tener usuarios en Auth: hazlo sin ventas en curso.
 3. `npx supabase functions deploy staff-user`.
