@@ -16,7 +16,10 @@ begin
   end loop;
 end $$;
 
--- Eliminar cualquier política permisiva previa para anon/public en estas tablas.
+-- Eliminar TODA política previa en estas tablas, sea cual sea su rol.
+-- Las políticas se suman con OR: una política vieja "to authenticated using (true)" dejaría a los
+-- clientes de la tienda (que también inician sesión, rol authenticated) leer costos, clientes y finanzas.
+-- Solo quedan "staff full" y la lectura pública de settings que se crea abajo.
 do $$
 declare r record;
 begin
@@ -26,14 +29,15 @@ begin
     where schemaname = 'public'
       and tablename in ('inventory','clients','client_invoices','kardex','transactions','bills',
                         'providers','investments','recurring_expenses','settings','users')
-      and policyname <> 'staff full'
-      and (roles && array['anon','public']::name[])
+      and policyname not in ('staff full', 'publico lee tasa y tienda')
   loop
+    raise notice 'Eliminando política previa % en %', r.policyname, r.tablename;
     execute format('drop policy %I on %I.%I', r.policyname, r.schemaname, r.tablename);
   end loop;
 end $$;
 
 -- Lectura pública mínima de settings: tasa BCV y datos públicos de la tienda.
+-- Cualquier otro id de settings (global_settings, tienda_privada, ...) es solo para el personal.
 drop policy if exists "publico lee tasa y tienda" on public.settings;
 create policy "publico lee tasa y tienda" on public.settings
   for select to anon, authenticated
