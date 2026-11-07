@@ -69,6 +69,10 @@ const Billing = () => {
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
     const { methods: payMethods, find: findMethod } = usePaymentMethods();
     const cash = useCashStatus();
+    const [manualType, setManualType] = useState('pct'); // descuento especial (solo administrador): 'pct' | 'amt'
+    const [manualValue, setManualValue] = useState('');
+    const [manualReason, setManualReason] = useState('');
+    const receiptTax = (r) => r.tax ?? Math.max((r.total || 0) + (r.discountAmount || 0) + (r.manualDiscountAmount || 0) - (r.subtotal || 0), 0);
     const [splitOn, setSplitOn] = useState(false);
     const [splitPayments, setSplitPayments] = useState([{ method: 'Efectivo', amount: '' }, { method: 'Transferencia', amount: '' }]);
     const [returnInvoice, setReturnInvoice] = useState(null);
@@ -255,9 +259,16 @@ const Billing = () => {
         const discountPct = (!isCredit && !splitOn) ? (payMethods.find((m) => m.name === paymentMethod)?.discountPct || 0) : 0;
         const gross = subtotal + tax;
         const discount = Math.round(gross * discountPct) / 100;
-        const total = Math.round((gross - discount) * 100) / 100;
-        return { subtotal, tax, total, gross, discount, discountPct };
-    }, [invoiceItems, applyTax, isCredit, splitOn, paymentMethod, payMethods]);
+        // Descuento especial del administrador (independiente del método de pago).
+        let manual = 0;
+        if (userRole === 'administrador') {
+            const v = parseFloat(String(manualValue).replace(',', '.')) || 0;
+            manual = Math.round((manualType === 'pct' ? gross * v / 100 : v) * 100) / 100;
+            manual = Math.max(0, Math.min(manual, Math.round((gross - discount) * 100) / 100));
+        }
+        const total = Math.round((gross - discount - manual) * 100) / 100;
+        return { subtotal, tax, total, gross, discount, discountPct, manual };
+    }, [invoiceItems, applyTax, isCredit, splitOn, paymentMethod, payMethods, manualType, manualValue, userRole]);
 
     // Date calculations
     const calculatedDueDate = useMemo(() => {
@@ -400,6 +411,11 @@ const Billing = () => {
             }
         }
 
+        if (invoiceTotals.manual > 0 && !manualReason.trim()) {
+            alert("Indica el motivo del descuento especial.");
+            return;
+        }
+
         setSubmittingInvoice(true);
         try {
             const invoiceData = {
@@ -418,6 +434,8 @@ const Billing = () => {
                 tax: invoiceTotals.tax,
                 discountPct: invoiceTotals.discountPct,
                 discountAmount: invoiceTotals.discount,
+                manualDiscountAmount: invoiceTotals.manual,
+                manualDiscountReason: manualReason.trim(),
                 invoiceNumber: customInvoiceNumber.trim() || undefined
             };
 
@@ -434,6 +452,8 @@ const Billing = () => {
             setIsCredit(false);
             setPaymentMethod('Efectivo');
             setSplitOn(false);
+            setManualValue('');
+            setManualReason('');
             setSplitPayments([{ method: 'Efectivo', amount: '' }, { method: 'Transferencia', amount: '' }]);
             setCustomInvoiceNumber('');
             setProductSearch('');
@@ -589,8 +609,9 @@ const Billing = () => {
 
         // ── TOTALS ───────────────────────────────────────────────────────
         row2('Subtotal:', formatCurrency(r.subtotal ?? 0), cy); cy += lineH;
-        row2('IVA:', formatCurrency(r.tax ?? Math.max((r.total ?? 0) + (r.discountAmount ?? 0) - (r.subtotal ?? 0), 0)), cy); cy += lineH + (r.discountAmount > 0 ? 0 : 4);
-        if (r.discountAmount > 0) { row2(`Descuento ${r.paymentMethod} ${r.discountPct}%:`, '-' + formatCurrency(r.discountAmount), cy); cy += lineH + 4; }
+        row2('IVA:', formatCurrency(receiptTax(r)), cy); cy += lineH + ((r.discountAmount > 0 || r.manualDiscountAmount > 0) ? 0 : 4);
+        if (r.discountAmount > 0) { row2(`Descuento ${r.paymentMethod} ${r.discountPct}%:`, '-' + formatCurrency(r.discountAmount), cy); cy += lineH + (r.manualDiscountAmount > 0 ? 0 : 4); }
+        if (r.manualDiscountAmount > 0) { row2('Descuento especial:', '-' + formatCurrency(r.manualDiscountAmount), cy); cy += lineH + 4; }
 
         // Total destacado
         ctx.fillStyle = '#15171A';
@@ -1282,6 +1303,9 @@ ${itemsText}-------------------------------
                                             Descuento {paymentMethod} {invoiceTotals.discountPct}%: -{formatCurrency(invoiceTotals.discount)}
                                         </p>
                                     )}
+                                    {invoiceTotals.manual > 0 && (
+                                        <p className="text-[12.5px] font-semibold text-[#7FD6A6] mb-0.5">Descuento especial: -{formatCurrency(invoiceTotals.manual)}</p>
+                                    )}
                                     <p className="text-[13px] font-semibold text-[#B4B0A6]">Total a cobrar</p>
                                     <p className="text-[38px] leading-none font-extrabold tracking-[-0.03em] tabular-nums mt-1.5">{formatCurrency(invoiceTotals.total)}</p>
                                 </div>
@@ -1319,6 +1343,23 @@ ${itemsText}-------------------------------
                                     })}
                                 </div>
                             </div>
+
+                            {userRole === 'administrador' && (
+                                <div className="flex flex-col gap-2 p-3 rounded-xl border border-dashed border-line">
+                                    <p className="text-[13.5px] font-bold">Descuento especial <span className="font-medium text-secondary">· solo administrador</span></p>
+                                    <div className="flex gap-2">
+                                        <select value={manualType} onChange={(e) => setManualType(e.target.value)} className="field h-11 w-24" aria-label="Tipo de descuento">
+                                            <option value="pct">%</option><option value="amt">$</option>
+                                        </select>
+                                        <input inputMode="decimal" value={manualValue} onChange={(e) => setManualValue(e.target.value)} placeholder={manualType === 'pct' ? 'Ej.: 5' : 'Ej.: 2.50'}
+                                            className="field h-11 flex-1 tabular-nums" aria-label="Valor del descuento" />
+                                    </div>
+                                    {invoiceTotals.manual > 0 && (
+                                        <input value={manualReason} onChange={(e) => setManualReason(e.target.value)} placeholder="Motivo (obligatorio)"
+                                            className="field h-11" aria-label="Motivo del descuento" />
+                                    )}
+                                </div>
+                            )}
 
                             {!isCredit && (
                                 <div className="flex flex-col gap-2">
@@ -1547,7 +1588,7 @@ ${itemsText}-------------------------------
                                                             const r = inv;
                                                             const store = globalSettings;
                                                             const W = 640, PAD = 40, lineH = 26, smallH = 22;
-                                                            let y = 60+28+24+30+(lineH*4)+30+30+((r.items?.length||0)*(lineH+smallH+6))+30+(lineH*3)+40+40+(r.discountAmount>0?lineH:0);
+                                                            let y = 60+28+24+30+(lineH*4)+30+30+((r.items?.length||0)*(lineH+smallH+6))+30+(lineH*3)+40+40+(r.discountAmount>0?lineH:0)+(r.manualDiscountAmount>0?lineH:0);
                                                             const canv = document.createElement('canvas');
                                                             const sc = 2;
                                                             canv.width=W*sc; canv.height=(y+20)*sc;
@@ -1576,7 +1617,7 @@ ${itemsText}-------------------------------
                                                             (r.items||[]).forEach((item,i)=>{if(i%2===0){ctx.fillStyle='#fafafa';ctx.fillRect(PAD,cy-16,W-PAD*2,lineH+smallH+4);}tx(item.name||item.productName||'—',PAD+8,cy,{size:13,bold:true});tx(String(item.quantity??1),W/2+40,cy,{size:13,align:'center'});tx(formatCurrency(item.total??(item.price*item.quantity)),W-PAD-8,cy,{size:13,bold:true,align:'right'});cy+=smallH;if(item.taxRate!=null){tx(`IVA: ${item.taxRate}%`,PAD+16,cy,{size:11,color:'#888'});}cy+=lineH-10+6;});
                                                             cy+=6; dL(cy); cy+=20;
                                                             r2('Subtotal:',formatCurrency(r.subtotal??0),cy); cy+=lineH;
-                                                            r2('IVA:',formatCurrency(r.tax??Math.max((r.total??0)+(r.discountAmount??0)-(r.subtotal??0),0)),cy); cy+=lineH+(r.discountAmount>0?0:4); if(r.discountAmount>0){r2('Descuento '+r.paymentMethod+' '+r.discountPct+'%:','-'+formatCurrency(r.discountAmount),cy); cy+=lineH+4;}
+                                                            r2('IVA:',formatCurrency(receiptTax(r)),cy); cy+=lineH+((r.discountAmount>0||r.manualDiscountAmount>0)?0:4); if(r.discountAmount>0){r2('Descuento '+r.paymentMethod+' '+r.discountPct+'%:','-'+formatCurrency(r.discountAmount),cy); cy+=lineH+(r.manualDiscountAmount>0?0:4);} if(r.manualDiscountAmount>0){r2('Descuento especial:','-'+formatCurrency(r.manualDiscountAmount),cy); cy+=lineH+4;}
                                                             ctx.fillStyle='#15171A'; ctx.fillRect(PAD,cy-20,W-PAD*2,38);
                                                             tx('TOTAL:',PAD+12,cy+4,{size:15,bold:true,color:'#fff'}); tx(formatCurrency(r.total??0),W-PAD-12,cy+4,{size:17,bold:true,align:'right',color:'#fff'}); cy+=46;
                                                             tx('¡Gracias por su preferencia!',W/2,cy,{size:12,align:'center',color:'#888'});
@@ -2122,8 +2163,14 @@ ${itemsText}-------------------------------
                                     </div>
                                     <div className="flex justify-between text-xs font-semibold text-secondary">
                                         <span>Impuesto (IVA):</span>
-                                        <span className="font-extrabold text-navy">{formatCurrency(activeReceipt.tax ?? Math.max((activeReceipt.total || 0) + (activeReceipt.discountAmount || 0) - (activeReceipt.subtotal || 0), 0))}</span>
+                                        <span className="font-extrabold text-navy">{formatCurrency(receiptTax(activeReceipt))}</span>
                                     </div>
+                                    {activeReceipt.manualDiscountAmount > 0 && (
+                                        <div className="flex justify-between text-xs font-semibold text-secondary">
+                                            <span>Descuento especial:</span>
+                                            <span className="font-extrabold text-success">-{formatCurrency(activeReceipt.manualDiscountAmount)}</span>
+                                        </div>
+                                    )}
                                     {activeReceipt.discountAmount > 0 && (
                                         <div className="flex justify-between text-xs font-semibold text-secondary">
                                             <span>Descuento {activeReceipt.paymentMethod} {activeReceipt.discountPct}%:</span>

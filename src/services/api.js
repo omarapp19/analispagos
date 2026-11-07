@@ -609,7 +609,9 @@ publishAllProductsToWeb: async (publish = true) => {
                 kardexConcept: data.kardexConcept || undefined,
                 payments: Array.isArray(data.payments) && data.payments.length ? data.payments : undefined,
                 discountPct: parseFloat(data.discountPct) || undefined,
-                discountAmount: parseFloat(data.discountAmount) || undefined
+                discountAmount: parseFloat(data.discountAmount) || undefined,
+                manualDiscountAmount: parseFloat(data.manualDiscountAmount) || undefined,
+                manualDiscountReason: data.manualDiscountReason || undefined
             };
             // Sin conexión: la venta se guarda en el equipo y se sincroniza al volver internet.
             const queueOffline = () => enqueueSale(payload, { ...data, items: payload.items, subtotal: payload.subtotal, total: payload.total });
@@ -633,6 +635,15 @@ publishAllProductsToWeb: async (publish = true) => {
     // Envía al servidor una venta guardada en la cola offline (usada por la sincronización).
     sendQueuedInvoice: async (payload) => {
         const { data, error } = await supabase.rpc('erp_create_invoice', { payload: { ...payload, allowNegativeStock: true } });
+        if (error) throw error;
+        return data;
+    },
+
+    // Descuento a una factura a credito pendiente (solo administrador; el servidor lo exige).
+    discountInvoice: async (invoiceId, amount, reason) => {
+        const { data, error } = await supabase.rpc('erp_discount_invoice', {
+            p_invoice_id: String(invoiceId), p_amount: Number(amount), p_reason: reason
+        });
         if (error) throw error;
         return data;
     },

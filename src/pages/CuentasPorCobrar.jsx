@@ -2,6 +2,8 @@
 import { Search, Calendar, FileText, CheckCircle, Clock, AlertTriangle, Landmark, X } from 'lucide-react';
 import { api } from '../services/api';
 import { usePaymentMethods } from '../hooks/usePaymentMethods';
+import { getRole } from '../auth/session';
+import InvoiceDiscountModal from '../components/InvoiceDiscountModal';
 
 const CuentasPorCobrar = () => {
     const [invoices, setInvoices] = useState([]);
@@ -13,6 +15,8 @@ const CuentasPorCobrar = () => {
     const [payingInvoice, setPayingInvoice] = useState(null);
     const [payMethod, setPayMethod] = useState('Efectivo');
     const { methods: payMethods } = usePaymentMethods();
+    const isAdmin = getRole() === 'administrador';
+    const [discountInvoice, setDiscountInvoice] = useState(null);
     const [submittingPayment, setSubmittingPayment] = useState(false);
 
     const [clients, setClients] = useState([]);
@@ -234,6 +238,15 @@ const CuentasPorCobrar = () => {
                                                 >
                                                     Registrar Cobro
                                                 </button>
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={() => setDiscountInvoice(inv)}
+                                                        className="btn btn-ghost py-1.5 px-3 rounded-lg text-xs ml-2 cursor-pointer"
+                                                        title="Aplicar descuento a esta factura"
+                                                    >
+                                                        Descuento
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => sendStatement(inv)}
                                                     className="btn btn-ghost py-1.5 px-3 rounded-lg text-xs ml-2 cursor-pointer"
@@ -307,6 +320,7 @@ const CuentasPorCobrar = () => {
                     </div>
                 </div>
             )}
+            {discountInvoice && <InvoiceDiscountModal invoice={discountInvoice} onClose={() => setDiscountInvoice(null)} onDone={fetchInvoices} />}
         </div>
     );
 };

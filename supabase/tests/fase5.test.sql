@@ -198,3 +198,49 @@ select erp_create_invoice(jsonb_build_object('invoiceNumber','D-4','subtotal',20
 set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 select erp_return_invoice((select id::text from client_invoices where "invoiceNumber"='D-1'), null, 'prueba') ->> 'status' as estado;
 select amount from transactions where note like 'Anulación Factura D-1%';
+
+-- @test el administrador da un descuento especial al facturar
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select cash_open(0) ->> 'status' as caja;
+select erp_create_invoice(jsonb_build_object('invoiceNumber','M-1','subtotal',20,'total',15,'manualDiscountAmount',5,'manualDiscountReason','cliente frecuente',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',2,'price',10)))) ->> 'manualDiscountAmount' as descuento;
+select (select amount from transactions where note like 'Factura M-1%') as ingreso;
+
+-- @test descuento especial junto con el de metodo de pago
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','M-2','subtotal',20,'total',13,'paymentMethod','Divisas',
+  'discountPct',10,'discountAmount',2,'manualDiscountAmount',5,'manualDiscountReason','promocion',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',2,'price',10)))) ->> 'total' as total;
+
+-- @fails el cajero no puede dar descuentos
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','M-3','subtotal',10,'total',8,'manualDiscountAmount',2,'manualDiscountReason','x',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10))));
+
+-- @fails el descuento exige motivo
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','M-4','subtotal',10,'total',8,'manualDiscountAmount',2,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10))));
+
+-- @fails el descuento no puede pasar del total
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','M-5','subtotal',10,'total',-5,'manualDiscountAmount',15,'manualDiscountReason','x',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10))));
+
+-- @test descuento a una factura a credito pendiente
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','M-6','subtotal',30,'total',30,'isCredit',true,'creditDays',15,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',3,'price',10)))) ->> 'status' as estado;
+select erp_discount_invoice((select id::text from client_invoices where "invoiceNumber"='M-6'), 4, 'pronto pago') ->> 'total' as nuevo_total;
+
+-- @fails no se da descuento a una factura ya cobrada
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_discount_invoice((select id::text from client_invoices where "invoiceNumber"='M-1'), 1, 'x');
+
+-- @fails el cajero no da descuento a facturas a credito
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_discount_invoice((select id::text from client_invoices where "invoiceNumber"='M-6'), 1, 'x');
+
+-- @test los descuentos quedan en la auditoria
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select count(*) as eventos from audit_log where action = 'INVOICE_DISCOUNT';
