@@ -107,10 +107,6 @@ select erp_return_invoice((select id::text from client_invoices where "invoiceNu
 set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 select report_restock(30);
 
--- @test cajero si abre caja
-set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
-select cash_open(5) ->> 'status' as abierta;
-
 -- @test ajuste atomico y conteo fisico
 set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 select erp_adjust_stock((select id::text from inventory where code='P1'), -2, 'Ajuste manual: merma') as ajuste;
@@ -127,3 +123,78 @@ select erp_adjust_stock((select id::text from inventory where code='P1'), 1, 'x'
 -- @fails ajuste exige motivo
 set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 select erp_adjust_stock((select id::text from inventory where code='P1'), 1, '');
+
+-- @fails cajero no abre la caja
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select cash_open(5);
+
+-- @fails cajero no factura con la caja cerrada
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','Z-1','subtotal',10,'total',10,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10))));
+
+-- @fails venta sin conexion se rechaza si no habia caja abierta cuando se hizo
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','OFF-000050','subtotal',10,'total',10,'offlineSoldAt',(now() - interval '1 hour')::text,'allowNegativeStock',true,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10)))) ->> 'invoiceNumber' as numero;
+
+-- @test el administrador abre la caja y el cajero ya factura
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select cash_open(20, 'turno de la mañana') ->> 'status' as abierta;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','Z-2','subtotal',10,'total',10,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10)))) ->> 'invoiceNumber' as numero;
+select cash_current() ->> 'openedBy' as abrio;
+
+-- @test el cajero puede cerrar la caja con su arqueo
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select cash_close(jsonb_build_object('Efectivo', 30)) ->> 'status' as cerrada;
+
+-- @fails con la caja cerrada otra vez el cajero no factura
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','Z-3','subtotal',10,'total',10,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10))));
+
+-- @test venta sin conexion se acepta si habia caja abierta cuando se hizo
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','OFF-000051','subtotal',10,'total',10,'allowNegativeStock',true,
+  'offlineSoldAt',(select "openedAt" from cash_sessions order by "openedAt" limit 1)::text,
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',1,'price',10)))) ->> 'invoiceNumber' as numero;
+
+-- @test cierre guarda lo recibido en cada moneda y la tasa
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select cash_open(0) ->> 'status' as abierta;
+select cash_close(jsonb_build_object('Efectivo', 10, 'Divisas', 5),
+  'con monedas',
+  jsonb_build_object('Efectivo', jsonb_build_object('amount', 2458, 'currency', 'VES'), 'Divisas', jsonb_build_object('amount', 5, 'currency', 'USD')),
+  245.8) as cierre;
+select "countedNative" -> 'Efectivo' ->> 'currency' as moneda, rate from cash_sessions where "closedAt" is not null order by "closedAt" desc limit 1;
+
+-- @test configurar descuento por metodo y facturar con el
+insert into settings (id, data) values ('global_settings', '{"paymentMethods":[{"name":"Divisas","enabled":true,"discountPct":10},{"name":"Efectivo","enabled":true,"discountPct":0}]}')
+  on conflict (id) do update set data = excluded.data;
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','D-1','subtotal',20,'total',18,'discountPct',10,'discountAmount',2,'paymentMethod','Divisas',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',2,'price',10)))) ->> 'discountAmount' as descuento;
+select (select amount from transactions where note like 'Factura D-1%') as ingreso;
+
+-- @fails descuento en un metodo que no lo tiene
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','D-2','subtotal',20,'total',18,'discountPct',10,'discountAmount',2,'paymentMethod','Efectivo',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',2,'price',10))));
+
+-- @fails descuento mayor al configurado
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','D-3','subtotal',20,'total',10,'discountPct',50,'discountAmount',10,'paymentMethod','Divisas',
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',2,'price',10))));
+
+-- @fails descuento con pago mixto
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_create_invoice(jsonb_build_object('invoiceNumber','D-4','subtotal',20,'total',18,'discountPct',10,'discountAmount',2,
+  'payments', jsonb_build_array(jsonb_build_object('method','Divisas','amount',9), jsonb_build_object('method','Efectivo','amount',9)),
+  'items', jsonb_build_array(jsonb_build_object('productId',(select id::text from inventory where code='P1'),'quantity',2,'price',10))));
+
+-- @test la devolucion respeta el descuento (reembolsa lo realmente pagado)
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select erp_return_invoice((select id::text from client_invoices where "invoiceNumber"='D-1'), null, 'prueba') ->> 'status' as estado;
+select amount from transactions where note like 'Anulación Factura D-1%';

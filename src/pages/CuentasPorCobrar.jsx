@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Calendar, FileText, CheckCircle, Clock, AlertTriangle, Landmark, X } from 'lucide-react';
 import { api } from '../services/api';
+import { usePaymentMethods } from '../hooks/usePaymentMethods';
 
 const CuentasPorCobrar = () => {
     const [invoices, setInvoices] = useState([]);
@@ -11,6 +12,7 @@ const CuentasPorCobrar = () => {
     const [showPayModal, setShowPayModal] = useState(false);
     const [payingInvoice, setPayingInvoice] = useState(null);
     const [payMethod, setPayMethod] = useState('Efectivo');
+    const { methods: payMethods } = usePaymentMethods();
     const [submittingPayment, setSubmittingPayment] = useState(false);
 
     const [clients, setClients] = useState([]);
@@ -290,11 +292,7 @@ const CuentasPorCobrar = () => {
                                     onChange={(e) => setPayMethod(e.target.value)}
                                     className="w-full p-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs font-bold text-navy focus:border-primary cursor-pointer"
                                 >
-                                    <option value="Efectivo">Efectivo</option>
-                                    <option value="Pago Móvil">Pago Móvil</option>
-                                    <option value="Tarjeta">Tarjeta de Débito/Crédito</option>
-                                    <option value="Transferencia">Transferencia Bancaria</option>
-                                    <option value="Divisas">Divisas (Dólares)</option>
+                                    {payMethods.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
                                 </select>
                             </div>
 

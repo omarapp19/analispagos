@@ -607,7 +607,9 @@ publishAllProductsToWeb: async (publish = true) => {
                 paymentMethod: data.paymentMethod || 'Efectivo',
                 date: data.date || undefined,
                 kardexConcept: data.kardexConcept || undefined,
-                payments: Array.isArray(data.payments) && data.payments.length ? data.payments : undefined
+                payments: Array.isArray(data.payments) && data.payments.length ? data.payments : undefined,
+                discountPct: parseFloat(data.discountPct) || undefined,
+                discountAmount: parseFloat(data.discountAmount) || undefined
             };
             // Sin conexión: la venta se guarda en el equipo y se sincroniza al volver internet.
             const queueOffline = () => enqueueSale(payload, { ...data, items: payload.items, subtotal: payload.subtotal, total: payload.total });
@@ -664,8 +666,11 @@ publishAllProductsToWeb: async (publish = true) => {
         if (error) throw error;
         return data;
     },
-    closeCash: async (counted, notes) => {
-        const { data, error } = await supabase.rpc('cash_close', { p_counted: counted, p_notes: notes || null });
+    // counted: USD por método; native: {método: {amount, currency}} lo recibido en su moneda; rate: tasa BCV usada.
+    closeCash: async (counted, notes, native, rate) => {
+        const { data, error } = await supabase.rpc('cash_close', {
+            p_counted: counted, p_notes: notes || null, p_native: native || null, p_rate: rate || null
+        });
         if (error) throw error;
         return data;
     },

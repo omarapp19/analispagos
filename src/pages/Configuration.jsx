@@ -4,9 +4,11 @@ import { api } from '../services/api';
 import { supabase } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
 import StoreSettingsPanel from '../components/store/StoreSettingsPanel';
+import PaymentMethodsPanel from '../components/PaymentMethodsPanel';
 
 const TABS = [
     ['general', 'Datos del Comercio'],
+    ['pagos', 'Métodos de pago'],
     ['users', 'Gestión de Usuarios y Roles'],
     ['tienda', 'Tienda web'],
 ];
@@ -299,6 +301,8 @@ const Configuration = () => {
 
             {/* Tienda web */}
             {activeTab === 'tienda' && <StoreSettingsPanel />}
+
+            {activeTab === 'pagos' && <PaymentMethodsPanel />}
 
             {/* General Tab */}
             {activeTab === 'general' && (

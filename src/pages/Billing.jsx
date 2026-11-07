@@ -15,6 +15,8 @@ import { imageUrl } from '../services/storeApi';
 import { useSearchParams } from 'react-router-dom';
 import SplitPayment from '../components/SplitPayment';
 import BarcodeScanButton from '../components/BarcodeScanButton';
+import { usePaymentMethods } from '../hooks/usePaymentMethods';
+import { useCashStatus } from '../hooks/useCashStatus';
 import ReturnInvoiceModal from '../components/ReturnInvoiceModal';
 
 // Imagen del producto: la principal de la tienda (Storage) o la antigua columna image.
@@ -65,6 +67,8 @@ const Billing = () => {
     
     // Checkout States
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+    const { methods: payMethods, find: findMethod } = usePaymentMethods();
+    const cash = useCashStatus();
     const [splitOn, setSplitOn] = useState(false);
     const [splitPayments, setSplitPayments] = useState([{ method: 'Efectivo', amount: '' }, { method: 'Transferencia', amount: '' }]);
     const [returnInvoice, setReturnInvoice] = useState(null);
@@ -247,9 +251,13 @@ const Billing = () => {
             }, 0);
         }
         
-        const total = subtotal + tax;
-        return { subtotal, tax, total };
-    }, [invoiceItems, applyTax]);
+        // Descuento configurado para el método de pago elegido (solo contado y un solo método).
+        const discountPct = (!isCredit && !splitOn) ? (payMethods.find((m) => m.name === paymentMethod)?.discountPct || 0) : 0;
+        const gross = subtotal + tax;
+        const discount = Math.round(gross * discountPct) / 100;
+        const total = Math.round((gross - discount) * 100) / 100;
+        return { subtotal, tax, total, gross, discount, discountPct };
+    }, [invoiceItems, applyTax, isCredit, splitOn, paymentMethod, payMethods]);
 
     // Date calculations
     const calculatedDueDate = useMemo(() => {
@@ -408,6 +416,8 @@ const Billing = () => {
                 creditDays: isCredit ? parseInt(creditDays) : 0,
                 dueDate: isCredit ? calculatedDueDate : invoiceDate,
                 tax: invoiceTotals.tax,
+                discountPct: invoiceTotals.discountPct,
+                discountAmount: invoiceTotals.discount,
                 invoiceNumber: customInvoiceNumber.trim() || undefined
             };
 
@@ -579,7 +589,8 @@ const Billing = () => {
 
         // ── TOTALS ───────────────────────────────────────────────────────
         row2('Subtotal:', formatCurrency(r.subtotal ?? 0), cy); cy += lineH;
-        row2('IVA:', formatCurrency(r.tax ?? 0), cy); cy += lineH + 4;
+        row2('IVA:', formatCurrency(r.tax ?? Math.max((r.total ?? 0) + (r.discountAmount ?? 0) - (r.subtotal ?? 0), 0)), cy); cy += lineH + (r.discountAmount > 0 ? 0 : 4);
+        if (r.discountAmount > 0) { row2(`Descuento ${r.paymentMethod} ${r.discountPct}%:`, '-' + formatCurrency(r.discountAmount), cy); cy += lineH + 4; }
 
         // Total destacado
         ctx.fillStyle = '#15171A';
@@ -743,17 +754,20 @@ ${itemsText}-------------------------------
         io.observe(el);
         return () => io.disconnect();
     }, [activeTab, posStep]);
+    const METHOD_ICONS = { 'Efectivo': Banknote, 'Divisas': DollarSign, 'Pago Móvil': Smartphone, 'Tarjeta': CreditCard, 'Transferencia': Landmark };
     const posMethods = [
-        { id: 'Efectivo', icon: Banknote },
-        { id: 'Divisas', icon: DollarSign },
-        { id: 'Pago Móvil', icon: Smartphone },
-        { id: 'Tarjeta', icon: CreditCard },
-        { id: 'Transferencia', icon: Landmark },
+        ...payMethods.map((m) => ({ id: m.name, icon: METHOD_ICONS[m.name] || WalletIcon, discountPct: m.discountPct })),
         { id: 'Crédito', icon: Clock3 },
     ];
+    // Si el método elegido se desactiva en Configuración, se pasa al primero activo.
+    useEffect(() => {
+        if (payMethods.length > 0 && !payMethods.some((m) => m.name === paymentMethod)) setPaymentMethod(payMethods[0].name);
+    }, [payMethods, paymentMethod]);
+    const methodCfg = findMethod(paymentMethod);
+    const methodIsVes = (methodCfg?.currency || 'VES') === 'VES';
     const receivedRaw = String(amountReceived).trim();
     const receivedNum = parseFloat(receivedRaw.includes(',') ? receivedRaw.replace(/\./g, '').replace(',', '.') : receivedRaw) || 0;
-    const totalInMethodCurrency = paymentMethod === 'Efectivo' ? invoiceTotals.total * (posRates?.bcv || 0) : invoiceTotals.total;
+    const totalInMethodCurrency = methodIsVes ? invoiceTotals.total * (posRates?.bcv || 0) : invoiceTotals.total;
     const changeDue = amountReceived ? receivedNum - totalInMethodCurrency : 0;
     const cartCount = invoiceItems.reduce((n, it) => n + (Number(it.quantity) || 0), 0);
     const canCharge = !submittingInvoice && invoiceItems.length > 0 && (!isCredit || !!selectedClient);
@@ -816,6 +830,22 @@ ${itemsText}-------------------------------
             overdueInvoicesCount
         };
     }, [invoices]);
+
+    // Un cajero no puede facturar hasta que un administrador abra la caja (el servidor tambien lo exige).
+    if (userRole === 'cajero' && cash.status === 'closed') {
+        return (
+            <div className="flex-1 flex items-center justify-center p-6">
+                <div className="card bg-white rounded-2xl p-8 max-w-md text-center flex flex-col gap-3 items-center" role="alert">
+                    <div className="w-14 h-14 rounded-full bg-amber-50 text-warning flex items-center justify-center text-2xl" aria-hidden="true">&#128274;</div>
+                    <h2 className="text-lg font-extrabold text-navy">La caja está cerrada</h2>
+                    <p className="text-sm text-secondary">
+                        Un administrador debe abrirla para que puedas facturar. Esta pantalla se desbloquea sola en cuanto la abran, desde cualquier equipo.
+                    </p>
+                    <button type="button" onClick={cash.refresh} className="btn btn-ghost h-10 px-4">Verificar de nuevo</button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`flex flex-col h-full bg-slate-50/30 ${userRole === 'cajero' ? 'p-0 gap-0' : 'gap-6'}`}>
@@ -1247,6 +1277,11 @@ ${itemsText}-------------------------------
                         <section className="card p-5 flex flex-col gap-5 order-1 lg:order-2" aria-label="Pago">
                             <div className="rounded-2xl bg-shell text-white px-5 py-4 flex items-end justify-between gap-3">
                                 <div>
+                                    {invoiceTotals.discount > 0 && (
+                                        <p className="text-[12.5px] font-semibold text-[#7FD6A6] mb-0.5">
+                                            Descuento {paymentMethod} {invoiceTotals.discountPct}%: -{formatCurrency(invoiceTotals.discount)}
+                                        </p>
+                                    )}
                                     <p className="text-[13px] font-semibold text-[#B4B0A6]">Total a cobrar</p>
                                     <p className="text-[38px] leading-none font-extrabold tracking-[-0.03em] tabular-nums mt-1.5">{formatCurrency(invoiceTotals.total)}</p>
                                 </div>
@@ -1260,7 +1295,7 @@ ${itemsText}-------------------------------
                             <div>
                                 <p className="text-[13.5px] font-bold mb-2">Forma de pago</p>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-label="Forma de pago">
-                                    {posMethods.map(({ id, icon: Icon }) => {
+                                    {posMethods.map(({ id, icon: Icon, discountPct: methodDiscount }) => {
                                         const active = id === 'Crédito' ? isCredit : !isCredit && paymentMethod === id;
                                         return (
                                             <button
@@ -1278,6 +1313,7 @@ ${itemsText}-------------------------------
                                                 }`}
                                             >
                                                 <Icon size={18} /> {id}
+                                                {methodDiscount > 0 && <span className="text-[11px] font-extrabold text-success">-{methodDiscount}%</span>}
                                             </button>
                                         );
                                     })}
@@ -1293,7 +1329,7 @@ ${itemsText}-------------------------------
                                     {splitOn && (
                                         <SplitPayment
                                             total={invoiceTotals.total}
-                                            methods={posMethods.filter((m) => m.id !== 'Crédito').map((m) => m.id)}
+                                            methods={payMethods.map((m) => m.name)}
                                             value={splitPayments}
                                             onChange={setSplitPayments}
                                         />
@@ -1319,27 +1355,27 @@ ${itemsText}-------------------------------
                                         </span>
                                     </div>
                                 </div>
-                            ) : !splitOn && (paymentMethod === 'Efectivo' || paymentMethod === 'Divisas') && (
+                            ) : !splitOn && methodCfg?.cash && (
                                 <div className="flex flex-col gap-2 animate-fade-in">
                                     <label htmlFor="pos-received" className="text-[13.5px] font-bold">
-                                        Monto recibido {paymentMethod === 'Efectivo' ? '(Bs)' : '($)'} <span className="font-medium text-secondary">· opcional, para calcular el vuelto</span>
+                                        Monto recibido {methodIsVes ? '(Bs)' : '($)'} <span className="font-medium text-secondary">· opcional, para calcular el vuelto</span>
                                     </label>
                                     <div className="flex items-center gap-3">
                                         <div className="relative flex-1">
-                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary font-bold">{paymentMethod === 'Efectivo' ? 'Bs' : '$'}</span>
+                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary font-bold">{methodIsVes ? 'Bs' : '$'}</span>
                                             <input
                                                 id="pos-received"
                                                 inputMode="decimal"
                                                 value={amountReceived}
                                                 onChange={(e) => setAmountReceived(e.target.value)}
                                                 placeholder="0,00"
-                                                className={`field h-12 text-[16px] tabular-nums ${paymentMethod === 'Efectivo' ? 'pl-10' : 'pl-8'}`}
+                                                className={`field h-12 text-[16px] tabular-nums ${methodIsVes ? 'pl-10' : 'pl-8'}`}
                                             />
                                         </div>
                                         <div className="text-right min-w-[130px]">
                                             <p className="text-[12.5px] font-semibold text-secondary">Vuelto</p>
                                             <p className={`text-[20px] font-extrabold tabular-nums ${changeDue < 0 ? 'text-danger' : 'text-navy'}`}>
-                                                {changeDue < 0 ? 'Falta ' : ''}{paymentMethod === 'Efectivo' ? 'Bs ' : '$'}{Math.abs(changeDue).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                {changeDue < 0 ? 'Falta ' : ''}{methodIsVes ? 'Bs ' : '$'}{Math.abs(changeDue).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </p>
                                         </div>
                                     </div>
@@ -1511,7 +1547,7 @@ ${itemsText}-------------------------------
                                                             const r = inv;
                                                             const store = globalSettings;
                                                             const W = 640, PAD = 40, lineH = 26, smallH = 22;
-                                                            let y = 60+28+24+30+(lineH*4)+30+30+((r.items?.length||0)*(lineH+smallH+6))+30+(lineH*3)+40+40;
+                                                            let y = 60+28+24+30+(lineH*4)+30+30+((r.items?.length||0)*(lineH+smallH+6))+30+(lineH*3)+40+40+(r.discountAmount>0?lineH:0);
                                                             const canv = document.createElement('canvas');
                                                             const sc = 2;
                                                             canv.width=W*sc; canv.height=(y+20)*sc;
@@ -1540,7 +1576,7 @@ ${itemsText}-------------------------------
                                                             (r.items||[]).forEach((item,i)=>{if(i%2===0){ctx.fillStyle='#fafafa';ctx.fillRect(PAD,cy-16,W-PAD*2,lineH+smallH+4);}tx(item.name||item.productName||'—',PAD+8,cy,{size:13,bold:true});tx(String(item.quantity??1),W/2+40,cy,{size:13,align:'center'});tx(formatCurrency(item.total??(item.price*item.quantity)),W-PAD-8,cy,{size:13,bold:true,align:'right'});cy+=smallH;if(item.taxRate!=null){tx(`IVA: ${item.taxRate}%`,PAD+16,cy,{size:11,color:'#888'});}cy+=lineH-10+6;});
                                                             cy+=6; dL(cy); cy+=20;
                                                             r2('Subtotal:',formatCurrency(r.subtotal??0),cy); cy+=lineH;
-                                                            r2('IVA:',formatCurrency(r.tax??0),cy); cy+=lineH+4;
+                                                            r2('IVA:',formatCurrency(r.tax??Math.max((r.total??0)+(r.discountAmount??0)-(r.subtotal??0),0)),cy); cy+=lineH+(r.discountAmount>0?0:4); if(r.discountAmount>0){r2('Descuento '+r.paymentMethod+' '+r.discountPct+'%:','-'+formatCurrency(r.discountAmount),cy); cy+=lineH+4;}
                                                             ctx.fillStyle='#15171A'; ctx.fillRect(PAD,cy-20,W-PAD*2,38);
                                                             tx('TOTAL:',PAD+12,cy+4,{size:15,bold:true,color:'#fff'}); tx(formatCurrency(r.total??0),W-PAD-12,cy+4,{size:17,bold:true,align:'right',color:'#fff'}); cy+=46;
                                                             tx('¡Gracias por su preferencia!',W/2,cy,{size:12,align:'center',color:'#888'});
@@ -1908,13 +1944,10 @@ ${itemsText}-------------------------------
                             <div>
                                 <label className="text-[10px] font-bold text-secondary uppercase tracking-wider mb-2.5 block">Método de Pago Recibido</label>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {[
-                                        { name: 'Efectivo', icon: <DollarSign size={14} /> },
-                                        { name: 'Tarjeta', icon: <CreditCard size={14} /> },
-                                        { name: 'Pago Móvil', icon: <Smartphone size={14} /> },
-                                        { name: 'Transferencia', icon: <Landmark size={14} /> },
-                                        { name: 'Divisas', icon: <DollarSign size={14} /> }
-                                    ].map((method) => {
+                                    {payMethods.map((m) => {
+                                        const MIcon = METHOD_ICONS[m.name] || WalletIcon;
+                                        return { name: m.name, icon: <MIcon size={14} /> };
+                                    }).map((method) => {
                                         const active = payMethod === method.name;
                                         return (
                                             <button
@@ -2089,8 +2122,14 @@ ${itemsText}-------------------------------
                                     </div>
                                     <div className="flex justify-between text-xs font-semibold text-secondary">
                                         <span>Impuesto (IVA):</span>
-                                        <span className="font-extrabold text-navy">{formatCurrency(activeReceipt.tax || 0)}</span>
+                                        <span className="font-extrabold text-navy">{formatCurrency(activeReceipt.tax ?? Math.max((activeReceipt.total || 0) + (activeReceipt.discountAmount || 0) - (activeReceipt.subtotal || 0), 0))}</span>
                                     </div>
+                                    {activeReceipt.discountAmount > 0 && (
+                                        <div className="flex justify-between text-xs font-semibold text-secondary">
+                                            <span>Descuento {activeReceipt.paymentMethod} {activeReceipt.discountPct}%:</span>
+                                            <span className="font-extrabold text-success">-{formatCurrency(activeReceipt.discountAmount)}</span>
+                                        </div>
+                                    )}
                                     <div className="h-px bg-primary/20 my-0.5"></div>
                                     <div className="flex justify-between items-baseline">
                                         <span className="text-xs font-black text-navy uppercase tracking-wider">Total Neto:</span>

@@ -27,7 +27,8 @@ const nextOfflineNumber = async () => {
 // Guarda la venta y devuelve una factura provisional con la forma que espera el recibo.
 export const enqueueSale = async (payload, original) => {
     const invoiceNumber = payload.invoiceNumber || await nextOfflineNumber();
-    const entry = { id: invoiceNumber, payload: { ...payload, invoiceNumber }, queuedAt: new Date().toISOString(), error: null };
+    const queuedAt = new Date().toISOString();
+    const entry = { id: invoiceNumber, payload: { ...payload, invoiceNumber, offlineSoldAt: queuedAt }, queuedAt, error: null };
     await saveQueue([...(await getQueue()), entry]);
     return {
         ...original,

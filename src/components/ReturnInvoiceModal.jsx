@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../services/api';
+import { usePaymentMethods } from '../hooks/usePaymentMethods';
 
 // Devolución parcial por línea o anulación total de una factura.
 export default function ReturnInvoiceModal({ invoice, onClose, onDone }) {
+    const { methods: payMethods } = usePaymentMethods();
     const returned = useMemo(() => {
         const m = {};
         (invoice.returns || []).forEach((r) => (r.items || []).forEach((i) => { m[i.productId] = (m[i.productId] || 0) + Number(i.quantity); }));
@@ -58,7 +60,7 @@ export default function ReturnInvoiceModal({ invoice, onClose, onDone }) {
                 {invoice.status === 'PAID' && (
                     <label className="text-[11px] font-bold text-secondary uppercase tracking-wider">Reembolso por
                         <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)} className="field h-10 mt-1 w-full">
-                            {['Efectivo', 'Divisas', 'Pago Móvil', 'Tarjeta', 'Transferencia'].map((m) => <option key={m}>{m}</option>)}
+                            {payMethods.map((m) => <option key={m.name}>{m.name}</option>)}
                         </select>
                     </label>
                 )}
