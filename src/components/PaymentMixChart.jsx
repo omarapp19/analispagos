@@ -22,6 +22,8 @@ const PaymentMixChart = ({ transactions = [] }) => {
             'Transferencia': '#FFB81C', // Info Cyan
             'Divisas': '#FFB81C', // Orange
             'Pago Móvil': '#C2301F', // Pink
+            'Zelle': '#565B63',
+            'Binance': '#8A3810',
             'Otros': '#8A9099'
         };
 
