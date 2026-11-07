@@ -617,7 +617,8 @@ publishAllProductsToWeb: async (publish = true) => {
                 if (isNetworkError(error)) return await queueOffline();
                 throw error;
             }
-            return created;
+            // La tabla no guarda el vencimiento: se calcula (fecha + días de crédito) para el recibo.
+            return withDueDate([created])[0];
         } catch (error) {
             if (isNetworkError(error)) {
                 try { return await enqueueSale(payload, data); } catch { /* cae al throw */ }
