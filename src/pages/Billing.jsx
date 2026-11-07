@@ -863,6 +863,9 @@ ${itemsText}-------------------------------
                         Un administrador debe abrirla para que puedas facturar. Esta pantalla se desbloquea sola en cuanto la abran, desde cualquier equipo.
                     </p>
                     <button type="button" onClick={cash.refresh} className="btn btn-ghost h-10 px-4">Verificar de nuevo</button>
+                    <button type="button" onClick={handleLogout} className="btn btn-ghost h-10 px-4 flex items-center gap-2 text-danger">
+                        <LogOut size={15} /> Cerrar sesión
+                    </button>
                 </div>
             </div>
         );
