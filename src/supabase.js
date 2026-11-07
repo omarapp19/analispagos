@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { kvGet, kvSet } from './offline/idb';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyzcompany.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
@@ -24,12 +25,13 @@ export async function getSettingDoc(id) {
 
         if (error) {
             console.error(`Error loading setting "${id}":`, error);
-            return null;
+            return (await kvGet(`cache_setting_${id}`)) || null;
         }
+        if (data?.data) kvSet(`cache_setting_${id}`, data.data);
         return data?.data || null;
     } catch (err) {
         console.error(`Unexpected error getting setting "${id}":`, err);
-        return null;
+        return (await kvGet(`cache_setting_${id}`)) || null;
     }
 }
 

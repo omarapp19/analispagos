@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase';
 import { setCurrentProfile } from './session';
+import { kvGet, kvSet, kvDelete } from '../offline/idb';
 
 const AuthContext = createContext(null);
 
@@ -43,12 +44,24 @@ export function AuthProvider({ children }) {
             .maybeSingle()
             .then(async ({ data, error }) => {
                 if (cancelled) return;
+                if (error) {
+                    // Error de red/servidor (no es "sin perfil"): si hay perfil guardado de este usuario, se sigue trabajando.
+                    const cached = await kvGet('cache_staff_profile');
+                    if (cancelled) return;
+                    if (cached && cached.userId === userId && cached.active) {
+                        setCurrentProfile(cached);
+                        setProfile(cached);
+                        setLoading(false);
+                        return;
+                    }
+                }
                 if (error || !data || !data.active) {
                     // Cuenta de Auth sin perfil activo de personal: no es del ERP.
                     await supabase.auth.signOut();
                     setProfile(null);
                     setCurrentProfile(null);
                 } else {
+                    kvSet('cache_staff_profile', data);
                     setCurrentProfile(data);
                     setProfile(data);
                 }
@@ -63,6 +76,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     const signOut = useCallback(async () => {
+        await kvDelete('cache_staff_profile');
         await supabase.auth.signOut();
         setProfile(null);
         setCurrentProfile(null);
