@@ -45,3 +45,6 @@ supabase/.temp/
 supabase/.branches/
 erp_schema.sql
 .vercel
+
+# Respaldos locales de datos
+backups

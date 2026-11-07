@@ -13,6 +13,9 @@ import { supabase, subscribeToTable } from '../supabase';
 import { getRole, getDisplayName } from '../auth/session';
 import { imageUrl } from '../services/storeApi';
 import { useSearchParams } from 'react-router-dom';
+import SplitPayment from '../components/SplitPayment';
+import BarcodeScanButton from '../components/BarcodeScanButton';
+import ReturnInvoiceModal from '../components/ReturnInvoiceModal';
 
 // Imagen del producto: la principal de la tienda (Storage) o la antigua columna image.
 const productImage = (p) => (p.images?.length ? imageUrl(p.images[0]) : p.image);
@@ -62,6 +65,9 @@ const Billing = () => {
     
     // Checkout States
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+    const [splitOn, setSplitOn] = useState(false);
+    const [splitPayments, setSplitPayments] = useState([{ method: 'Efectivo', amount: '' }, { method: 'Transferencia', amount: '' }]);
+    const [returnInvoice, setReturnInvoice] = useState(null);
     const [isCredit, setIsCredit] = useState(false);
     const [creditDays, setCreditDays] = useState('30');
     const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString('en-CA'));
@@ -175,7 +181,24 @@ const Billing = () => {
         loadInvoices();
         loadSettings();
 
-        const unsubProd = subscribeToTable('inventory', () => loadProducts());
+        // Inventario: se aplica solo la fila que cambió en vez de volver a descargar todo el catálogo.
+        const unsubProd = subscribeToTable('inventory', (payload) => {
+            if (!isMounted) return;
+            const { eventType, new: row, old } = payload || {};
+            if (eventType === 'DELETE' && old?.id !== undefined) {
+                setProducts((prev) => prev.filter((p) => String(p.id) !== String(old.id)));
+            } else if ((eventType === 'INSERT' || eventType === 'UPDATE') && row?.id !== undefined) {
+                setProducts((prev) => {
+                    const i = prev.findIndex((p) => String(p.id) === String(row.id));
+                    if (i === -1) return [row, ...prev];
+                    const next = prev.slice();
+                    next[i] = { ...prev[i], ...row };
+                    return next;
+                });
+            } else {
+                loadProducts();
+            }
+        });
         const unsubCli = subscribeToTable('clients', () => loadClients());
         const unsubInv = subscribeToTable('client_invoices', () => loadInvoices());
         const unsubSettings = subscribeToTable('settings', () => loadSettings());
@@ -359,9 +382,20 @@ const Billing = () => {
             return;
         }
 
+        let payments;
+        if (splitOn && !isCredit) {
+            payments = splitPayments.map((p) => ({ method: p.method, amount: Math.round((Number(p.amount) || 0) * 100) / 100 })).filter((p) => p.amount > 0);
+            const paid = payments.reduce((s, p) => s + p.amount, 0);
+            if (payments.length < 2 || Math.abs(paid - invoiceTotals.total) > 0.01) {
+                alert("El pago dividido debe usar al menos 2 métodos y sumar exactamente el total de la factura.");
+                return;
+            }
+        }
+
         setSubmittingInvoice(true);
         try {
             const invoiceData = {
+                payments,
                 clientId: saleClient.id,
                 clientName: saleClient.name,
                 clientDocument: saleClient.documentId || '',
@@ -369,7 +403,7 @@ const Billing = () => {
                 items: invoiceItems,
                 subtotal: invoiceTotals.subtotal,
                 total: invoiceTotals.total,
-                paymentMethod: isCredit ? '-' : paymentMethod,
+                paymentMethod: isCredit ? '-' : (payments ? 'Mixto' : paymentMethod),
                 isCredit,
                 creditDays: isCredit ? parseInt(creditDays) : 0,
                 dueDate: isCredit ? calculatedDueDate : invoiceDate,
@@ -389,6 +423,8 @@ const Billing = () => {
             setInvoiceItems([]);
             setIsCredit(false);
             setPaymentMethod('Efectivo');
+            setSplitOn(false);
+            setSplitPayments([{ method: 'Efectivo', amount: '' }, { method: 'Transferencia', amount: '' }]);
             setCustomInvoiceNumber('');
             setProductSearch('');
             setAmountReceived('');
@@ -741,6 +777,13 @@ ${itemsText}-------------------------------
         }
     };
 
+    // Código leído con la cámara: si coincide con un producto, se agrega; si no, queda en el buscador.
+    const handleScanDetected = (code) => {
+        const q = String(code).trim().toLowerCase();
+        const exact = products.find((p) => String(p.code || '').toLowerCase() === q);
+        if (exact) { handleAddProduct(exact); setProductSearch(''); } else { setProductSearch(String(code)); }
+    };
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
     };
@@ -885,6 +928,7 @@ ${itemsText}-------------------------------
                                     Enter agrega
                                 </kbd>
                             </div>
+                            <BarcodeScanButton onDetect={handleScanDetected} />
                             <button
                                 type="button"
                                 onClick={() => setStockFilter((prev) => (prev === 'all' ? 'instock' : 'all'))}
@@ -1225,7 +1269,7 @@ ${itemsText}-------------------------------
                                                 role="radio"
                                                 aria-checked={active}
                                                 onClick={() => {
-                                                    if (id === 'Crédito') { setIsCredit(true); }
+                                                    if (id === 'Crédito') { setIsCredit(true); setSplitOn(false); }
                                                     else { setIsCredit(false); setPaymentMethod(id); }
                                                     setAmountReceived('');
                                                 }}
@@ -1239,6 +1283,23 @@ ${itemsText}-------------------------------
                                     })}
                                 </div>
                             </div>
+
+                            {!isCredit && (
+                                <div className="flex flex-col gap-2">
+                                    <label className="flex items-center gap-2 text-[13.5px] font-semibold cursor-pointer">
+                                        <input type="checkbox" checked={splitOn} onChange={(e) => setSplitOn(e.target.checked)} />
+                                        Dividir el pago en varios métodos
+                                    </label>
+                                    {splitOn && (
+                                        <SplitPayment
+                                            total={invoiceTotals.total}
+                                            methods={posMethods.filter((m) => m.id !== 'Crédito').map((m) => m.id)}
+                                            value={splitPayments}
+                                            onChange={setSplitPayments}
+                                        />
+                                    )}
+                                </div>
+                            )}
 
                             {isCredit ? (
                                 <div className="flex flex-col gap-3 animate-fade-in">
@@ -1258,7 +1319,7 @@ ${itemsText}-------------------------------
                                         </span>
                                     </div>
                                 </div>
-                            ) : (paymentMethod === 'Efectivo' || paymentMethod === 'Divisas') && (
+                            ) : !splitOn && (paymentMethod === 'Efectivo' || paymentMethod === 'Divisas') && (
                                 <div className="flex flex-col gap-2 animate-fade-in">
                                     <label htmlFor="pos-received" className="text-[13.5px] font-bold">
                                         Monto recibido {paymentMethod === 'Efectivo' ? '(Bs)' : '($)'} <span className="font-medium text-secondary">· opcional, para calcular el vuelto</span>
@@ -1412,6 +1473,10 @@ ${itemsText}-------------------------------
                                                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-orange-500">
                                                         <Clock size={12} /> Pendiente
                                                     </span>
+                                                ) : inv.status === 'VOIDED' ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-secondary line-through">
+                                                        Anulada
+                                                    </span>
                                                 ) : (
                                                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-50 text-danger">
                                                         <AlertTriangle size={12} /> Vencido
@@ -1433,6 +1498,14 @@ ${itemsText}-------------------------------
                                                         <Printer size={14} />
                                                         Ver
                                                     </button>
+                                                    {userRole !== 'cajero' && inv.status !== 'VOIDED' && (
+                                                        <button
+                                                            onClick={() => setReturnInvoice(inv)}
+                                                            className="p-2 bg-slate-50 hover:bg-slate-100 rounded-lg text-danger font-bold text-xs inline-flex items-center gap-1 border border-gray-100 shadow-sm"
+                                                        >
+                                                            Devolver
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => {
                                                             const r = inv;
@@ -1873,6 +1946,8 @@ ${itemsText}-------------------------------
             )}
 
             {/* MODAL: RECIBO DIGITAL DE FACTURA (TICKET PREMIUM DE IMPRESIÓN) */}
+            {returnInvoice && <ReturnInvoiceModal invoice={returnInvoice} onClose={() => setReturnInvoice(null)} />}
+
             {showReceiptModal && activeReceipt && (
                 <div 
                     onClick={() => { setShowReceiptModal(false); setActiveReceipt(null); }}

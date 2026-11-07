@@ -9,8 +9,13 @@ import Invoices from './pages/Invoices';
 import Inventory from './pages/Inventory';
 import Billing from './pages/Billing';
 import Login from './pages/Login'; 
+import CashRegister from './pages/CashRegister';
+import Reports from './pages/Reports';
+import Restock from './pages/Restock';
+import StockCount from './pages/StockCount';
 import Investments from './pages/Investments';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import OfflineStatus from './components/OfflineStatus';
 
 // Import new pages
 import Providers from './pages/Providers';
@@ -55,6 +60,7 @@ const RoleProtectedRoute = ({ allowedRoles }) => {
 function App() {
   return (
     <AuthProvider>
+    <OfflineStatus />
     <Router>
       <Routes>
         {/* Public Login Route */}
@@ -77,14 +83,21 @@ function App() {
               <Route path="pos" element={<Billing />} />
             </Route>
 
+            {/* Caja (todos los roles) */}
+            <Route element={<RoleProtectedRoute allowedRoles={['administrador', 'supervisor', 'cajero']} />}>
+              <Route path="ventas/caja" element={<CashRegister />} />
+            </Route>
+
             {/* 3. Inventory (Admin and Supervisor) */}
             <Route path="inventory">
               <Route element={<RoleProtectedRoute allowedRoles={['administrador', 'supervisor']} />}>
                 <Route index element={<Inventory />} />
                 <Route path="kardex" element={<Kardex />} />
+                <Route path="reposicion" element={<Restock />} />
               </Route>
               <Route element={<RoleProtectedRoute allowedRoles={['administrador']} />}>
                 <Route path="adjustments" element={<InventoryAdjustments />} />
+                <Route path="conteo" element={<StockCount />} />
               </Route>
             </Route>
 
@@ -113,6 +126,11 @@ function App() {
               <Route path="reglas" element={<PricingRules />} />
               <Route path="categorias" element={<StoreCategories />} />
               <Route path="vehiculos" element={<Vehicles />} />
+            </Route>
+
+            {/* Reportes (Admin and Supervisor) */}
+            <Route element={<RoleProtectedRoute allowedRoles={['administrador', 'supervisor']} />}>
+              <Route path="reportes" element={<Reports />} />
             </Route>
 
             {/* 8. Configuration (Only Admin) */}

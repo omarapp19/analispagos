@@ -1,7 +1,17 @@
 ﻿import { supabase, getSettingDoc, setSettingDoc } from '../supabase';
+import { kvGet, kvSet } from '../offline/idb';
+import { enqueueSale, isNetworkError } from '../offline/salesQueue';
 
 const WEB_COLUMNS = ['webPublished', 'webFeatured', 'categoryId', 'reference', 'webDescription', 'specs', 'images',
     'wholesaleEnabled', 'minWholesaleQty', 'maxDiscountPct', 'minMarginPct'];
+
+// client_invoices no guarda fecha de vencimiento: se deriva de la fecha de la factura + días de crédito.
+const withDueDate = (rows) => rows.map((inv) => {
+    if (inv.dueDate || !inv.date) return inv;
+    const d = new Date(String(inv.date).slice(0, 10) + 'T12:00:00');
+    d.setDate(d.getDate() + (parseInt(inv.creditDays) || 0));
+    return { ...inv, dueDate: d.toLocaleDateString('en-CA') };
+});
 
 export const api = {
     // ==========================================
@@ -316,10 +326,11 @@ export const api = {
                 .order('createdAt', { ascending: false });
 
             if (error) throw error;
+            kvSet('cache_inventory', data || []);
             return data || [];
         } catch (error) {
             console.error("Error fetching inventory:", error);
-            return [];
+            return (await kvGet('cache_inventory')) || [];
         }
     },
 
@@ -486,10 +497,11 @@ publishAllProductsToWeb: async (publish = true) => {
                 .order('name', { ascending: true });
 
             if (error) throw error;
+            kvSet('cache_clients', data || []);
             return data || [];
         } catch (error) {
             console.error("Error fetching clients:", error);
-            return [];
+            return (await kvGet('cache_clients')) || [];
         }
     },
 
@@ -570,10 +582,12 @@ publishAllProductsToWeb: async (publish = true) => {
                 .order('createdAt', { ascending: false });
 
             if (error) throw error;
-            return data || [];
+            const rows = withDueDate(data || []);
+            kvSet('cache_client_invoices', rows);
+            return rows;
         } catch (error) {
             console.error("Error fetching client invoices:", error);
-            return [];
+            return (await kvGet('cache_client_invoices')) || [];
         }
     },
 
@@ -592,54 +606,110 @@ publishAllProductsToWeb: async (publish = true) => {
                 creditDays: parseInt(data.creditDays) || 0,
                 paymentMethod: data.paymentMethod || 'Efectivo',
                 date: data.date || undefined,
-                kardexConcept: data.kardexConcept || undefined
+                kardexConcept: data.kardexConcept || undefined,
+                payments: Array.isArray(data.payments) && data.payments.length ? data.payments : undefined
             };
+            // Sin conexión: la venta se guarda en el equipo y se sincroniza al volver internet.
+            const queueOffline = () => enqueueSale(payload, { ...data, items: payload.items, subtotal: payload.subtotal, total: payload.total });
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) return await queueOffline();
             const { data: created, error } = await supabase.rpc('erp_create_invoice', { payload });
-            if (error) throw error;
+            if (error) {
+                if (isNetworkError(error)) return await queueOffline();
+                throw error;
+            }
             return created;
         } catch (error) {
+            if (isNetworkError(error)) {
+                try { return await enqueueSale(payload, data); } catch { /* cae al throw */ }
+            }
             console.error("Error creating client invoice:", error);
             throw error;
         }
     },
 
-    payClientInvoice: async (invoiceId, paymentMethod) => {
-        try {
-            const { data: invoice, error: fetchErr } = await supabase
-                .from('client_invoices')
-                .select('*')
-                .eq('id', invoiceId)
-                .single();
-
-            if (fetchErr || !invoice) throw new Error("Factura no encontrada");
-
-            const { error: updateErr } = await supabase
-                .from('client_invoices')
-                .update({
-                    status: 'PAID',
-                    paymentMethod,
-                    updatedAt: new Date().toISOString()
-                })
-                .eq('id', invoiceId);
-
-            if (updateErr) throw updateErr;
-
-            await api.createTransaction({
-                amount: parseFloat(invoice.total),
-                method: paymentMethod,
-                date: new Date().toISOString().split('T')[0],
-                note: `Cobro Factura ${invoice.invoiceNumber} - Cliente: ${invoice.clientName}`,
-                type: 'INCOME',
-                category: 'Venta',
-                status: 'COMPLETED'
-            });
-
-            return { id: invoiceId, status: 'PAID' };
-        } catch (error) {
-            console.error("Error paying client invoice:", error);
-            throw error;
-        }
+    // Envía al servidor una venta guardada en la cola offline (usada por la sincronización).
+    sendQueuedInvoice: async (payload) => {
+        const { data, error } = await supabase.rpc('erp_create_invoice', { payload: { ...payload, allowNegativeStock: true } });
+        if (error) throw error;
+        return data;
     },
+
+    // Cobro atómico (RPC): marca la factura y registra el ingreso en una sola transacción.
+    payClientInvoice: async (invoiceId, paymentMethod, payments) => {
+        const { data, error } = await supabase.rpc('erp_pay_invoice', {
+            p_invoice_id: String(invoiceId), p_method: paymentMethod || 'Efectivo', p_payments: payments || null
+        });
+        if (error) { console.error("Error paying client invoice:", error); throw error; }
+        return data;
+    },
+
+    // Devolución parcial (items = [{productId, quantity}]) o anulación total (items = null).
+    returnInvoice: async (invoiceId, items, reason, refundMethod) => {
+        const { data, error } = await supabase.rpc('erp_return_invoice', {
+            p_invoice_id: String(invoiceId), p_items: items || null, p_reason: reason, p_refund_method: refundMethod || null
+        });
+        if (error) throw error;
+        return data;
+    },
+
+    // ---- Caja ----
+    getCashSession: async () => {
+        const { data, error } = await supabase.rpc('cash_current');
+        if (error) throw error;
+        return data;
+    },
+    openCash: async (openingFloat, notes) => {
+        const { data, error } = await supabase.rpc('cash_open', { p_float: Number(openingFloat) || 0, p_notes: notes || null });
+        if (error) throw error;
+        return data;
+    },
+    closeCash: async (counted, notes) => {
+        const { data, error } = await supabase.rpc('cash_close', { p_counted: counted, p_notes: notes || null });
+        if (error) throw error;
+        return data;
+    },
+    getCashHistory: async () => {
+        const { data, error } = await supabase.from('cash_sessions').select('*').order('openedAt', { ascending: false }).limit(60);
+        if (error) throw error;
+        return data || [];
+    },
+
+    // ---- Reportes (solo administrador/supervisor) ----
+    getSalesReport: async (from, to) => {
+        const { data, error } = await supabase.rpc('report_sales', { p_from: from, p_to: to });
+        if (error) throw error;
+        return data;
+    },
+    getReceivablesAging: async () => {
+        const { data, error } = await supabase.rpc('report_receivables_aging');
+        if (error) throw error;
+        return data || [];
+    },
+    getRestockReport: async (days = 30) => {
+        const { data, error } = await supabase.rpc('report_restock', { p_days: days });
+        if (error) throw error;
+        return data || [];
+    },
+    getSlowMovers: async (days = 90) => {
+        const { data, error } = await supabase.rpc('report_slow_movers', { p_days: days });
+        if (error) throw error;
+        return data || [];
+    },
+    getMarginAlerts: async (minPct = 10) => {
+        const { data, error } = await supabase.rpc('report_margin_alerts', { p_min_pct: minPct });
+        if (error) throw error;
+        return data || [];
+    },
+    getAuditLog: async (limit = 200) => {
+        const { data, error } = await supabase.from('audit_log').select('*').order('at', { ascending: false }).limit(limit);
+        if (error) throw error;
+        return data || [];
+    },
+    updateMinStock: async (productId, minStock) => {
+        const { error } = await supabase.from('inventory').update({ minStock: Math.max(0, parseInt(minStock) || 0) }).eq('id', productId);
+        if (error) throw error;
+    },
+
 
     updateClientInvoice: async (id, data) => {
         try {
@@ -819,39 +889,22 @@ publishAllProductsToWeb: async (publish = true) => {
         }
     },
 
-    adjustInventory: async (productId, changeQty, concept, username) => {
-        try {
-            const { data: product, error: fetchErr } = await supabase
-                .from('inventory')
-                .select('*')
-                .eq('id', productId)
-                .single();
-
-            if (fetchErr || !product) throw new Error("Producto no encontrado");
-
-            const currentQty = parseInt(product.quantity) || 0;
-            const newQty = Math.max(0, currentQty + changeQty);
-
-            await supabase
-                .from('inventory')
-                .update({ quantity: newQty, updatedAt: new Date().toISOString() })
-                .eq('id', productId);
-
-            await api.registerKardexEntry({
-                productId,
-                productName: product.name,
-                type: changeQty > 0 ? 'ENTRADA' : 'SALIDA',
-                quantity: Math.abs(changeQty),
-                concept,
-                user: username || 'Sistema'
-            });
-
-            return { id: productId, quantity: newQty };
-        } catch (error) {
-            console.error("Error adjusting inventory:", error);
-            throw error;
-        }
+    // Ajuste atómico en la base (RPC): bloquea la fila, actualiza stock y deja kardex y auditoría.
+    adjustInventory: async (productId, changeQty, concept) => {
+        const { data, error } = await supabase.rpc('erp_adjust_stock', {
+            p_product_id: String(productId), p_delta: parseInt(changeQty), p_concept: concept
+        });
+        if (error) { console.error("Error adjusting inventory:", error); throw error; }
+        return data;
     },
+
+    // Conteo físico: counts = [{productId, counted}]. Fija la existencia y registra cada diferencia.
+    applyStockCount: async (counts, note) => {
+        const { data, error } = await supabase.rpc('erp_apply_stock_count', { p_counts: counts, p_note: note || null });
+        if (error) throw error;
+        return data;
+    },
+
 
     // ==========================================
     // PROVIDERS

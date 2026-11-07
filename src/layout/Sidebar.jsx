@@ -20,9 +20,11 @@ const roleLabel = { administrador: 'Administrador', supervisor: 'Supervisor', ca
 const buildNav = ({ isAdmin, isManager, pending = { orders: 0, wholesale: 0 } }) => [
     isManager && { to: '/', icon: LayoutDashboard, label: 'Resumen', end: true },
     { to: '/pos', icon: Receipt, label: 'Punto de venta' },
+    { to: '/ventas/caja', icon: Landmark, label: 'Cierre de caja' },
+    isManager && { to: '/reportes', icon: BarChart3, label: 'Reportes' },
     isManager && {
         id: 'ventas', icon: Users, label: 'Ventas',
-        match: ['/ventas', '/finanzas/cuentas-por-cobrar'],
+        match: ['/ventas/clientes', '/finanzas/cuentas-por-cobrar'],
         children: [
             { to: '/ventas/clientes', label: 'Clientes' },
             { to: '/finanzas/cuentas-por-cobrar', label: 'Cuentas por cobrar' },
@@ -34,7 +36,9 @@ const buildNav = ({ isAdmin, isManager, pending = { orders: 0, wholesale: 0 } })
         children: [
             { to: '/inventory', label: 'Productos', end: true },
             { to: '/inventory/kardex', label: 'Kardex' },
+            { to: '/inventory/reposicion', label: 'Reposición y rotación' },
             isAdmin && { to: '/inventory/adjustments', label: 'Ajustes de stock' },
+            isAdmin && { to: '/inventory/conteo', label: 'Conteo físico' },
         ].filter(Boolean),
     },
     isManager && {

@@ -13,6 +13,21 @@ const CuentasPorCobrar = () => {
     const [payMethod, setPayMethod] = useState('Efectivo');
     const [submittingPayment, setSubmittingPayment] = useState(false);
 
+    const [clients, setClients] = useState([]);
+    useEffect(() => { api.getClients().then(setClients).catch(() => {}); }, []);
+
+    // Estado de cuenta del cliente por WhatsApp: todas sus facturas pendientes.
+    const sendStatement = (inv) => {
+        const client = clients.find((c) => String(c.id) === String(inv.clientId));
+        const pending = invoices.filter((i) => i.isCredit && i.status === 'PENDING' && (i.clientId ? String(i.clientId) === String(inv.clientId) : i.clientName === inv.clientName));
+        const total = pending.reduce((s, i) => s + Number(i.total), 0);
+        const today = new Date().toLocaleDateString('en-CA');
+        const lines = pending.map((i) => `• ${i.invoiceNumber} — vence ${new Date(i.dueDate + 'T12:00:00').toLocaleDateString('es-VE')} — ${formatCurrency(i.total)}${i.dueDate < today ? ' (VENCIDA)' : ''}`);
+        const text = ['Hola ' + inv.clientName + ', este es su estado de cuenta:', '', ...lines, '', '*Total pendiente: ' + formatCurrency(total) + '*', '', 'Gracias por su preferencia.'].join('\n');
+        const phone = String(client?.phone || '').replace(/\D/g, '');
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    };
+
     const fetchInvoices = async () => {
         setLoading(true);
         try {
@@ -216,6 +231,13 @@ const CuentasPorCobrar = () => {
                                                     className="btn btn-primary py-1.5 px-3 rounded-lg text-xs hover:-translate-y-0.5 shadow-teal-500/20 cursor-pointer"
                                                 >
                                                     Registrar Cobro
+                                                </button>
+                                                <button
+                                                    onClick={() => sendStatement(inv)}
+                                                    className="btn btn-ghost py-1.5 px-3 rounded-lg text-xs ml-2 cursor-pointer"
+                                                    title="Enviar estado de cuenta por WhatsApp"
+                                                >
+                                                    WhatsApp
                                                 </button>
                                             </td>
                                         </tr>
