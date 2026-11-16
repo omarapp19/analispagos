@@ -54,7 +54,7 @@ export default function PurchaseReceiptModal({ purchase, onClose, onOpenSupport 
         >
             <div 
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[92vh] border border-gray-150 animate-in zoom-in duration-200"
+                className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl relative overflow-hidden flex flex-col max-h-[92vh] border border-gray-150 animate-in zoom-in duration-200"
             >
                 {/* Frozen Top Header / Action Bar */}
                 <div className="bg-white px-6 py-4 border-b border-gray-150 flex items-center justify-between no-print flex-shrink-0 z-10 shadow-xs">
@@ -225,26 +225,27 @@ export default function PurchaseReceiptModal({ purchase, onClose, onOpenSupport 
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-secondary border-b border-gray-200">
                                         <tr>
-                                            <th className="py-2 px-3">#</th>
-                                            <th className="py-2 px-3">Producto / Descripción</th>
-                                            <th className="py-2 px-3 text-center">Cant.</th>
-                                            <th className="py-2 px-3 text-right">Costo Unit. ($)</th>
-                                            <th className="py-2 px-3 text-right">IVA</th>
-                                            <th className="py-2 px-3 text-right">Total ($)</th>
+                                            <th className="py-2.5 px-3 text-center w-10">#</th>
+                                            <th className="py-2.5 px-3">Código</th>
+                                            <th className="py-2.5 px-3">Producto / Descripción</th>
+                                            <th className="py-2.5 px-3">Marca</th>
+                                            <th className="py-2.5 px-3 text-center">Cant.</th>
+                                            <th className="py-2.5 px-3 text-right">Costo Unit. ($)</th>
+                                            <th className="py-2.5 px-3 text-right">Total ($)</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-150">
                                         {items.map((it, idx) => {
                                             const qty = parseInt(it.quantity) || 0;
                                             const cost = parseFloat(it.costPrice) || 0;
-                                            const taxPct = parseFloat(it.taxPercentage) || 0;
-                                            const lineSubtotal = qty * cost;
-                                            const lineTax = lineSubtotal * (taxPct / 100);
-                                            const lineTotal = lineSubtotal + lineTax;
+                                            const lineTotal = qty * cost;
 
                                             return (
                                                 <tr key={idx} className="hover:bg-slate-50/50">
-                                                    <td className="py-2.5 px-3 text-secondary font-bold text-[11px]">{idx + 1}</td>
+                                                    <td className="py-2.5 px-3 text-secondary font-bold text-[11px] text-center">{idx + 1}</td>
+                                                    <td className="py-2.5 px-3 font-mono font-bold text-primary text-xs whitespace-nowrap">
+                                                        {it.code || '-'}
+                                                    </td>
                                                     <td className="py-2.5 px-3">
                                                         <span className="font-bold text-navy block text-xs">{it.name}</span>
                                                         {it.unitsPerPackage > 1 && (
@@ -253,16 +254,22 @@ export default function PurchaseReceiptModal({ purchase, onClose, onOpenSupport 
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td className="py-2.5 px-3 text-center font-bold text-navy">
-                                                        {qty}
+                                                    <td className="py-2.5 px-3">
+                                                        {it.brand ? (
+                                                            <span className="inline-block bg-slate-100 text-secondary text-[10px] px-2 py-0.5 rounded font-bold uppercase">
+                                                                {it.brand}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-secondary opacity-40">-</span>
+                                                        )}
                                                     </td>
-                                                    <td className="py-2.5 px-3 text-right font-medium text-secondary">
+                                                    <td className="py-2.5 px-3 text-center font-bold text-navy whitespace-nowrap">
+                                                        {qty} {it.isFlete ? 'viaje' : 'und.'}
+                                                    </td>
+                                                    <td className="py-2.5 px-3 text-right font-medium text-secondary whitespace-nowrap">
                                                         {formatUSD(cost)}
                                                     </td>
-                                                    <td className="py-2.5 px-3 text-right text-secondary text-[11px]">
-                                                        {taxPct > 0 ? `${taxPct}%` : 'Exento'}
-                                                    </td>
-                                                    <td className="py-2.5 px-3 text-right font-bold text-navy">
+                                                    <td className="py-2.5 px-3 text-right font-black text-navy whitespace-nowrap">
                                                         {formatUSD(lineTotal)}
                                                         {bcvRate > 0 && (
                                                             <span className="block text-[10px] text-secondary opacity-60 font-medium">
