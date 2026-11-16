@@ -19,6 +19,8 @@ const webIssues = (p) => {
     return out;
 };
 
+const thumbOf = (p) => (p?.images?.length ? imageUrl(p.images[0]) : (p?.image || ''));
+
 
 const Inventory = () => {
     const userRole = getRole();
@@ -53,7 +55,7 @@ const Inventory = () => {
         description: '',
         quantity: '0',
         costPrice: '0.00',
-        marginPercentage: '0',
+        marginPercentage: '30',
         sellingPrice: '0.00',
         image: '',
         imageType: 'url', // 'url' | 'base64'
@@ -244,16 +246,29 @@ const Inventory = () => {
 
     // Form Calculations
     const handleCostChange = (costVal) => {
-        const cost = parseFloat(costVal) || 0;
-        const margin = parseFloat(formData.marginPercentage) || 0;
+        let cleanVal = costVal;
+        if (cleanVal.startsWith('0.00') && cleanVal.length > 4) {
+            cleanVal = cleanVal.slice(4);
+        } else if (cleanVal.endsWith('0.00') && cleanVal.length > 4) {
+            cleanVal = cleanVal.replace(/0\.00$/, '');
+        } else if (cleanVal.startsWith('0') && cleanVal.length > 1 && cleanVal[1] !== '.') {
+            cleanVal = cleanVal.replace(/^0+/, '');
+        }
+
+        const cost = parseFloat(cleanVal) || 0;
+        let margin = parseFloat(formData.marginPercentage) || 0;
+        if (margin <= 0) {
+            margin = 30;
+        }
         
         // Calculate selling price based on cost & margin
         const selling = cost * (1 + margin / 100);
         
         setFormData(prev => ({
             ...prev,
-            costPrice: costVal,
-            sellingPrice: selling.toFixed(2)
+            costPrice: cleanVal,
+            marginPercentage: (parseFloat(prev.marginPercentage) > 0) ? prev.marginPercentage : '30',
+            sellingPrice: cost > 0 ? selling.toFixed(2) : (prev.sellingPrice === '0.00' ? '0.00' : prev.sellingPrice)
         }));
     };
 
@@ -267,14 +282,35 @@ const Inventory = () => {
         setFormData(prev => ({
             ...prev,
             marginPercentage: marginVal,
-            sellingPrice: selling.toFixed(2)
+            sellingPrice: cost > 0 ? selling.toFixed(2) : prev.sellingPrice
         }));
     };
 
     const handleSellingChange = (sellingVal) => {
-        const selling = parseFloat(sellingVal) || 0;
+        let cleanVal = sellingVal;
+        if (cleanVal.startsWith('0.00') && cleanVal.length > 4) {
+            cleanVal = cleanVal.slice(4);
+        } else if (cleanVal.endsWith('0.00') && cleanVal.length > 4) {
+            cleanVal = cleanVal.replace(/0\.00$/, '');
+        } else if (cleanVal.startsWith('0') && cleanVal.length > 1 && cleanVal[1] !== '.') {
+            cleanVal = cleanVal.replace(/^0+/, '');
+        }
+
+        const selling = parseFloat(cleanVal) || 0;
         const cost = parseFloat(formData.costPrice) || 0;
         
+        // Si se agrega un precio de venta sin costo, se calcula automáticamente el costo con margen del 30%
+        if (cost <= 0 && selling > 0) {
+            const calculatedCost = Number((selling / 1.30).toFixed(2));
+            setFormData(prev => ({
+                ...prev,
+                costPrice: calculatedCost.toFixed(2),
+                sellingPrice: cleanVal,
+                marginPercentage: '30'
+            }));
+            return;
+        }
+
         // Calculate margin
         let margin = 0;
         if (cost > 0) {
@@ -283,7 +319,7 @@ const Inventory = () => {
         
         setFormData(prev => ({
             ...prev,
-            sellingPrice: sellingVal,
+            sellingPrice: cleanVal,
             marginPercentage: margin % 1 === 0 ? margin.toString() : margin.toFixed(1)
         }));
     };
@@ -318,6 +354,39 @@ const Inventory = () => {
 
         setSavingForm(true);
         try {
+            let newImage = (formData.image || '').trim();
+            let productImages = webForm.images || [];
+
+            // Si se subió una nueva imagen en base64 en la pestaña de datos
+            if (newImage.startsWith('data:')) {
+                try {
+                    const blobRes = await fetch(newImage);
+                    const blob = await blobRes.blob();
+                    const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
+                    const targetId = editingProduct?.id || crypto.randomUUID();
+                    const storagePath = `${targetId}/${Date.now()}.${ext}`;
+                    const { error: upErr } = await supabase.storage
+                        .from('product-images')
+                        .upload(storagePath, blob, { contentType: blob.type, upsert: true });
+                    if (!upErr) {
+                        productImages = [storagePath];
+                        newImage = '';
+                    }
+                } catch (storageErr) {
+                    console.warn("No se pudo subir imagen a Storage:", storageErr);
+                }
+            } else if (!newImage) {
+                // Usuario removió la imagen
+                productImages = [];
+            } else if (editingProduct?.images?.length && newImage === imageUrl(editingProduct.images[0])) {
+                // No se modificó la imagen existente de Storage
+                productImages = editingProduct.images;
+                newImage = '';
+            } else if (newImage.startsWith('http')) {
+                // URL externa directa
+                productImages = [newImage];
+            }
+
             const productData = {
                 productType: formData.productType || 'product',
                 name: (formData.name || '').trim().toUpperCase(),
@@ -328,12 +397,16 @@ const Inventory = () => {
                 costPrice: isService ? 0 : (parseFloat(formData.costPrice) || 0),
                 marginPercentage: isService ? 0 : (parseFloat(formData.marginPercentage) || 0),
                 sellingPrice: parseFloat(formData.sellingPrice) || 0,
-                image: (formData.image || '').trim(),
+                image: newImage,
+                images: productImages,
                 taxPercentage: parseFloat(formData.taxPercentage) || 0,
                 username: username,
                 unitsPerPackage: isService ? 1 : (parseInt(formData.unitsPerPackage) || 1),
                 // Los servicios nunca se publican en la tienda.
-                ...(storeReady ? (isService ? { webPublished: false } : webColumns(webForm)) : {})
+                ...(storeReady ? (isService ? { webPublished: false } : {
+                    ...webColumns(webForm),
+                    images: productImages
+                }) : { images: productImages })
             };
 
             if (editingProduct) {
@@ -399,6 +472,17 @@ const Inventory = () => {
     // Edit Product trigger
     const handleEditProduct = (product) => {
         setEditingProduct(product);
+        const resolvedImage = thumbOf(product) || '';
+        const costNum = product.costPrice || 0;
+        const sellNum = product.sellingPrice || 0;
+        let initialMargin = '30';
+        if (product.marginPercentage && parseFloat(product.marginPercentage) > 0) {
+            initialMargin = product.marginPercentage.toString();
+        } else if (costNum > 0 && sellNum > 0) {
+            const m = ((sellNum - costNum) / costNum) * 100;
+            initialMargin = m % 1 === 0 ? m.toString() : m.toFixed(1);
+        }
+
         setFormData({
             productType: product.productType || 'product',
             name: product.name,
@@ -406,11 +490,11 @@ const Inventory = () => {
             code: product.code || '',
             description: product.description || '',
             quantity: (product.quantity || 0).toString(),
-            costPrice: (product.costPrice || 0).toFixed(2),
-            marginPercentage: (product.marginPercentage || 0).toString(),
-            sellingPrice: (product.sellingPrice || 0).toFixed(2),
-            image: product.image || '',
-            imageType: product.image?.startsWith('data:') ? 'base64' : 'url',
+            costPrice: costNum.toFixed(2),
+            marginPercentage: initialMargin,
+            sellingPrice: sellNum.toFixed(2),
+            image: resolvedImage,
+            imageType: resolvedImage.startsWith('data:') ? 'base64' : 'url',
             taxPercentage: product.taxPercentage !== undefined ? product.taxPercentage.toString() : '16',
             unitsPerPackage: product.unitsPerPackage ? product.unitsPerPackage.toString() : '1',
             packageQty: '0',
@@ -533,7 +617,6 @@ const Inventory = () => {
     }), [products]);
 
     // Imagen para la lista: la principal de la tienda si existe, si no la del POS.
-    const thumbOf = (p) => (p.images?.length ? imageUrl(p.images[0]) : p.image);
 
     return (
         <div className="flex flex-col gap-8 h-full">
@@ -901,9 +984,10 @@ const Inventory = () => {
                                         type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            const currentImg = thumbOf(p) || '';
                                             setQuickImageProduct(p);
-                                            setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : '');
-                                            setQuickImagePreview(p.image || '');
+                                            setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : (currentImg.startsWith('http') ? currentImg : ''));
+                                            setQuickImagePreview(currentImg);
                                         }}
                                         className="absolute bottom-2 right-2 z-10 bg-white/95 hover:bg-white text-navy px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-md flex items-center gap-1.5 transition-all opacity-85 group-hover:opacity-100 backdrop-blur-sm border border-slate-200/60"
                                         title="Subir foto real de este producto"
@@ -943,9 +1027,10 @@ const Inventory = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => {
+                                                    const currentImg = thumbOf(p) || '';
                                                     setQuickImageProduct(p);
-                                                    setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : '');
-                                                    setQuickImagePreview(p.image || '');
+                                                    setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : (currentImg.startsWith('http') ? currentImg : ''));
+                                                    setQuickImagePreview(currentImg);
                                                 }}
                                                 className="text-xs font-bold text-secondary hover:text-primary flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors"
                                                 title="Cargar o cambiar foto real"
@@ -1069,9 +1154,10 @@ const Inventory = () => {
                                                         <button 
                                                             type="button"
                                                             onClick={() => {
+                                                                const currentImg = thumbOf(p) || '';
                                                                 setQuickImageProduct(p);
-                                                                setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : '');
-                                                                setQuickImagePreview(p.image || '');
+                                                                setQuickImageUrl(p.image && p.image.startsWith('http') ? p.image : (currentImg.startsWith('http') ? currentImg : ''));
+                                                                setQuickImagePreview(currentImg);
                                                             }}
                                                             className="p-1.5 rounded-lg text-secondary hover:bg-slate-100 hover:text-primary transition-colors"
                                                             title="Subir foto real"
@@ -1472,18 +1558,64 @@ const Inventory = () => {
                                             />
                                         </div>
                                     )}
-                                    <div className={editingProduct ? 'col-span-2' : ''}>
-                                        <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Precio Costo ($) *</label>
-                                        <input 
-                                            type="number" 
-                                            step="0.01"
-                                            min="0"
-                                            value={formData.costPrice}
-                                            onChange={(e) => handleCostChange(e.target.value)}
-                                            placeholder="0.00"
-                                            className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
-                                        />
-                                    </div>
+                                    {editingProduct ? (
+                                        <div className="col-span-2 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent rounded-2xl p-4 border-2 border-amber-400/80 shadow-xs space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                                                        <DollarSign size={14} strokeWidth={3} />
+                                                    </div>
+                                                    <label className="text-xs font-black text-navy uppercase tracking-wider">
+                                                        Precio Costo ($) *
+                                                    </label>
+                                                </div>
+                                                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300 uppercase tracking-wide">
+                                                    Costo Base
+                                                </span>
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-black text-amber-600 select-none">
+                                                    $
+                                                </span>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={formData.costPrice}
+                                                    onChange={(e) => handleCostChange(e.target.value)}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onClick={(e) => {
+                                                        if (e.target.value === '0.00' || e.target.value === '0') e.target.select();
+                                                    }}
+                                                    placeholder="0.00"
+                                                    className="w-full pl-9 pr-4 py-3 bg-white rounded-xl border-2 border-amber-200 outline-none text-lg text-navy font-black focus:border-amber-500 focus:ring-4 focus:ring-amber-500/15 shadow-xs transition-all"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-secondary font-medium">
+                                                Modificar este costo recalcula automáticamente el margen o precio de venta.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 block">Precio Costo ($) *</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-secondary select-none">$</span>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={formData.costPrice}
+                                                    onChange={(e) => handleCostChange(e.target.value)}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onClick={(e) => {
+                                                        if (e.target.value === '0.00' || e.target.value === '0') e.target.select();
+                                                    }}
+                                                    placeholder="0.00"
+                                                    className="w-full pl-7 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {editingProduct && (
@@ -1512,6 +1644,10 @@ const Inventory = () => {
                                                 step="0.1"
                                                 value={formData.marginPercentage}
                                                 onChange={(e) => handleMarginChange(e.target.value)}
+                                                onFocus={(e) => e.target.select()}
+                                                onClick={(e) => {
+                                                    if (e.target.value === '0' || e.target.value === '30') e.target.select();
+                                                }}
                                                 placeholder="30"
                                                 className="w-full pl-4 pr-8 py-2 bg-white rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all"
                                             />
@@ -1528,6 +1664,10 @@ const Inventory = () => {
                                                 required
                                                 value={formData.sellingPrice}
                                                 onChange={(e) => handleSellingChange(e.target.value)}
+                                                onFocus={(e) => e.target.select()}
+                                                onClick={(e) => {
+                                                    if (e.target.value === '0.00' || e.target.value === '0') e.target.select();
+                                                }}
                                                 placeholder="0.00"
                                                 className="w-full pl-4 pr-4 py-2 bg-white rounded-xl border border-gray-200 outline-none text-sm text-primary font-black focus:border-primary transition-all"
                                             />
@@ -1623,7 +1763,13 @@ const Inventory = () => {
                                     <input 
                                         type="url" 
                                         value={formData.imageType === 'url' ? formData.image : ''}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData(prev => ({ ...prev, image: val }));
+                                            if (val) {
+                                                setWebForm(w => ({ ...w, images: [val] }));
+                                            }
+                                        }}
                                         placeholder="Pegar dirección URL de la imagen (ej: https://...)"
                                         className="w-full pl-4 pr-4 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-xs text-secondary focus:border-primary transition-all font-medium"
                                     />
@@ -1653,8 +1799,15 @@ const Inventory = () => {
                                             <span className="text-xs font-bold text-navy block truncate">Imagen cargada con éxito</span>
                                             <button 
                                                 type="button" 
-                                                onClick={() => setFormData(prev => ({ ...prev, image: '' }))}
-                                                className="text-[10px] text-danger hover:underline font-bold mt-0.5"
+                                                onClick={() => {
+                                                    setFormData(prev => ({ ...prev, image: '' }));
+                                                    setWebForm(prev => ({
+                                                        ...prev,
+                                                        images: [],
+                                                        removedImages: [...(prev.removedImages || []), ...(editingProduct?.images || [])]
+                                                    }));
+                                                }}
+                                                className="text-[10px] text-danger hover:underline font-bold mt-0.5 cursor-pointer"
                                             >
                                                 Quitar imagen
                                             </button>

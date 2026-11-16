@@ -57,7 +57,8 @@ const Analytics = () => {
                     const dateStr = typeof tx.date === 'string' ? tx.date.split('T')[0] : '';
                     const [y, m, d] = dateStr.split('-').map(Number);
                     const dObj = new Date(y, m - 1, d);
-                    return tx.type === 'INCOME' && dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear;
+                    const isCapital = /inversi[oó]n/i.test(tx.category || '');
+                    return tx.type === 'INCOME' && !isCapital && dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear;
                 })
                 .reduce((acc, curr) => acc + curr.amount, 0);
             setMonthlyIncome(mIncome);
@@ -94,6 +95,7 @@ const Analytics = () => {
         return transactions
             .filter(tx => {
                 if (!tx.date || tx.type !== 'INCOME') return false;
+                if (/inversi[oó]n/i.test(tx.category || '')) return false;
                 const d = new Date(tx.date + 'T12:00:00');
                 return d.getFullYear() === y && d.getMonth() === m;
             })

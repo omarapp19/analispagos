@@ -27,7 +27,7 @@ export const webFormFromProduct = (p) => ({
     reference: p.reference || '',
     webDescription: p.webDescription || '',
     specs: Object.entries(p.specs || {}).map(([key, value]) => ({ key, value: String(value) })),
-    images: Array.isArray(p.images) ? p.images : [],
+    images: (Array.isArray(p.images) && p.images.length > 0) ? p.images : (p.image ? [p.image] : []),
     wholesaleEnabled: p.wholesaleEnabled !== false,
     minWholesaleQty: String(p.minWholesaleQty || 1),
     maxDiscountPct: p.maxDiscountPct ?? '',
