@@ -25,6 +25,21 @@ const Invoices = () => {
     const [showSupportModal, setShowSupportModal] = useState(false);
     const [activeSupportFile, setActiveSupportFile] = useState(null);
     const [activeSupportFileName, setActiveSupportFileName] = useState('');
+    const [expandedNameIds, setExpandedNameIds] = useState(new Set());
+
+    const toggleExpandName = (id) => {
+        setExpandedNameIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const getCleanTitle = (bill) => {
+        const raw = bill.title || bill.provider || 'Sin Nombre';
+        return raw.replace(/^compra\s*[-–:]\s*/i, '').trim();
+    };
 
     const openSupportModal = (file, name) => {
         setActiveSupportFile(file);
@@ -221,7 +236,8 @@ const Invoices = () => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Vista Escritorio (Tabla) */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50/50 border-b border-gray-100">
                             <tr>
@@ -250,116 +266,255 @@ const Invoices = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredBills.map((bill) => (
-                                    <tr key={bill.id} className="hover:bg-gray-50/30 transition-colors group align-middle">
-                                        <td className="p-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold">
-                                                    <FileText size={20} />
+                                filteredBills.map((bill) => {
+                                    const cleanTitle = getCleanTitle(bill);
+                                    const isExpanded = expandedNameIds.has(bill.id);
+                                    return (
+                                        <tr key={bill.id} className="hover:bg-gray-50/30 transition-colors group align-middle">
+                                            <td className="p-6">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold shrink-0">
+                                                        <FileText size={20} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleExpandName(bill.id)}
+                                                            className={`font-bold text-navy text-sm text-left hover:text-primary transition-colors cursor-pointer ${
+                                                                isExpanded ? 'whitespace-normal break-words' : 'truncate max-w-[200px] lg:max-w-xs xl:max-w-md block'
+                                                            }`}
+                                                            title="Clic para ver nombre completo"
+                                                        >
+                                                            {cleanTitle}
+                                                        </button>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <p className="text-xs text-secondary opacity-60">
+                                                                {bill.invoiceNumber ? `Factura: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
+                                                            </p>
+                                                            {bill.supportFile && (
+                                                                <button
+                                                                    onClick={() => openSupportModal(bill.supportFile, bill.supportFileName)}
+                                                                    className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer select-none"
+                                                                    title="Ver documento de soporte"
+                                                                >
+                                                                    Soporte
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <p className="font-bold text-navy text-sm">{bill.title}</p>
-                                                        {Array.isArray(bill.items) && bill.items.length > 0 && (
-                                                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-md font-bold">
-                                                                {bill.items.length} {bill.items.length === 1 ? 'producto' : 'productos'}
-                                                            </span>
+                                            </td>
+                                            <td className="p-6">
+                                                <p className="text-sm font-medium text-secondary">{bill.provider || '-'}</p>
+                                            </td>
+                                            <td className="p-6">
+                                                <div className="flex items-start gap-2 text-secondary text-sm">
+                                                    <CalendarIcon size={16} className="opacity-60 mt-0.5" />
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-navy text-xs" title="Fecha de Vencimiento">Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}</span>
+                                                        {bill.invoiceDate && (
+                                                            <span className="text-[10px] text-secondary opacity-60 font-semibold" title="Fecha de Facturación">Factura: {new Date(bill.invoiceDate + 'T12:00:00').toLocaleDateString()}</span>
                                                         )}
-                                                        {bill.category && (
-                                                            <span className="bg-slate-100 text-secondary border border-gray-200 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                                                                {bill.category}
-                                                            </span>
-                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-6">
+                                                {bill.status === 'COMPLETED' || bill.status === 'PAID' ? (
+                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-success">
+                                                        <CheckCircle size={12} /> Pagado
+                                                    </span>
+                                                ) : bill.status === 'PARTIAL' ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-primary border border-indigo-100/50 w-fit">
+                                                            <Clock size={10} /> Abonado: {formatCurrency(bill.paidAmount || 0)}
+                                                        </span>
+                                                        <span className="text-[10px] text-secondary opacity-60 font-semibold pl-1">
+                                                            Pendiente: {formatCurrency(bill.amount - (bill.paidAmount || 0))}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-warning">
+                                                        <Clock size={12} /> Pendiente
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                <p className="font-bold text-navy">{formatCurrency(bill.amount)}</p>
+                                            </td>
+                                            <td className="p-6 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => setSelectedPurchaseForReceipt(bill)}
+                                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs select-none"
+                                                        title="Ver detalle y reimprimir comprobante de compra"
+                                                    >
+                                                        <Printer size={13} />
+                                                        <span className="hidden sm:inline">Reimprimir</span>
+                                                    </button>
+                                                    {(bill.status !== 'PAID' && bill.status !== 'COMPLETED') && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedBillForAbono(bill);
+                                                                setShowAbonoModal(true);
+                                                            }}
+                                                            className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer select-none"
+                                                            title="Registrar Pago de Abono"
+                                                        >
+                                                            <Landmark size={12} />
+                                                            Abonar
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => handleDelete(bill.id)}
+                                                        className="p-2 text-gray-300 hover:text-danger hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                        title="Eliminar factura"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Vista Móvil (Cards) */}
+                <div className="block md:hidden">
+                    {loading ? (
+                        <div className="p-8 text-center text-secondary opacity-50 text-sm">Cargando facturas...</div>
+                    ) : filteredBills.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <div className="flex flex-col items-center gap-3 opacity-40">
+                                <FileText size={40} />
+                                <p className="font-medium text-secondary text-sm">
+                                    {bills.length === 0 ? "No hay facturas registradas" : "No hay facturas que coincidan con el filtro"}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-gray-100">
+                            {filteredBills.map((bill) => {
+                                const cleanTitle = getCleanTitle(bill);
+                                const isExpanded = expandedNameIds.has(bill.id);
+                                const isPaid = bill.status === 'COMPLETED' || bill.status === 'PAID';
+                                const isPartial = bill.status === 'PARTIAL';
+                                const pendingAmount = bill.amount - (bill.paidAmount || 0);
+
+                                return (
+                                    <div key={bill.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/40 transition-colors">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-start gap-2.5 min-w-0">
+                                                <div className="w-9 h-9 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold shrink-0 mt-0.5">
+                                                    <FileText size={18} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleExpandName(bill.id)}
+                                                        className={`font-bold text-navy text-sm text-left hover:text-primary transition-colors cursor-pointer ${
+                                                            isExpanded ? 'whitespace-normal break-words' : 'truncate max-w-[200px] block'
+                                                        }`}
+                                                        title="Clic para ver nombre completo"
+                                                    >
+                                                        {cleanTitle}
+                                                    </button>
+                                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                        <span className="text-xs text-secondary opacity-60">
+                                                            {bill.invoiceNumber ? `Fac: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
+                                                        </span>
                                                         {bill.supportFile && (
                                                             <button
+                                                                type="button"
                                                                 onClick={() => openSupportModal(bill.supportFile, bill.supportFileName)}
-                                                                className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer select-none"
-                                                                title="Ver documento de soporte"
+                                                                className="text-primary inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer"
                                                             >
                                                                 Soporte
                                                             </button>
                                                         )}
                                                     </div>
-                                                     <p className="text-xs text-secondary opacity-60">
-                                                         {bill.invoiceNumber ? `Factura: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
-                                                     </p>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="p-6">
-                                            <p className="text-sm font-medium text-secondary">{bill.provider || '-'}</p>
-                                        </td>
-                                        <td className="p-6">
-                                            <div className="flex items-start gap-2 text-secondary text-sm">
-                                                <CalendarIcon size={16} className="opacity-60 mt-0.5" />
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-navy text-xs" title="Fecha de Vencimiento">Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}</span>
-                                                    {bill.invoiceDate && (
-                                                        <span className="text-[10px] text-secondary opacity-60 font-semibold" title="Fecha de Facturación">Factura: {new Date(bill.invoiceDate + 'T12:00:00').toLocaleDateString()}</span>
-                                                    )}
-                                                </div>
+                                            <div className="shrink-0">
+                                                {isPaid ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-success">
+                                                        <CheckCircle size={11} /> Pagado
+                                                    </span>
+                                                ) : isPartial ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-primary border border-indigo-100">
+                                                        <Clock size={10} /> Abonado
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-warning">
+                                                        <Clock size={11} /> Pendiente
+                                                    </span>
+                                                )}
                                             </div>
-                                        </td>
-                                        <td className="p-6">
-                                            {bill.status === 'COMPLETED' || bill.status === 'PAID' ? (
-                                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-success">
-                                                    <CheckCircle size={12} /> Pagado
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-xs bg-gray-50/60 p-2.5 rounded-xl border border-gray-100/80">
+                                            <div className="flex flex-col text-secondary">
+                                                <span className="font-bold text-navy text-[11px]">
+                                                    Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}
                                                 </span>
-                                            ) : bill.status === 'PARTIAL' ? (
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-primary border border-indigo-100/50 w-fit">
-                                                        <Clock size={10} /> Abonado: {formatCurrency(bill.paidAmount || 0)}
+                                                {bill.invoiceDate && (
+                                                    <span className="text-[10px] opacity-60">
+                                                        Emisión: {new Date(bill.invoiceDate + 'T12:00:00').toLocaleDateString()}
                                                     </span>
-                                                    <span className="text-[10px] text-secondary opacity-60 font-semibold pl-1">
-                                                        Pendiente: {formatCurrency(bill.amount - (bill.paidAmount || 0))}
-                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-black text-navy text-sm">
+                                                    {formatCurrency(bill.amount)}
                                                 </div>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-warning">
-                                                    <Clock size={12} /> Pendiente
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="p-6 text-right">
-                                            <p className="font-bold text-navy">{formatCurrency(bill.amount)}</p>
-                                        </td>
-                                        <td className="p-6 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                                {isPartial && (
+                                                    <div className="text-[10px] text-warning font-bold">
+                                                        Resta: {formatCurrency(pendingAmount)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-2 pt-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
                                                 <button
+                                                    type="button"
                                                     onClick={() => setSelectedPurchaseForReceipt(bill)}
-                                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs select-none"
-                                                    title="Ver detalle y reimprimir comprobante de compra"
+                                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                                                 >
-                                                    <Printer size={13} />
-                                                    <span className="hidden sm:inline">Reimprimir</span>
+                                                    <Printer size={12} />
+                                                    <span>Reimprimir</span>
                                                 </button>
-                                                {(bill.status !== 'PAID' && bill.status !== 'COMPLETED') && (
+                                                {!isPaid && (
                                                     <button
+                                                        type="button"
                                                         onClick={() => {
                                                             setSelectedBillForAbono(bill);
                                                             setShowAbonoModal(true);
                                                         }}
-                                                        className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer select-none"
-                                                        title="Registrar Pago de Abono"
+                                                        className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer"
                                                     >
                                                         <Landmark size={12} />
-                                                        Abonar
+                                                        <span>Abonar</span>
                                                     </button>
                                                 )}
-                                                <button
-                                                    onClick={() => handleDelete(bill.id)}
-                                                    className="p-2 text-gray-300 hover:text-danger hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-                                                    title="Eliminar factura"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDelete(bill.id)}
+                                                className="p-1.5 text-gray-300 hover:text-danger hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                                                title="Eliminar factura"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
 
