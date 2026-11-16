@@ -7,6 +7,7 @@ import ExpenseFormModal from '../components/ExpenseFormModal';
 import AbonoFormModal from '../components/AbonoFormModal';
 import RecurringExpensesModal from '../components/RecurringExpensesModal';
 import PurchaseReceiptModal from '../components/PurchaseReceiptModal';
+import SupportViewerModal from '../components/SupportViewerModal';
 
 const Invoices = () => {
     const navigate = useNavigate();
@@ -386,64 +387,13 @@ const Invoices = () => {
                 onAbonoAdded={fetchBills}
             />
 
-            {/* Support Document Modal */}
+            {/* Support Document Modal with Interactive Zoom & Pan */}
             {showSupportModal && activeSupportFile && (
-                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl animate-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                        {/* Header */}
-                        <div className="flex justify-between items-center p-6 border-b border-gray-100 flex-shrink-0">
-                            <div>
-                                <h3 className="text-lg font-bold text-navy flex items-center gap-2">
-                                    Documento de Soporte
-                                </h3>
-                                <p className="text-xs text-secondary opacity-60 mt-0.5 truncate max-w-lg">
-                                    {activeSupportFileName}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => {
-                                        const link = document.createElement('a');
-                                        link.href = activeSupportFile;
-                                        link.download = activeSupportFileName || 'soporte_factura';
-                                        link.click();
-                                    }}
-                                    className="px-3 py-1.5 bg-primary text-white hover:bg-primary-dark rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    Descargar
-                                </button>
-                                <button 
-                                    onClick={closeSupportModal} 
-                                    className="p-2 rounded-full text-secondary hover:bg-gray-100 transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                        </div>
-                        
-                        {/* Body (Preview) */}
-                        <div className="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center">
-                            {activeSupportFile.startsWith('data:application/pdf') ? (
-                                <iframe 
-                                    src={activeSupportFile} 
-                                    className="w-full h-[65vh] rounded-xl border border-gray-200 bg-white animate-fade-in" 
-                                    title="Soporte PDF"
-                                />
-                            ) : (
-                                <img 
-                                    src={activeSupportFile} 
-                                    alt="Documento Soporte" 
-                                    className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-md bg-white border border-gray-100 animate-fade-in"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.style.display = 'none';
-                                        alert('No se pudo previsualizar la imagen.');
-                                    }}
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <SupportViewerModal
+                    file={activeSupportFile}
+                    fileName={activeSupportFileName}
+                    onClose={closeSupportModal}
+                />
             )}
 
             {showRecurringModal && (
