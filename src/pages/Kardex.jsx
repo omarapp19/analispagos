@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Search, Calendar, Filter, ArrowUpRight, ArrowDownLeft, RefreshCw, Layers } from 'lucide-react';
+import { Search, Calendar, Filter, ArrowUpRight, ArrowDownLeft, RefreshCw, Layers, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { api } from '../services/api';
 
 const Kardex = () => {
@@ -9,6 +9,8 @@ const Kardex = () => {
     const [selectedProduct, setSelectedProduct] = useState('all');
     const [selectedType, setSelectedType] = useState('all'); // 'all' | 'ENTRADA' | 'SALIDA'
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
 
     const fetchData = async () => {
         setLoading(true);
@@ -40,6 +42,33 @@ const Kardex = () => {
         
         return matchesProduct && matchesType && matchesSearch;
     });
+
+    // Reset pagination to page 1 on filter or page size changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedProduct, selectedType, pageSize]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+    const safePage = Math.min(currentPage, totalPages);
+    const startIndex = (safePage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredEntries.length);
+    const paginatedEntries = filteredEntries.slice(startIndex, endIndex);
+
+    const getPageNumbers = () => {
+        const pages = [];
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            if (safePage > 3) pages.push('...');
+            const start = Math.max(2, safePage - 1);
+            const end = Math.min(totalPages - 1, safePage + 1);
+            for (let i = start; i <= end; i++) pages.push(i);
+            if (safePage < totalPages - 2) pages.push('...');
+            pages.push(totalPages);
+        }
+        return pages;
+    };
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
@@ -149,7 +178,7 @@ const Kardex = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredEntries.map((entry) => {
+                                paginatedEntries.map((entry) => {
                                     const entryDate = new Date(entry.date);
                                     const dateStr = entryDate.toLocaleDateString() + ' ' + entryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                     const isEntrada = entry.type === 'ENTRADA';
@@ -198,6 +227,89 @@ const Kardex = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Table Pagination Footer */}
+                {!loading && filteredEntries.length > 0 && (
+                    <div className="p-4 sm:px-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/40 text-xs">
+                        <div className="flex items-center gap-3 text-secondary font-medium">
+                            <span>
+                                Mostrando <strong className="text-navy">{filteredEntries.length === 0 ? 0 : startIndex + 1}</strong> al <strong className="text-navy">{endIndex}</strong> de <strong className="text-navy">{filteredEntries.length}</strong> movimientos
+                            </span>
+                            <span className="text-gray-300">•</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] opacity-70">Filas:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => setPageSize(Number(e.target.value))}
+                                    className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-bold text-navy outline-none cursor-pointer focus:border-primary text-xs shadow-xs"
+                                >
+                                    <option value={15}>15</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={safePage === 1}
+                                    className="p-1.5 rounded-lg border border-gray-200 bg-white text-secondary hover:text-navy hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                                    title="Primera página"
+                                >
+                                    <ChevronsLeft size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={safePage === 1}
+                                    className="p-1.5 rounded-lg border border-gray-200 bg-white text-secondary hover:text-navy hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                                    title="Página anterior"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+
+                                <div className="flex items-center gap-1 mx-1">
+                                    {getPageNumbers().map((p, idx) => (
+                                        p === '...' ? (
+                                            <span key={`ellipsis-${idx}`} className="px-2 py-1 text-secondary opacity-50 select-none">...</span>
+                                        ) : (
+                                            <button
+                                                key={`page-${p}`}
+                                                onClick={() => setCurrentPage(p)}
+                                                className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                    safePage === p
+                                                        ? 'bg-primary text-white shadow-xs'
+                                                        : 'bg-white border border-gray-200 text-secondary hover:text-navy hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        )
+                                    ))}
+                                </div>
+
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safePage === totalPages}
+                                    className="p-1.5 rounded-lg border border-gray-200 bg-white text-secondary hover:text-navy hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                                    title="Página siguiente"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={safePage === totalPages}
+                                    className="p-1.5 rounded-lg border border-gray-200 bg-white text-secondary hover:text-navy hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                                    title="Última página"
+                                >
+                                    <ChevronsRight size={16} />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
