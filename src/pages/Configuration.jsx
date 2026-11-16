@@ -433,6 +433,26 @@ const Configuration = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="pt-4 border-t border-gray-100">
+                                <label className="flex items-start gap-3 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        name="includeDivisas"
+                                        checked={settings.includeDivisas ?? true}
+                                        onChange={(e) => setSettings({ ...settings, includeDivisas: e.target.checked })}
+                                        className="mt-1 h-4 w-4 rounded text-primary focus:ring-primary border-gray-300 cursor-pointer"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-bold text-navy block">
+                                            Incluir divisas en efectivo en el saldo disponible en caja
+                                        </span>
+                                        <span className="text-xs text-secondary opacity-75">
+                                            Al estar activo, todos los cobros y pagos recibidos en divisas en efectivo (USD) se suman al saldo total disponible en caja en el dashboard y estadísticas.
+                                        </span>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
 
 

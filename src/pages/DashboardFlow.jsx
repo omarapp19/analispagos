@@ -41,7 +41,7 @@ const DashboardFlow = () => {
             setSettings({
                 storeName: sData?.storeName || '',
                 adminName: sData?.adminName || getDisplayName(''),
-                includeDivisas: !!sData?.includeDivisas,
+                includeDivisas: sData?.includeDivisas ?? true,
             });
             setTransactions(txData || []);
             setBills(billData || []);
@@ -55,10 +55,13 @@ const DashboardFlow = () => {
     useEffect(() => { fetchData(); }, []);
 
     const m = useMemo(() => {
-        const valid = settings.includeDivisas ? transactions : transactions.filter((t) => t.method !== 'Divisas');
+        const valid = (settings.includeDivisas !== false)
+            ? transactions
+            : transactions.filter((t) => (t.method || '').toLowerCase() !== 'divisas');
         const sum = (arr, type) => arr.filter((t) => t.type === type).reduce((a, t) => a + (Number(t.amount) || 0), 0);
         const balance = sum(valid, 'INCOME') - sum(valid, 'EXPENSE');
-        const divisas = sum(transactions.filter((t) => t.method === 'Divisas'), 'INCOME');
+        const divisasTxs = transactions.filter((t) => (t.method || '').toLowerCase() === 'divisas');
+        const divisas = sum(divisasTxs, 'INCOME') - sum(divisasTxs, 'EXPENSE');
 
         const now = new Date();
         const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

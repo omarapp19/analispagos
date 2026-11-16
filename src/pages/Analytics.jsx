@@ -19,11 +19,11 @@ const Analytics = () => {
     const fetchData = async () => {
         try {
             // Fetch Settings
-            let settingsInclude = false;
+            let settingsInclude = true;
             try {
                 const globalSettings = await api.getSettings('global_settings');
-                if (globalSettings) {
-                    settingsInclude = globalSettings.includeDivisas || false;
+                if (globalSettings && globalSettings.includeDivisas !== undefined) {
+                    settingsInclude = globalSettings.includeDivisas;
                 }
             } catch (err) {
                 console.warn("Could not fetch settings", err);
@@ -36,9 +36,9 @@ const Analytics = () => {
             ]);
 
             // Filter for Balance Calculation
-            const validTxs = settingsInclude
+            const validTxs = (settingsInclude !== false)
                 ? txData
-                : txData.filter(tx => tx.method !== 'Divisas');
+                : txData.filter(tx => (tx.method || '').toLowerCase() !== 'divisas');
 
             setBills(billsRes);
 
