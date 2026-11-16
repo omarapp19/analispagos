@@ -1,11 +1,12 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark, Filter, Search, X } from 'lucide-react';
+import { Plus, FileText, Calendar as CalendarIcon, CheckCircle, Clock, Trash2, Landmark, Filter, Search, X, Printer, ShoppingBag, Eye } from 'lucide-react';
 import { api } from '../services/api';
 import BillFormModal from '../components/BillFormModal';
 import ExpenseFormModal from '../components/ExpenseFormModal';
 import AbonoFormModal from '../components/AbonoFormModal';
 import RecurringExpensesModal from '../components/RecurringExpensesModal';
+import PurchaseReceiptModal from '../components/PurchaseReceiptModal';
 
 const Invoices = () => {
     const navigate = useNavigate();
@@ -16,6 +17,8 @@ const Invoices = () => {
     const [showAbonoModal, setShowAbonoModal] = useState(false);
     const [showRecurringModal, setShowRecurringModal] = useState(false);
     const [selectedBillForAbono, setSelectedBillForAbono] = useState(null);
+    const [selectedPurchaseForReceipt, setSelectedPurchaseForReceipt] = useState(null);
+    const [typeFilter, setTypeFilter] = useState('ALL'); // 'ALL' | 'PURCHASES' | 'EXPENSES'
     const [filter, setFilter] = useState('ALL'); // 'ALL' | 'PENDING_DESC' | 'PAID'
     const [searchTerm, setSearchTerm] = useState('');
     const [showSupportModal, setShowSupportModal] = useState(false);
@@ -65,9 +68,24 @@ const Invoices = () => {
         }
     };
 
+    const counts = useMemo(() => {
+        let purchases = 0;
+        let expenses = 0;
+        bills.forEach(b => {
+            const isPurchase = (Array.isArray(b.items) && b.items.length > 0) || (b.title || '').toLowerCase().includes('compra');
+            if (isPurchase) purchases++;
+            else expenses++;
+        });
+        return { total: bills.length, purchases, expenses };
+    }, [bills]);
+
     const filteredBills = useMemo(() => {
         // Filter by provider or details search term
         const searched = bills.filter(b => {
+            const isPurchase = (Array.isArray(b.items) && b.items.length > 0) || (b.title || '').toLowerCase().includes('compra');
+            if (typeFilter === 'PURCHASES' && !isPurchase) return false;
+            if (typeFilter === 'EXPENSES' && isPurchase) return false;
+
             const term = searchTerm.toLowerCase().trim();
             if (!term) return true;
             return (
@@ -93,7 +111,7 @@ const Invoices = () => {
             // 'ALL' -> pending de mayor a menor first, paid at the end
             return [...sortedPending, ...sortedPaid];
         }
-    }, [bills, filter, searchTerm]);
+    }, [bills, typeFilter, filter, searchTerm]);
 
     return (
         <div className="flex flex-col h-full gap-8">
@@ -130,11 +148,46 @@ const Invoices = () => {
 
             <div className="card flex-1 overflow-hidden flex flex-col p-0 bg-white shadow-card rounded-3xl">
                 {/* Filter Toolbar */}
-                <div className="p-4 px-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/20">
-                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-                        <div className="text-sm font-bold text-navy whitespace-nowrap">
-                            Facturas: {filteredBills.length}
+                <div className="p-4 px-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-center gap-4 bg-gray-50/20">
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                        {/* Quick Type Filter Tabs */}
+                        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-full sm:w-auto overflow-x-auto">
+                            <button
+                                type="button"
+                                onClick={() => setTypeFilter('ALL')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                    typeFilter === 'ALL'
+                                        ? 'bg-white text-navy shadow-xs'
+                                        : 'text-secondary hover:text-navy'
+                                }`}
+                            >
+                                Todas ({counts.total})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTypeFilter('PURCHASES')}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                                    typeFilter === 'PURCHASES'
+                                        ? 'bg-navy text-white shadow-xs'
+                                        : 'text-secondary hover:text-navy'
+                                }`}
+                            >
+                                <ShoppingBag size={13} />
+                                Compras ({counts.purchases})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTypeFilter('EXPENSES')}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                    typeFilter === 'EXPENSES'
+                                        ? 'bg-white text-navy shadow-xs'
+                                        : 'text-secondary hover:text-navy'
+                                }`}
+                            >
+                                Gastos ({counts.expenses})
+                            </button>
                         </div>
+
                         {/* Search Input for Provider / Details */}
                         <div className="relative w-full sm:w-64">
                             <input 
@@ -147,7 +200,11 @@ const Invoices = () => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary opacity-40" size={14} />
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+
+                    <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
+                        <div className="text-xs font-bold text-secondary whitespace-nowrap">
+                            Mostrando: <strong className="text-navy">{filteredBills.length}</strong>
+                        </div>
                         <div className="relative flex items-center bg-background rounded-xl px-3 py-2 border border-gray-200 text-xs font-bold text-secondary w-full sm:w-auto">
                             <Filter size={14} className="text-primary mr-2" />
                             <select 
@@ -202,6 +259,11 @@ const Invoices = () => {
                                                 <div>
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <p className="font-bold text-navy text-sm">{bill.title}</p>
+                                                        {Array.isArray(bill.items) && bill.items.length > 0 && (
+                                                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-md font-bold">
+                                                                {bill.items.length} {bill.items.length === 1 ? 'producto' : 'productos'}
+                                                            </span>
+                                                        )}
                                                         {bill.category && (
                                                             <span className="bg-slate-100 text-secondary border border-gray-200 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">
                                                                 {bill.category}
@@ -261,7 +323,15 @@ const Invoices = () => {
                                             <p className="font-bold text-navy">{formatCurrency(bill.amount)}</p>
                                         </td>
                                         <td className="p-6 text-right">
-                                            <div className="flex items-center justify-end gap-3">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => setSelectedPurchaseForReceipt(bill)}
+                                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs select-none"
+                                                    title="Ver detalle y reimprimir comprobante de compra"
+                                                >
+                                                    <Printer size={13} />
+                                                    <span className="hidden sm:inline">Reimprimir</span>
+                                                </button>
                                                 {(bill.status !== 'PAID' && bill.status !== 'COMPLETED') && (
                                                     <button
                                                         onClick={() => {
@@ -381,6 +451,15 @@ const Invoices = () => {
                     onClose={() => setShowRecurringModal(false)}
                     onExpenseAdded={fetchBills}
                     existingBills={bills}
+                />
+            )}
+
+            {/* Purchase Receipt & Print Modal */}
+            {selectedPurchaseForReceipt && (
+                <PurchaseReceiptModal
+                    purchase={selectedPurchaseForReceipt}
+                    onClose={() => setSelectedPurchaseForReceipt(null)}
+                    onOpenSupport={openSupportModal}
                 />
             )}
         </div>

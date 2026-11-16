@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Calendar, FileText, CheckCircle, Clock, AlertTriangle, Landmark, Trash2 } from 'lucide-react';
+import { Search, Calendar, FileText, CheckCircle, Clock, AlertTriangle, Landmark, Trash2, Printer } from 'lucide-react';
 import { api } from '../services/api';
 import AbonoFormModal from '../components/AbonoFormModal';
+import PurchaseReceiptModal from '../components/PurchaseReceiptModal';
 
 const CuentasPorPagar = () => {
     const [bills, setBills] = useState([]);
@@ -11,6 +12,7 @@ const CuentasPorPagar = () => {
     // Abono modal state
     const [showAbonoModal, setShowAbonoModal] = useState(false);
     const [selectedBillForAbono, setSelectedBillForAbono] = useState(null);
+    const [selectedPurchaseForReceipt, setSelectedPurchaseForReceipt] = useState(null);
 
     const fetchBills = async () => {
         setLoading(true);
@@ -171,17 +173,27 @@ const CuentasPorPagar = () => {
                                                 {formatCurrency(remaining)}
                                             </td>
                                             <td className="p-6 text-center">
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedBillForAbono(bill);
-                                                        setShowAbonoModal(true);
-                                                    }}
-                                                    className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer"
-                                                    title="Registrar Abono"
-                                                >
-                                                    <Landmark size={12} />
-                                                    Abonar
-                                                </button>
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => setSelectedPurchaseForReceipt(bill)}
+                                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer select-none"
+                                                        title="Ver detalle y reimprimir comprobante"
+                                                    >
+                                                        <Printer size={13} />
+                                                        <span className="hidden sm:inline">Reimprimir</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedBillForAbono(bill);
+                                                            setShowAbonoModal(true);
+                                                        }}
+                                                        className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer"
+                                                        title="Registrar Abono"
+                                                    >
+                                                        <Landmark size={12} />
+                                                        Abonar
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -201,6 +213,13 @@ const CuentasPorPagar = () => {
                 }}
                 onAbonoAdded={fetchBills}
             />
+
+            {selectedPurchaseForReceipt && (
+                <PurchaseReceiptModal
+                    purchase={selectedPurchaseForReceipt}
+                    onClose={() => setSelectedPurchaseForReceipt(null)}
+                />
+            )}
         </div>
     );
 };
