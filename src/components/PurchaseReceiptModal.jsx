@@ -14,6 +14,7 @@ export default function PurchaseReceiptModal({ purchase, onClose, onOpenSupport 
         storePhone: ''
     });
     const [providerInfo, setProviderInfo] = useState(null);
+    const [showInlineSupport, setShowInlineSupport] = useState(false);
 
     useEffect(() => {
         api.getSettings('global_settings').then(s => {
@@ -77,7 +78,7 @@ export default function PurchaseReceiptModal({ purchase, onClose, onOpenSupport 
                                     if (onOpenSupport) {
                                         onOpenSupport(purchase.supportFile, purchase.supportFileName);
                                     } else {
-                                        window.open(purchase.supportFile, '_blank');
+                                        setShowInlineSupport(true);
                                     }
                                 }}
                                 className="px-3 py-1.5 bg-blue-50 text-primary hover:bg-blue-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
@@ -354,6 +355,60 @@ export default function PurchaseReceiptModal({ purchase, onClose, onOpenSupport 
                     }
                 `}} />
             </div>
+
+            {/* Inline Support Modal when onOpenSupport is not provided */}
+            {showInlineSupport && purchase.supportFile && (
+                <div 
+                    onClick={() => setShowInlineSupport(false)}
+                    className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in"
+                >
+                    <div 
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in duration-200"
+                    >
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-150">
+                            <div>
+                                <h3 className="text-sm font-black text-navy uppercase tracking-wider">
+                                    Documento Soporte Original
+                                </h3>
+                                <p className="text-xs text-secondary opacity-70 mt-0.5">
+                                    {purchase.supportFileName || (purchase.invoiceNumber ? `Factura_${purchase.invoiceNumber}.jpg` : 'soporte.jpg')}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={purchase.supportFile}
+                                    download={purchase.supportFileName || `Factura_${purchase.invoiceNumber || 'soporte'}.jpg`}
+                                    className="px-3 py-1.5 bg-primary text-white hover:bg-primary-dark rounded-xl text-xs font-black transition-all flex items-center gap-1.5"
+                                >
+                                    Descargar
+                                </a>
+                                <button
+                                    onClick={() => setShowInlineSupport(false)}
+                                    className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-secondary hover:text-navy transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4 bg-slate-900/5 flex items-center justify-center">
+                            {purchase.supportFile.startsWith('data:application/pdf') ? (
+                                <iframe 
+                                    src={purchase.supportFile} 
+                                    className="w-full h-[70vh] rounded-xl border border-gray-200 bg-white" 
+                                    title="Soporte PDF"
+                                />
+                            ) : (
+                                <img 
+                                    src={purchase.supportFile} 
+                                    alt="Soporte de Factura" 
+                                    className="max-w-full max-h-[72vh] object-contain rounded-xl shadow-lg bg-white border border-gray-200"
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
