@@ -93,7 +93,7 @@ const MainLayout = () => {
                 </header>
 
                 <main className="flex-1 overflow-y-auto">
-                    <div className="mx-auto w-full max-w-[1480px] px-4 py-5 md:px-8 md:py-7">
+                    <div className="mx-auto w-full max-w-[1480px] px-3 py-4 sm:px-4 sm:py-5 md:px-8 md:py-7">
                         <Outlet />
                     </div>
                 </main>

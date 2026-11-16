@@ -12,8 +12,11 @@ export default defineConfig({
         name: 'Analista de Pagos',
         short_name: 'AnalistaPagos',
         description: 'Gestión inteligente de flujos y pagos',
-        theme_color: '#0A1128',
-        background_color: '#F4F6FA',
+        theme_color: '#15171A',
+        background_color: '#F4F1EA',
+        display: 'standalone',
+        orientation: 'portrait-primary',
+        start_url: '/',
         icons: [
           {
             src: 'pwa-192x192.png',

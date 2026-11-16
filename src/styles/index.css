@@ -132,6 +132,8 @@
 @layer base {
     html {
         -webkit-text-size-adjust: 100%;
+        touch-action: pan-x pan-y;
+        overscroll-behavior-y: none;
     }
 
     body {
@@ -139,6 +141,8 @@
         font-size: 15px;
         font-feature-settings: "cv11", "ss01";
         margin: 0;
+        touch-action: pan-x pan-y;
+        overscroll-behavior-y: none;
     }
 
     h1, h2, h3, h4, h5, h6 {
@@ -563,4 +567,13 @@ main td[colspan] svg { opacity: 0.45; }
 @media (max-width: 1023px) {
     main :has(> table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     main table { min-width: 680px; }
+}
+
+/* Hide scrollbar for clean horizontal tab lists */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }

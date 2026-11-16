@@ -130,48 +130,50 @@ const Invoices = () => {
     }, [bills, typeFilter, filter, searchTerm]);
 
     return (
-        <div className="flex flex-col h-full gap-8">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <div className="flex flex-col h-full gap-4 sm:gap-6 lg:gap-8">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-navy">Facturas (Gastos)</h1>
-                    <p className="text-secondary opacity-60">Gestión de gastos, compras a proveedores y cuentas por pagar</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-navy">Facturas (Gastos)</h1>
+                    <p className="text-xs sm:text-sm text-secondary opacity-60">Gestión de gastos, compras a proveedores y cuentas por pagar</p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
                     <button
                         onClick={() => navigate('/compras/nueva')}
-                        className="btn btn-primary"
+                        className="btn btn-primary col-span-2 sm:col-span-1 justify-center py-2 text-xs sm:text-sm font-bold shadow-xs"
                     >
                         <Plus size={16} />
                         Nueva compra
                     </button>
                     <button
                         onClick={() => setShowExpenseModal(true)}
-                        className="btn btn-outline"
+                        className="btn btn-outline justify-center py-2 text-xs sm:text-sm font-bold"
                         title="Nómina, servicios y otros gastos"
                     >
                         <Plus size={16} />
-                        Registrar gasto
+                        <span className="sm:inline hidden">Registrar gasto</span>
+                        <span className="sm:hidden inline">Gasto</span>
                     </button>
                     <button
                         onClick={() => setShowRecurringModal(true)}
-                        className="btn btn-outline"
+                        className="btn btn-outline justify-center py-2 text-xs sm:text-sm font-bold"
                     >
                         <CalendarIcon size={16} />
-                        Gastos fijos
+                        <span className="sm:inline hidden">Gastos fijos</span>
+                        <span className="sm:hidden inline">Fijos</span>
                     </button>
                 </div>
             </div>
 
-            <div className="card flex-1 overflow-hidden flex flex-col p-0 bg-white shadow-card rounded-3xl">
+            <div className="card flex-1 overflow-hidden flex flex-col p-0 bg-white shadow-card rounded-2xl sm:rounded-3xl border border-gray-100">
                 {/* Filter Toolbar */}
-                <div className="p-4 px-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-center gap-4 bg-gray-50/20">
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                <div className="p-3 sm:p-4 md:px-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-gray-50/30">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
                         {/* Quick Type Filter Tabs */}
-                        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-full sm:w-auto overflow-x-auto">
+                        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar">
                             <button
                                 type="button"
                                 onClick={() => setTypeFilter('ALL')}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                className={`flex-1 sm:flex-initial text-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                                     typeFilter === 'ALL'
                                         ? 'bg-white text-navy shadow-xs'
                                         : 'text-secondary hover:text-navy'
@@ -182,7 +184,7 @@ const Invoices = () => {
                             <button
                                 type="button"
                                 onClick={() => setTypeFilter('PURCHASES')}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                                className={`flex-1 sm:flex-initial text-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                                     typeFilter === 'PURCHASES'
                                         ? 'bg-navy text-white shadow-xs'
                                         : 'text-secondary hover:text-navy'
@@ -194,7 +196,7 @@ const Invoices = () => {
                             <button
                                 type="button"
                                 onClick={() => setTypeFilter('EXPENSES')}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                className={`flex-1 sm:flex-initial text-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                                     typeFilter === 'EXPENSES'
                                         ? 'bg-white text-navy shadow-xs'
                                         : 'text-secondary hover:text-navy'
@@ -217,18 +219,18 @@ const Invoices = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full lg:w-auto">
                         <div className="text-xs font-bold text-secondary whitespace-nowrap">
                             Mostrando: <strong className="text-navy">{filteredBills.length}</strong>
                         </div>
-                        <div className="relative flex items-center bg-background rounded-xl px-3 py-2 border border-gray-200 text-xs font-bold text-secondary w-full sm:w-auto">
-                            <Filter size={14} className="text-primary mr-2" />
+                        <div className="relative flex items-center bg-background rounded-xl px-2.5 py-1.5 border border-gray-200 text-xs font-bold text-secondary flex-1 sm:flex-initial justify-between sm:justify-start">
+                            <Filter size={13} className="text-primary mr-1.5 shrink-0" />
                             <select 
                                 value={filter} 
                                 onChange={(e) => setFilter(e.target.value)}
-                                className="bg-transparent focus:outline-none pr-4 cursor-pointer text-navy font-bold w-full sm:w-auto"
+                                className="bg-transparent focus:outline-none pr-2 cursor-pointer text-navy font-bold w-full sm:w-auto text-xs truncate"
                             >
-                                <option value="ALL">Todas · pendientes primero</option>
+                                <option value="ALL">Todas · pendientes</option>
                                 <option value="PENDING_DESC">Pendientes (Mayor a Menor)</option>
                                 <option value="PAID">Pagadas</option>
                             </select>
@@ -404,42 +406,35 @@ const Invoices = () => {
                                 const pendingAmount = bill.amount - (bill.paidAmount || 0);
 
                                 return (
-                                    <div key={bill.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/40 transition-colors">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex items-start gap-2.5 min-w-0">
+                                    <div key={bill.id} className="p-3.5 sm:p-4 flex flex-col gap-3 hover:bg-gray-50/40 transition-colors">
+                                        {/* Header de la tarjeta */}
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-2.5 min-w-0 flex-1">
                                                 <div className="w-9 h-9 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold shrink-0 mt-0.5">
                                                     <FileText size={18} />
                                                 </div>
-                                                <div className="min-w-0">
+                                                <div className="min-w-0 flex-1">
                                                     <button
                                                         type="button"
                                                         onClick={() => toggleExpandName(bill.id)}
-                                                        className={`font-bold text-navy text-sm text-left hover:text-primary transition-colors cursor-pointer ${
-                                                            isExpanded ? 'whitespace-normal break-words' : 'truncate max-w-[200px] block'
+                                                        className={`font-bold text-navy text-sm text-left hover:text-primary transition-colors cursor-pointer w-full leading-snug ${
+                                                            isExpanded ? 'whitespace-normal break-words' : 'truncate block'
                                                         }`}
-                                                        title="Clic para ver nombre completo"
+                                                        title="Toca para ver nombre completo"
                                                     >
                                                         {cleanTitle}
                                                     </button>
-                                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                                        <span className="text-xs text-secondary opacity-60">
-                                                            {bill.invoiceNumber ? `Fac: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
-                                                        </span>
-                                                        {bill.supportFile && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openSupportModal(bill.supportFile, bill.supportFileName)}
-                                                                className="text-primary inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer"
-                                                            >
-                                                                Soporte
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                    {bill.provider && bill.provider.toLowerCase() !== cleanTitle.toLowerCase() && (
+                                                        <p className="text-[11px] text-secondary opacity-75 truncate">{bill.provider}</p>
+                                                    )}
+                                                    <p className="text-[11px] text-secondary opacity-60 mt-0.5">
+                                                        {bill.invoiceNumber ? `Factura: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <div className="shrink-0">
+                                            <div className="shrink-0 mt-0.5">
                                                 {isPaid ? (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-success">
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-success border border-green-100">
                                                         <CheckCircle size={11} /> Pagado
                                                     </span>
                                                 ) : isPartial ? (
@@ -447,44 +442,57 @@ const Invoices = () => {
                                                         <Clock size={10} /> Abonado
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-warning">
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-warning border border-orange-100">
                                                         <Clock size={11} /> Pendiente
                                                     </span>
                                                 )}
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between text-xs bg-gray-50/60 p-2.5 rounded-xl border border-gray-100/80">
-                                            <div className="flex flex-col text-secondary">
-                                                <span className="font-bold text-navy text-[11px]">
-                                                    Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}
-                                                </span>
+                                        {/* Bloque Fechas y Monto */}
+                                        <div className="flex items-center justify-between text-xs bg-gray-50/70 p-2.5 rounded-xl border border-gray-100">
+                                            <div className="flex flex-col text-secondary gap-0.5">
+                                                <div className="flex items-center gap-1 text-[11px] font-bold text-navy">
+                                                    <CalendarIcon size={12} className="text-secondary opacity-60" />
+                                                    <span>Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}</span>
+                                                </div>
                                                 {bill.invoiceDate && (
-                                                    <span className="text-[10px] opacity-60">
+                                                    <span className="text-[10px] text-secondary opacity-60 pl-4">
                                                         Emisión: {new Date(bill.invoiceDate + 'T12:00:00').toLocaleDateString()}
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="text-right">
-                                                <div className="font-black text-navy text-sm">
+                                                <div className="font-black text-navy text-sm tabular-nums">
                                                     {formatCurrency(bill.amount)}
                                                 </div>
                                                 {isPartial && (
-                                                    <div className="text-[10px] text-warning font-bold">
+                                                    <div className="text-[10px] text-warning font-bold tabular-nums">
                                                         Resta: {formatCurrency(pendingAmount)}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between gap-2 pt-1">
+                                        {/* Acciones */}
+                                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-50">
                                             <div className="flex items-center gap-1.5 flex-wrap">
+                                                {bill.supportFile && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openSupportModal(bill.supportFile, bill.supportFileName)}
+                                                        className="h-8 px-2.5 bg-blue-50 hover:bg-blue-100 text-primary rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-blue-100"
+                                                    >
+                                                        <Eye size={13} />
+                                                        <span>Soporte</span>
+                                                    </button>
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => setSelectedPurchaseForReceipt(bill)}
-                                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                    className="h-8 px-2.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                                                 >
-                                                    <Printer size={12} />
+                                                    <Printer size={13} />
                                                     <span>Reimprimir</span>
                                                 </button>
                                                 {!isPaid && (
@@ -494,9 +502,9 @@ const Invoices = () => {
                                                             setSelectedBillForAbono(bill);
                                                             setShowAbonoModal(true);
                                                         }}
-                                                        className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer"
+                                                        className="h-8 px-3 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer"
                                                     >
-                                                        <Landmark size={12} />
+                                                        <Landmark size={13} />
                                                         <span>Abonar</span>
                                                     </button>
                                                 )}
@@ -504,7 +512,7 @@ const Invoices = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => handleDelete(bill.id)}
-                                                className="p-1.5 text-gray-300 hover:text-danger hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                                                className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-danger hover:bg-red-50 rounded-lg transition-all cursor-pointer shrink-0"
                                                 title="Eliminar factura"
                                             >
                                                 <Trash2 size={16} />
