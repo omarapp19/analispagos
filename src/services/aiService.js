@@ -74,7 +74,24 @@ export async function getBusinessSnapshot() {
         })
         .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
-    // Inventario
+    // Rotación de ventas por producto
+    const salesStats = {};
+    (clientInvoices || []).forEach(inv => {
+        if (inv.status === 'VOIDED') return;
+        const items = Array.isArray(inv.items) ? inv.items : [];
+        items.forEach(item => {
+            const pid = item.productId || item.id;
+            if (!pid) return;
+            const q = Number(item.quantity) || 0;
+            if (!salesStats[pid]) salesStats[pid] = { totalSold: 0 };
+            salesStats[pid].totalSold += q;
+        });
+    });
+    Object.keys(salesStats).forEach(pid => {
+        salesStats[pid].weeklyRate = Number((salesStats[pid].totalSold / (30 / 7)).toFixed(1));
+    });
+
+    // Inventario con detección inteligente de stock bajo por rotación
     const totalProducts = inventory.length;
     let totalStockUnits = 0;
     let totalCostValuation = 0;
@@ -92,8 +109,16 @@ export async function getBusinessSnapshot() {
 
         if (qty === 0) {
             outOfStock.push(p);
-        } else if (qty <= 5) {
-            lowStock.push(p);
+        } else {
+            const manualMin = Number(p.minStock) || 0;
+            const stat = salesStats[p.id];
+            const hasSales = stat && stat.totalSold > 0;
+            const weeklyRate = stat?.weeklyRate || 0;
+
+            const isLow = (manualMin > 0 && qty <= manualMin) || (hasSales && weeklyRate > 0 && qty < weeklyRate);
+            if (isLow) {
+                lowStock.push({ ...p, weeklyRate });
+            }
         }
     });
 

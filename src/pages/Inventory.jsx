@@ -37,6 +37,7 @@ const Inventory = () => {
 
     // Inventory Data States
     const [products, setProducts] = useState([]);
+    const [salesStats, setSalesStats] = useState({});
     const [publishingAll, setPublishingAll] = useState(false);
     const [quickImageProduct, setQuickImageProduct] = useState(null);
     const [quickImageUrl, setQuickImageUrl] = useState('');
@@ -106,9 +107,13 @@ const Inventory = () => {
         let isMounted = true;
         const fetchInventory = async () => {
             try {
-                const items = await api.getInventory();
+                const [items, stats] = await Promise.all([
+                    api.getInventory(),
+                    api.getProductSalesStats(30)
+                ]);
                 if (isMounted) {
                     setProducts(items);
+                    setSalesStats(stats || {});
                     setLoading(false);
                 }
             } catch (error) {
@@ -593,6 +598,24 @@ const Inventory = () => {
         return opts;
     }, [categories, categoryCounts, products.length]);
 
+    // Inteligencia de Stock basada en rotación de ventas
+    const isLowStock = React.useCallback((p) => {
+        const qty = Number(p.quantity) || 0;
+        if (qty <= 0) return false; // 0 unidades es 'Sin existencias', no bajo stock
+
+        // Stock mínimo fijado manualmente por el usuario
+        const manualMin = Number(p.minStock) || 0;
+        if (manualMin > 0 && qty <= manualMin) return true;
+
+        const stat = salesStats[p.id];
+        // Si no tiene ventas registradas, el stock se considera normal (baja rotación)
+        if (!stat || !stat.totalSold || stat.totalSold <= 0) return false;
+
+        // Si tiene ventas registradas: stock bajo si la existencia es menor a su venta semanal
+        const weeklyRate = stat.weeklyRate || 0;
+        return weeklyRate > 0 && qty < weeklyRate;
+    }, [salesStats]);
+
     // Calculations for KPIs
     const kpis = React.useMemo(() => {
         let totalItems = 0;
@@ -608,7 +631,7 @@ const Inventory = () => {
             
             if (p.quantity === 0) {
                 outOfStockCount++;
-            } else if (p.quantity <= 5) {
+            } else if (isLowStock(p)) {
                 lowStockCount++;
             }
         });
@@ -628,7 +651,7 @@ const Inventory = () => {
             outOfStockCount,
             uniqueProducts: products.length
         };
-    }, [products]);
+    }, [products, isLowStock]);
 
     // Filtering & Sorting Logic
     const processedProducts = React.useMemo(() => {
@@ -648,7 +671,7 @@ const Inventory = () => {
                 // Status filter match
                 let matchStatus = true;
                 if (statusFilter === 'low') {
-                    matchStatus = p.quantity > 0 && p.quantity <= 5;
+                    matchStatus = isLowStock(p);
                 } else if (statusFilter === 'empty') {
                     matchStatus = p.quantity === 0;
                 } else if (statusFilter === 'web') {
@@ -680,7 +703,7 @@ const Inventory = () => {
                 if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
                 return 0;
             });
-    }, [products, searchTerm, statusFilter, selectedCategory, sortBy, sortOrder, categoryMap]);
+    }, [products, searchTerm, statusFilter, selectedCategory, sortBy, sortOrder, categoryMap, isLowStock]);
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
@@ -964,19 +987,19 @@ const Inventory = () => {
                             onClick={() => setStatusFilter('all')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'all' ? 'bg-white text-primary shadow-sm' : 'text-secondary opacity-60 hover:opacity-100'}`}
                         >
-                            Todos
+                            Todos ({products.length})
                         </button>
                         <button 
                             onClick={() => setStatusFilter('low')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'low' ? 'bg-white text-warning shadow-sm' : 'text-secondary opacity-60 hover:opacity-100'}`}
                         >
-                            Stock Bajo (≤5)
+                            Stock Bajo {kpis.lowStockCount > 0 ? `(${kpis.lowStockCount})` : ''}
                         </button>
                         <button
                             onClick={() => setStatusFilter('empty')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statusFilter === 'empty' ? 'bg-white text-danger shadow-sm' : 'text-secondary opacity-60 hover:opacity-100'}`}
                         >
-                            Sin existencias
+                            Sin existencias {kpis.outOfStockCount > 0 ? `(${kpis.outOfStockCount})` : ''}
                         </button>
                         {storeReady && (
                             <button
@@ -1105,8 +1128,9 @@ const Inventory = () => {
                 /* Product Grid View */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {processedProducts.map(p => {
-                        const isLow = p.quantity > 0 && p.quantity <= 5;
+                        const isLow = isLowStock(p);
                         const isEmpty = p.quantity === 0;
+                        const weeklySales = salesStats[p.id]?.weeklyRate || 0;
 
                         return (
                             <div 
@@ -1124,8 +1148,9 @@ const Inventory = () => {
                                             Sin Existencias
                                         </span>
                                     ) : isLow ? (
-                                        <span className="bg-warning text-navy text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                                        <span className="bg-warning text-navy text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1" title={`Venta semanal: ${weeklySales} un. / Stock: ${p.quantity} un.`}>
                                             Stock Bajo
+                                            {weeklySales > 0 && <span className="opacity-75 text-[9px] font-black">({weeklySales}/sem)</span>}
                                         </span>
                                     ) : (
                                         <span className="bg-success text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
@@ -1297,8 +1322,9 @@ const Inventory = () => {
                             </thead>
                             <tbody>
                                 {processedProducts.map(p => {
-                                    const isLow = p.quantity > 0 && p.quantity <= 5;
+                                    const isLow = isLowStock(p);
                                     const isEmpty = p.quantity === 0;
+                                    const weeklySales = salesStats[p.id]?.weeklyRate || 0;
 
                                     return (
                                         <tr key={p.id} className="border-b border-gray-50 hover:bg-slate-50/50 transition-colors align-middle text-sm">
@@ -1364,7 +1390,9 @@ const Inventory = () => {
                                                         {isEmpty ? (
                                                             <span className="text-[10px] font-extrabold text-danger bg-red-50 px-2 py-0.5 rounded-full uppercase">Agotado</span>
                                                         ) : isLow ? (
-                                                            <span className="text-[10px] font-extrabold text-warning bg-amber-50 px-2 py-0.5 rounded-full uppercase">Bajo</span>
+                                                            <span className="text-[10px] font-extrabold text-warning bg-amber-50 px-2 py-0.5 rounded-full uppercase" title={`Venta semanal: ${weeklySales} un. / Stock: ${p.quantity} un.`}>
+                                                                Bajo {weeklySales > 0 ? `(${weeklySales}/sem)` : ''}
+                                                            </span>
                                                         ) : null}
                                                     </div>
                                                 )}

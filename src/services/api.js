@@ -707,6 +707,48 @@ publishAllProductsToWeb: async (publish = true) => {
         if (error) throw error;
         return data || [];
     },
+    getProductSalesStats: async (days = 30) => {
+        try {
+            const sinceDate = new Date();
+            sinceDate.setDate(sinceDate.getDate() - days);
+            const sinceStr = sinceDate.toISOString();
+
+            // Facturas de clientes no anuladas dentro del periodo de análisis
+            const { data: invoices, error } = await supabase
+                .from('client_invoices')
+                .select('items, createdAt, status')
+                .neq('status', 'VOIDED')
+                .gte('createdAt', sinceStr);
+
+            if (error) {
+                console.warn("No se pudieron cargar ventas para rotación:", error.message);
+                return {};
+            }
+
+            const stats = {};
+            (invoices || []).forEach(inv => {
+                const items = Array.isArray(inv.items) ? inv.items : [];
+                items.forEach(item => {
+                    const pid = item.productId || item.id;
+                    if (!pid) return;
+                    const qty = Number(item.quantity) || 0;
+                    if (!stats[pid]) stats[pid] = { totalSold: 0 };
+                    stats[pid].totalSold += qty;
+                });
+            });
+
+            // Promedio de ventas semanales (días / 7)
+            const weeks = Math.max(days / 7, 1);
+            Object.keys(stats).forEach(pid => {
+                stats[pid].weeklyRate = Number((stats[pid].totalSold / weeks).toFixed(1));
+            });
+
+            return stats;
+        } catch (err) {
+            console.warn("Error en getProductSalesStats:", err);
+            return {};
+        }
+    },
     getSlowMovers: async (days = 90) => {
         const { data, error } = await supabase.rpc('report_slow_movers', { p_days: days });
         if (error) throw error;
