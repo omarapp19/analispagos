@@ -4,7 +4,7 @@ import { supabase } from '../supabase';
 const GEMINI_API_KEY_STORAGE = 'valkar_gemini_api_key';
 
 export const getStoredApiKey = () => {
-    return localStorage.getItem(GEMINI_API_KEY_STORAGE) || '';
+    return import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem(GEMINI_API_KEY_STORAGE) || '';
 };
 
 export const setStoredApiKey = (key) => {
@@ -25,7 +25,7 @@ async function getExchangeRate() {
 }
 
 /**
- * Obtiene una instantánea en tiempo real del estado del negocio (caja, ventas, deudas, inventario)
+ * Obtiene una instantánea en tiempo real del estado del negocio (caja, ventas, deudas, inventario y rotación)
  */
 export async function getBusinessSnapshot() {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -55,6 +55,9 @@ export async function getBusinessSnapshot() {
         const method = tx.method || 'Otros';
         todayByMethod[method] = (todayByMethod[method] || 0) + (Number(tx.amount) || 0);
     });
+    const todayMethodsSummary = Object.entries(todayByMethod)
+        .map(([m, amt]) => `${m}: $${amt.toFixed(2)}`)
+        .join(', ');
 
     // Ventas del mes actual
     const monthTxs = transactions.filter(tx => {
@@ -74,7 +77,7 @@ export async function getBusinessSnapshot() {
         })
         .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
-    // Rotación de ventas por producto
+    // Rotación de ventas por producto (últimos 30 días)
     const salesStats = {};
     (clientInvoices || []).forEach(inv => {
         if (inv.status === 'VOIDED') return;
@@ -83,13 +86,25 @@ export async function getBusinessSnapshot() {
             const pid = item.productId || item.id;
             if (!pid) return;
             const q = Number(item.quantity) || 0;
-            if (!salesStats[pid]) salesStats[pid] = { totalSold: 0 };
+            if (!salesStats[pid]) salesStats[pid] = { totalSold: 0, name: item.name || '' };
             salesStats[pid].totalSold += q;
         });
     });
+
     Object.keys(salesStats).forEach(pid => {
         salesStats[pid].weeklyRate = Number((salesStats[pid].totalSold / (30 / 7)).toFixed(1));
     });
+
+    // Top 5 más vendidos
+    const topSellersList = Object.entries(salesStats)
+        .sort((a, b) => b[1].totalSold - a[1].totalSold)
+        .slice(0, 5)
+        .map(([pid, st]) => {
+            const prod = inventory.find(p => p.id === pid);
+            const name = prod?.name || st.name || pid;
+            return `• ${name}: ${st.totalSold} un. vendidas (${st.weeklyRate} un./sem)`;
+        });
+    const topSellersSummary = topSellersList.join('\n');
 
     // Inventario con detección inteligente de stock bajo por rotación
     const totalProducts = inventory.length;
@@ -122,6 +137,12 @@ export async function getBusinessSnapshot() {
         }
     });
 
+    const criticalList = [...outOfStock.slice(0, 4), ...lowStock.slice(0, 6)].map(p => {
+        const rateInfo = p.weeklyRate ? ` | Venta: ~${p.weeklyRate} un/sem` : '';
+        return `• [${p.code || 'S/C'}] ${p.name} — Stock actual: ${p.quantity} un.${rateInfo} (P. Venta: $${(Number(p.sellingPrice) || 0).toFixed(2)})`;
+    });
+    const criticalSummary = criticalList.join('\n');
+
     // Deudas a proveedores (Bills pendientes)
     const pendingBills = bills.filter(b => b.status !== 'PAID' && b.status !== 'PAGADO');
     const totalDebt = pendingBills.reduce((sum, b) => {
@@ -131,6 +152,10 @@ export async function getBusinessSnapshot() {
     }, 0);
 
     const overdueBills = pendingBills.filter(b => b.dueDate && b.dueDate < todayStr);
+    const overdueSummary = overdueBills.slice(0, 5).map(b => {
+        const rem = (Number(b.totalAmount || b.amount) || 0) - (Number(b.paidAmount) || 0);
+        return `• ${b.providerName || b.supplier || 'Proveedor'}: $${rem.toFixed(2)} (Vencida: ${b.dueDate})`;
+    }).join('\n');
 
     // Cuentas por Cobrar (Clientes)
     const pendingClientInvoices = (clientInvoices || []).filter(inv => inv.status === 'PENDING' || inv.status === 'PARTIAL');
@@ -147,6 +172,7 @@ export async function getBusinessSnapshot() {
             today: todaySales,
             todayCount: todayTxs.length,
             todayByMethod,
+            todayMethodsSummary,
             month: monthSales,
             monthCount: monthTxs.length,
             monthExpenses
@@ -158,15 +184,15 @@ export async function getBusinessSnapshot() {
             totalSaleValuation,
             outOfStockCount: outOfStock.length,
             lowStockCount: lowStock.length,
-            outOfStock: outOfStock.slice(0, 10),
-            lowStock: lowStock.slice(0, 10),
+            criticalSummary,
+            topSellersSummary,
             items: inventory
         },
         debt: {
             total: totalDebt,
             pendingCount: pendingBills.length,
             overdueCount: overdueBills.length,
-            pendingBills: pendingBills.slice(0, 10)
+            overdueSummary
         },
         receivables: {
             total: totalReceivables,
@@ -176,155 +202,69 @@ export async function getBusinessSnapshot() {
 }
 
 /**
- * Motor de Detección de Intenciones en Tiempo Real (Respuesta local directa a 0ms sin costo de API)
+ * Consulta directa a Google Gemini con el contexto en tiempo real del negocio
  */
-export function processLocalQuery(text, snapshot) {
-    const q = text.toLowerCase().trim();
-
-    // 1. Ventas de Hoy
-    if (q.includes('hoy') && (q.includes('venta') || q.includes('vend') || q.includes('ingreso') || q.includes('caja') || q.includes('facturad'))) {
-        const { today, todayCount, todayByMethod } = snapshot.sales;
-        const methodsList = Object.entries(todayByMethod)
-            .map(([m, amt]) => `• **${m}**: $${amt.toFixed(2)}`)
-            .join('\n');
-
-        return {
-            type: 'financial_today',
-            title: 'Resumen de Ventas de Hoy',
-            text: `Hoy se han registrado **$${today.toFixed(2)}** en ingresos a través de **${todayCount}** operaciones.\n\n${methodsList ? '**Desglose por método:**\n' + methodsList : '_No hay métodos registrados aún hoy._'}`
-        };
-    }
-
-    // 2. Ventas del Mes
-    if ((q.includes('mes') || q.includes('mensual')) && (q.includes('venta') || q.includes('ingreso') || q.includes('factura'))) {
-        const { month, monthCount, monthExpenses } = snapshot.sales;
-        const balance = month - monthExpenses;
-        return {
-            type: 'financial_month',
-            title: 'Resumen del Mes en Curso',
-            text: `En lo que va de mes:\n• **Ingresos por Ventas:** $${month.toFixed(2)} (${monthCount} transacciones)\n• **Gastos Operativos:** $${monthExpenses.toFixed(2)}\n• **Balance Neto del Mes:** $${balance.toFixed(2)}`
-        };
-    }
-
-    // 3. Deudas / Cuentas por pagar / Facturas a proveedores
-    if (q.includes('deuda') || q.includes('debemos') || q.includes('pagar') || q.includes('proveedor') || (q.includes('factura') && q.includes('pendiente'))) {
-        const { total, pendingCount, overdueCount, pendingBills } = snapshot.debt;
-        let billsList = pendingBills.slice(0, 5).map(b => {
-            const rem = (Number(b.totalAmount || b.amount) || 0) - (Number(b.paidAmount) || 0);
-            return `• **${b.providerName || b.supplier || 'Proveedor'}**: $${rem.toFixed(2)} (Vence: ${b.dueDate || 'S/F'})`;
-        }).join('\n');
-
-        return {
-            type: 'debts',
-            title: 'Cuentas por Pagar (Proveedores)',
-            text: `Total de deuda pendiente: **$${total.toFixed(2)}** en **${pendingCount}** facturas.\n${overdueCount > 0 ? `⚠️ **${overdueCount} facturas ya están vencidas.**\n\n` : '\n'}${billsList ? '**Próximas facturas:**\n' + billsList : ''}`
-        };
-    }
-
-    // 4. Cuentas por cobrar (Clientes)
-    if (q.includes('cobrar') || q.includes('deben') || q.includes('credito') || q.includes('moros')) {
-        const { total, pendingCount } = snapshot.receivables;
-        return {
-            type: 'receivables',
-            title: 'Cuentas por Cobrar (Clientes)',
-            text: `Total por cobrar a clientes: **$${total.toFixed(2)}** en **${pendingCount}** facturas a crédito pendientes.`
-        };
-    }
-
-    // 5. Stock bajo / Agotados / Inventario bajo
-    if (q.includes('stock bajo') || q.includes('agotad') || q.includes('sin stock') || q.includes('por agotar') || q.includes('reponer') || q.includes('faltante')) {
-        const { outOfStockCount, lowStockCount, outOfStock, lowStock } = snapshot.inventory;
-        const criticalItems = [...outOfStock.slice(0, 4), ...lowStock.slice(0, 4)].map(p => {
-            return `• **[${p.code || 'S/C'}]** ${p.name} — **Stock: ${p.quantity} un.** (P. Venta: $${(Number(p.sellingPrice) || 0).toFixed(2)})`;
-        }).join('\n');
-
-        return {
-            type: 'inventory_alert',
-            title: 'Alertas de Existencias',
-            text: `Hay **${outOfStockCount}** productos sin existencias (0 unidades) y **${lowStockCount}** con stock bajo (≤ 5 unidades).\n\n**Artículos prioritarios para reposición:**\n${criticalItems || '_No hay artículos críticos en este momento._'}`
-        };
-    }
-
-    // 6. Valor de inventario / Cuánto hay en inventario
-    if (q.includes('valor') && (q.includes('inventario') || q.includes('stock') || q.includes('mercanc') || q.includes('almacen'))) {
-        const { totalProducts, totalStockUnits, totalCostValuation, totalSaleValuation } = snapshot.inventory;
-        const potentialProfit = totalSaleValuation - totalCostValuation;
-        return {
-            type: 'inventory_value',
-            title: 'Valoración Global del Inventario',
-            text: `• **Variedad de Productos:** ${totalProducts} ítems registrados\n• **Unidades Físicas en Stock:** ${totalStockUnits.toLocaleString()} unidades\n• **Valor a Costo Base:** $${totalCostValuation.toFixed(2)}\n• **Valor a Precio de Venta:** $${totalSaleValuation.toFixed(2)}\n• **Ganancia Potencial Proyectada:** +$${potentialProfit.toFixed(2)}`
-        };
-    }
-
-    // 7. Tasa de cambio / BCV / Dólar
-    if (q.includes('tasa') || q.includes('bcv') || q.includes('dolar') || q.includes('dólar') || q.includes('precio del dolar')) {
-        const rate = snapshot.bcvRate;
-        return {
-            type: 'exchange_rate',
-            title: 'Tasa Oficial BCV',
-            text: `La tasa oficial del Banco Central de Venezuela es de **Bs. ${rate.toFixed(2)} / USD**.\n\nPuedes convertir cualquier monto multiplicando el precio en dólares por esta tasa.`
-        };
-    }
-
-    // 8. Búsqueda directa de repuesto / producto (ej. "filtro 46443", "pastillas corolla", "buscar 1340")
-    if (q.startsWith('busca') || q.startsWith('tienes') || q.startsWith('precio de') || q.startsWith('hay ') || q.startsWith('filtro') || q.startsWith('repuesto')) {
-        const cleanQuery = q.replace(/^(buscar?|tienes|precio de|hay|filtro|repuesto)\s+/i, '').trim();
-        if (cleanQuery.length >= 2) {
-            const matches = (snapshot.inventory.items || []).filter(p => {
-                const nameMatch = (p.name || '').toLowerCase().includes(cleanQuery);
-                const codeMatch = (p.code || '').toLowerCase().includes(cleanQuery);
-                const brandMatch = (p.brand || '').toLowerCase().includes(cleanQuery);
-                return nameMatch || codeMatch || brandMatch;
-            }).slice(0, 5);
-
-            if (matches.length > 0) {
-                const list = matches.map(p => {
-                    const status = p.quantity > 5 ? '🟢 Disponible' : p.quantity > 0 ? '🟡 Stock Bajo' : '🔴 Agotado';
-                    return `• **[${p.code || 'S/C'}]** ${p.name}\n  Precio: **$${(Number(p.sellingPrice) || 0).toFixed(2)}** | Stock: **${p.quantity} un.** (${status})`;
-                }).join('\n\n');
-
-                return {
-                    type: 'product_search',
-                    title: `Resultados para "${cleanQuery}"`,
-                    text: `Encontré los siguientes repuestos en el sistema:\n\n${list}`
-                };
-            }
-        }
-    }
-
-    return null;
-}
-
-/**
- * Consulta a Google Gemini con el contexto en tiempo real del negocio
- */
-export async function askGemini(prompt, businessSnapshot, apiKey) {
+export async function askGemini(prompt, businessSnapshot, conversationHistory = []) {
+    const apiKey = getStoredApiKey();
     if (!apiKey) {
         throw new Error('NO_API_KEY');
     }
 
     const systemInstruction = `
-Eres Valkar AI, el asesor inteligente de finanzas, repuestos automotrices y operaciones de Valkar C.A. (Maracaibo, Venezuela).
-Tu objetivo es dar respuestas claras, precisas, profesionales y estratégicas al dueño o encargado del negocio.
+Eres Valkar AI, el asesor inteligente de finanzas, repuestos automotrices y operaciones de Valkar C.A. (Maracaibo, Zulia, Venezuela).
+Tu interlocutor es el dueño / administrador de la empresa. Tu meta es responder de forma inteligente, ejecutiva, clara y 100% contextualizada en la realidad del negocio.
 
 DATOS EN TIEMPO REAL DEL NEGOCIO (HOY):
 - Fecha de hoy: ${businessSnapshot.todayStr}
 - Tasa oficial BCV: Bs. ${businessSnapshot.bcvRate} / USD
-- Ventas de hoy: $${businessSnapshot.sales.today.toFixed(2)} (${businessSnapshot.sales.todayCount} ventas)
-- Ventas del mes: $${businessSnapshot.sales.month.toFixed(2)}
-- Gastos del mes: $${businessSnapshot.sales.monthExpenses.toFixed(2)}
+- Ventas de hoy: $${businessSnapshot.sales.today.toFixed(2)} (aprox. Bs. ${(businessSnapshot.sales.today * businessSnapshot.bcvRate).toFixed(2)}) en ${businessSnapshot.sales.todayCount} operaciones
+- Métodos de pago hoy: ${businessSnapshot.sales.todayMethodsSummary || 'Sin ventas registradas hoy todavía'}
+- Ventas del mes actual: $${businessSnapshot.sales.month.toFixed(2)} (${businessSnapshot.sales.monthCount} ventas)
+- Gastos operativos del mes: $${businessSnapshot.sales.monthExpenses.toFixed(2)}
+- Balance neto del mes: $${(businessSnapshot.sales.month - businessSnapshot.sales.monthExpenses).toFixed(2)}
+- Cuentas por cobrar a clientes: $${businessSnapshot.receivables.total.toFixed(2)} (${businessSnapshot.receivables.pendingCount} facturas a crédito pendientes)
 - Cuentas por pagar a proveedores (Deudas): $${businessSnapshot.debt.total.toFixed(2)} (${businessSnapshot.debt.pendingCount} facturas pendientes, ${businessSnapshot.debt.overdueCount} vencidas)
-- Cuentas por cobrar a clientes: $${businessSnapshot.receivables.total.toFixed(2)}
-- Total de productos en inventario: ${businessSnapshot.inventory.totalProducts} (${businessSnapshot.inventory.totalStockUnits} unidades físicas)
-- Valor del inventario a costo: $${businessSnapshot.inventory.totalCostValuation.toFixed(2)} | A precio de venta: $${businessSnapshot.inventory.totalSaleValuation.toFixed(2)}
-- Productos sin existencias: ${businessSnapshot.inventory.outOfStockCount} | Stock bajo (<=5): ${businessSnapshot.inventory.lowStockCount}
+${businessSnapshot.debt.overdueSummary ? `- Deudas vencidas prioritarias:\n${businessSnapshot.debt.overdueSummary}\n` : ''}
+- Total de productos en catálogo: ${businessSnapshot.inventory.totalProducts} (${businessSnapshot.inventory.totalStockUnits.toLocaleString()} unidades físicas)
+- Valor del inventario: Costo $${businessSnapshot.inventory.totalCostValuation.toFixed(2)} | Venta $${businessSnapshot.inventory.totalSaleValuation.toFixed(2)} (Margen potencial: $${(businessSnapshot.inventory.totalSaleValuation - businessSnapshot.inventory.totalCostValuation).toFixed(2)})
+- Alertas de existencias: ${businessSnapshot.inventory.outOfStockCount} productos agotados (0 un.) | ${businessSnapshot.inventory.lowStockCount} productos con stock bajo respecto a su rotación de ventas.
+${businessSnapshot.inventory.criticalSummary ? `- Repuestos críticos a reponer:\n${businessSnapshot.inventory.criticalSummary}\n` : ''}
+${businessSnapshot.inventory.topSellersSummary ? `- Repuestos con mayor salida (últimos 30 días):\n${businessSnapshot.inventory.topSellersSummary}\n` : ''}
 
 REGLAS DE RESPUESTA:
-1. Responde siempre en español de manera concisa y accionable.
-2. Usa formato Markdown con viñetas y negritas para facilitar la lectura rápida en el móvil o escritorio.
-3. Si te preguntan sobre finanzas o recomendaciones, apóyate en las cifras reales de la empresa mostradas arriba.
-4. Si te preguntan sobre repuestos, mecánica o compatibilidad de vehículos, aporta valor técnico especializado para el mercado automotriz venezolano.
+1. Responde SIEMPRE en español de manera natural, profesional, ejecutiva y directa.
+2. Usa formato Markdown con viñetas (*) y negritas (**) para facilitar la lectura inmediata.
+3. Si te preguntan cifras (ventas, stock, deudas, tasas), usa los datos en tiempo real de arriba con total precisión.
+4. Si te piden sugerencias, recomendaciones o análisis de compra/finanzas, sé proactivo y estratégico.
+5. Si te preguntan sobre marcas, repuestos, filtros o compatibilidad de carros, brinda asesoría técnica especializada con el lenguaje del mercado automotriz venezolano.
+6. Mantén las respuestas concisas y al grano; evita introducciones de relleno.
     `.trim();
+
+    // Construir historial multi-turno para que Gemini recuerde la conversación
+    const contents = [];
+
+    // Agregar últimos turnos de la conversación (máximo 6 para eficiencia y velocidad)
+    const recentHistory = (conversationHistory || []).slice(-6);
+    recentHistory.forEach(msg => {
+        if (!msg.text) return;
+        if (msg.type === 'user') {
+            contents.push({
+                role: 'user',
+                parts: [{ text: msg.text }]
+            });
+        } else if (msg.type === 'bot' && !msg.isError && msg.id !== 'welcome') {
+            contents.push({
+                role: 'model',
+                parts: [{ text: msg.text }]
+            });
+        }
+    });
+
+    // Agregar la consulta actual del usuario
+    contents.push({
+        role: 'user',
+        parts: [{ text: prompt }]
+    });
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
@@ -332,15 +272,10 @@ REGLAS DE RESPUESTA:
         system_instruction: {
             parts: [{ text: systemInstruction }]
         },
-        contents: [
-            {
-                role: 'user',
-                parts: [{ text: prompt }]
-            }
-        ],
+        contents,
         generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 800
+            maxOutputTokens: 900
         }
     };
 
