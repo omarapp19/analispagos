@@ -3,7 +3,7 @@ import {
     Plus, Search, Edit, Trash2, Package, AlertTriangle, 
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
     ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe, Camera,
-    Calendar, Type } from 'lucide-react';
+    Calendar, Type, Tag, Layers, Filter } from 'lucide-react';
 import CustomDropdown from '../components/ui/CustomDropdown';
 import { api } from '../services/api';
 import { supabase, subscribeToTable } from '../supabase';
@@ -50,6 +50,7 @@ const Inventory = () => {
     const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'low' | 'empty'
+    const [selectedCategory, setSelectedCategory] = useState('all'); // 'all' | categoryId | 'uncategorized'
     const [sortBy, setSortBy] = useState('createdAt'); // 'name' | 'quantity' | 'costPrice' | 'sellingPrice' | 'createdAt'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
     
@@ -407,6 +408,7 @@ const Inventory = () => {
                 brand: (formData.brand || '').trim().toUpperCase(),
                 code: (formData.code || '').trim().toUpperCase(),
                 description: (formData.description || '').trim(),
+                categoryId: isService ? null : (webForm.categoryId || null),
                 quantity: isService ? 0 : (parseInt(formData.quantity) || 0),
                 costPrice: isService ? 0 : (parseFloat(formData.costPrice) || 0),
                 marginPercentage: isService ? 0 : (parseFloat(formData.marginPercentage) || 0),
@@ -417,10 +419,14 @@ const Inventory = () => {
                 username: username,
                 unitsPerPackage: isService ? 1 : (parseInt(formData.unitsPerPackage) || 1),
                 // Los servicios nunca se publican en la tienda.
-                ...(storeReady ? (isService ? { webPublished: false } : {
+                ...(storeReady ? (isService ? { webPublished: false, categoryId: null } : {
                     ...webColumns(webForm),
-                    images: productImages
-                }) : { images: productImages })
+                    images: productImages,
+                    categoryId: webForm.categoryId || null,
+                }) : { 
+                    images: productImages,
+                    categoryId: isService ? null : (webForm.categoryId || null),
+                })
             };
 
             if (editingProduct) {
@@ -549,6 +555,44 @@ const Inventory = () => {
         }
     };
 
+    // Category Mappings and Counts
+    const categoryMap = React.useMemo(() => {
+        const map = new Map();
+        categories.forEach(c => map.set(c.id, c));
+        return map;
+    }, [categories]);
+
+    const categoryCounts = React.useMemo(() => {
+        const counts = {};
+        products.forEach(p => {
+            const id = p.categoryId || 'uncategorized';
+            counts[id] = (counts[id] || 0) + 1;
+        });
+        return counts;
+    }, [products]);
+
+    const categoryDropdownOptions = React.useMemo(() => {
+        const opts = [
+            { value: 'all', label: `Todas las categorías (${products.length})`, icon: Layers },
+        ];
+        categories.forEach(c => {
+            const count = categoryCounts[c.id] || 0;
+            opts.push({
+                value: c.id,
+                label: `${c.name} (${count})`,
+                icon: Tag,
+            });
+        });
+        if (categoryCounts['uncategorized']) {
+            opts.push({
+                value: 'uncategorized',
+                label: `Sin categoría (${categoryCounts['uncategorized']})`,
+                icon: AlertTriangle,
+            });
+        }
+        return opts;
+    }, [categories, categoryCounts, products.length]);
+
     // Calculations for KPIs
     const kpis = React.useMemo(() => {
         let totalItems = 0;
@@ -588,11 +632,18 @@ const Inventory = () => {
 
     // Filtering & Sorting Logic
     const processedProducts = React.useMemo(() => {
+        const term = searchTerm.toLowerCase().trim();
+
         return products
             .filter(p => {
                 // Search term match
-                const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (p.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+                const catName = categoryMap.get(p.categoryId)?.name || '';
+                const matchSearch = !term ||
+                    p.name.toLowerCase().includes(term) ||
+                    (p.code || '').toLowerCase().includes(term) ||
+                    (p.brand || '').toLowerCase().includes(term) ||
+                    (p.description || '').toLowerCase().includes(term) ||
+                    catName.toLowerCase().includes(term);
                 
                 // Status filter match
                 let matchStatus = true;
@@ -606,7 +657,15 @@ const Inventory = () => {
                     matchStatus = webIssues(p).length > 0;
                 }
 
-                return matchSearch && matchStatus;
+                // Category filter match
+                let matchCategory = true;
+                if (selectedCategory === 'uncategorized') {
+                    matchCategory = !p.categoryId;
+                } else if (selectedCategory !== 'all') {
+                    matchCategory = p.categoryId === selectedCategory;
+                }
+
+                return matchSearch && matchStatus && matchCategory;
             })
             .sort((a, b) => {
                 let valA = a[sortBy];
@@ -621,7 +680,7 @@ const Inventory = () => {
                 if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
                 return 0;
             });
-    }, [products, searchTerm, statusFilter, sortBy, sortOrder]);
+    }, [products, searchTerm, statusFilter, selectedCategory, sortBy, sortOrder, categoryMap]);
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
@@ -691,7 +750,11 @@ const Inventory = () => {
                                     packageQty: '0',
                                     looseQty: '0'
                                 });
-                                setWebForm(emptyWebForm());
+                                const initWeb = emptyWebForm();
+                                if (selectedCategory !== 'all' && selectedCategory !== 'uncategorized') {
+                                    initWeb.categoryId = selectedCategory;
+                                }
+                                setWebForm(initWeb);
                                 setIsModalOpen(true);
                             }}
                             className="btn btn-primary shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50"
@@ -772,18 +835,125 @@ const Inventory = () => {
                 </div>
             </div>
 
+            {/* Category Navigation Pills */}
+            {categories.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Tag size={15} className="text-primary" />
+                            <span className="text-xs font-bold text-secondary uppercase tracking-wider">
+                                Categorías del Catálogo
+                            </span>
+                        </div>
+                        {selectedCategory !== 'all' && (
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategory('all')}
+                                className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+                            >
+                                <X size={13} />
+                                <span>Mostrar todas ({products.length})</span>
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedCategory('all')}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                                selectedCategory === 'all'
+                                    ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20'
+                                    : 'bg-background hover:bg-slate-100 text-secondary'
+                            }`}
+                        >
+                            <Layers size={13} />
+                            <span>Todas</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                selectedCategory === 'all' ? 'bg-white/25 text-white' : 'bg-slate-200/80 text-secondary'
+                            }`}>
+                                {products.length}
+                            </span>
+                        </button>
+
+                        {categories.map((c) => {
+                            const count = categoryCounts[c.id] || 0;
+                            const isSelected = selectedCategory === c.id;
+                            return (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(isSelected ? 'all' : c.id)}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                                        isSelected
+                                            ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20'
+                                            : count > 0 
+                                                ? 'bg-background hover:bg-slate-100 text-secondary' 
+                                                : 'bg-background/60 hover:bg-slate-100 text-secondary/50'
+                                    }`}
+                                >
+                                    <span>{c.name}</span>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        isSelected 
+                                            ? 'bg-white/25 text-white' 
+                                            : count > 0 
+                                                ? 'bg-slate-200/80 text-secondary' 
+                                                : 'bg-slate-100 text-secondary/40'
+                                    }`}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
+
+                        {categoryCounts['uncategorized'] > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategory(selectedCategory === 'uncategorized' ? 'all' : 'uncategorized')}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                                    selectedCategory === 'uncategorized'
+                                        ? 'bg-amber-500 text-white shadow-sm'
+                                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                }`}
+                            >
+                                <AlertTriangle size={12} />
+                                <span>Sin categoría</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-white/30 text-current">
+                                    {categoryCounts['uncategorized']}
+                                </span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Toolbar and Filters */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col lg:flex-row gap-4 items-center justify-between">
-                {/* Search */}
-                <div className="relative w-full lg:w-96">
-                    <input 
-                        type="text" 
-                        placeholder="Buscar producto por nombre o descripción..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-background rounded-xl border border-gray-200 outline-none text-sm text-secondary font-medium focus:border-primary transition-all"
-                    />
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary opacity-40" size={16} />
+                {/* Search & Category Filter */}
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto flex-1">
+                    <div className="relative w-full sm:w-80">
+                        <input 
+                            type="text" 
+                            placeholder="Buscar por nombre, código, marca..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-background rounded-xl border border-gray-200 outline-none text-sm text-secondary font-medium focus:border-primary transition-all"
+                        />
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary opacity-40" size={16} />
+                    </div>
+
+                    {categories.length > 0 && (
+                        <CustomDropdown
+                            value={selectedCategory}
+                            onChange={setSelectedCategory}
+                            options={categoryDropdownOptions}
+                            prefixIcon={Tag}
+                            label="Categoría:"
+                            showOrderToggle={false}
+                            menuWidth="w-64"
+                            align="left"
+                        />
+                    )}
                 </div>
 
                 {/* Filter Controls */}
@@ -882,12 +1052,21 @@ const Inventory = () => {
                     </div>
                     <h3 className="text-xl font-bold text-navy">Sin productos registrados</h3>
                     <p className="text-sm text-secondary opacity-70">
-                        {searchTerm || statusFilter !== 'all' 
-                            ? 'No se encontraron productos con los filtros y búsqueda actuales. Intenta cambiar los criterios.'
+                        {searchTerm || statusFilter !== 'all' || selectedCategory !== 'all' 
+                            ? 'No se encontraron productos con los filtros y búsqueda actuales. Intenta cambiar los criterios o limpiar la categoría seleccionada.'
                             : 'Aún no has registrado ningún producto. Empieza por crear un nuevo producto para controlar sus existencias y calcular márgenes.'
                         }
                     </p>
-                    {!(searchTerm || statusFilter !== 'all') && userRole !== 'cajero' && (
+                    {selectedCategory !== 'all' && (
+                        <button 
+                            type="button"
+                            onClick={() => setSelectedCategory('all')}
+                            className="btn btn-outline text-xs font-bold"
+                        >
+                            Ver todas las categorías ({products.length})
+                        </button>
+                    )}
+                    {!(searchTerm || statusFilter !== 'all') && selectedCategory === 'all' && userRole !== 'cajero' && (
                         <button 
                             onClick={() => {
                                 setEditingProduct(null);
@@ -908,7 +1087,11 @@ const Inventory = () => {
                                     packageQty: '0',
                                     looseQty: '0'
                                 });
-                                setWebForm(emptyWebForm());
+                                const initWeb = emptyWebForm();
+                                if (selectedCategory !== 'all' && selectedCategory !== 'uncategorized') {
+                                    initWeb.categoryId = selectedCategory;
+                                }
+                                setWebForm(initWeb);
                                 setIsModalOpen(true);
                             }}
                             className="btn btn-primary"
@@ -1011,6 +1194,29 @@ const Inventory = () => {
                                         <h4 className="font-bold text-navy text-base leading-snug truncate uppercase" title={p.name}>
                                             {p.name}
                                         </h4>
+                                        <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
+                                            {p.categoryId && categoryMap.get(p.categoryId) ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedCategory(p.categoryId);
+                                                    }}
+                                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-secondary hover:text-primary transition-colors bg-slate-100 hover:bg-primary/10 px-2 py-0.5 rounded-md cursor-pointer"
+                                                    title={`Filtrar por categoría: ${categoryMap.get(p.categoryId).name}`}
+                                                >
+                                                    <Tag size={10} className="text-primary shrink-0" />
+                                                    <span className="truncate max-w-[130px]">{categoryMap.get(p.categoryId).name}</span>
+                                                </button>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-400 font-semibold italic">Sin categoría</span>
+                                            )}
+                                            {p.code && (
+                                                <span className="text-[10px] font-mono font-bold text-secondary/80 bg-slate-100 border border-slate-200/60 px-1.5 py-0.5 rounded truncate max-w-[120px]" title={`Código: ${p.code}`}>
+                                                    {p.code}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Price & Stock Display */}
@@ -1079,6 +1285,7 @@ const Inventory = () => {
                             <thead>
                                 <tr className="border-b border-gray-100 bg-background text-secondary text-xs uppercase font-bold tracking-wider">
                                     <th className="py-4 px-6">Producto</th>
+                                    <th className="py-4 px-6">Categoría</th>
                                     <th className="py-4 px-6">Stock</th>
                                     <th className="py-4 px-6 text-right">P. Costo</th>
                                     <th className="py-4 px-6 text-right">P. Venta</th>
@@ -1109,6 +1316,11 @@ const Inventory = () => {
                                                         <span className="font-bold text-navy max-w-xs truncate uppercase" title={p.name}>
                                                             {p.name}
                                                         </span>
+                                                        {p.code && (
+                                                            <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200/60" title={`Código: ${p.code}`}>
+                                                                {p.code}
+                                                            </span>
+                                                        )}
                                                         {p.productType !== 'service' && (
                                                             <button
                                                                 type="button"
@@ -1127,6 +1339,21 @@ const Inventory = () => {
                                                     </div>
                                                     <span className="text-xs text-secondary opacity-60 line-clamp-1 max-w-xs">{p.description || 'Sin descripción'}</span>
                                                 </div>
+                                            </td>
+                                            <td className="py-4 px-6 whitespace-nowrap">
+                                                {p.categoryId && categoryMap.get(p.categoryId) ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedCategory(p.categoryId)}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-navy hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                                                        title={`Filtrar por categoría: ${categoryMap.get(p.categoryId).name}`}
+                                                    >
+                                                        <Tag size={12} className="text-primary shrink-0" />
+                                                        <span className="truncate max-w-[140px]">{categoryMap.get(p.categoryId).name}</span>
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400 font-medium italic">-</span>
+                                                )}
                                             </td>
                                             <td className="py-4 px-6">
                                                 {p.productType === 'service' ? (
@@ -1456,6 +1683,29 @@ const Inventory = () => {
                                     />
                                 </div>
                             </div>
+
+                            {/* Categoría (Sincronizada con catálogo y tienda web) */}
+                            {categories.length > 0 && formData.productType === 'product' && (
+                                <div>
+                                    <label className="text-xs font-bold text-secondary uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                                        <span>Categoría</span>
+                                        <span className="text-[10px] font-normal normal-case text-secondary opacity-60">Organización en almacén y tienda</span>
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={webForm.categoryId || ''}
+                                            onChange={(e) => setWebForm(prev => ({ ...prev, categoryId: e.target.value }))}
+                                            className="w-full pl-4 pr-9 py-2.5 bg-background rounded-xl border border-gray-200 outline-none text-sm text-navy font-bold focus:border-primary transition-all cursor-pointer"
+                                        >
+                                            <option value="">(Sin categoría)</option>
+                                            {categories.map((c) => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                        <Tag size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-secondary opacity-40 pointer-events-none" />
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Description */}
                             <div>
