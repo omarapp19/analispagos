@@ -248,12 +248,12 @@ const Invoices = () => {
                     <table className="w-full text-left">
                         <thead className="bg-gray-50/50 border-b border-gray-100">
                             <tr>
-                                <th className="p-6 text-xs font-bold text-secondary uppercase tracking-wider">Detalles</th>
-                                <th className="p-6 text-xs font-bold text-secondary uppercase tracking-wider">Proveedor</th>
-                                <th className="p-6 text-xs font-bold text-secondary uppercase tracking-wider">Fecha Vencimiento</th>
-                                <th className="p-6 text-xs font-bold text-secondary uppercase tracking-wider">Estado</th>
-                                <th className="p-6 text-xs font-bold text-secondary uppercase tracking-wider text-right">Monto</th>
-                                <th className="p-6"></th>
+                                <th className="px-4 py-3 text-xs font-bold text-secondary uppercase tracking-wider">Detalles</th>
+                                <th className="px-4 py-3 text-xs font-bold text-secondary uppercase tracking-wider hidden lg:table-cell">Proveedor</th>
+                                <th className="px-4 py-3 text-xs font-bold text-secondary uppercase tracking-wider">Fecha Vencimiento</th>
+                                <th className="px-4 py-3 text-xs font-bold text-secondary uppercase tracking-wider">Estado</th>
+                                <th className="px-4 py-3 text-xs font-bold text-secondary uppercase tracking-wider text-right">Monto</th>
+                                <th className="px-4 py-3 text-xs font-bold text-secondary uppercase tracking-wider text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -278,30 +278,31 @@ const Invoices = () => {
                                     const isExpanded = expandedNameIds.has(bill.id);
                                     return (
                                         <tr key={bill.id} className="hover:bg-gray-50/30 transition-colors group align-middle">
-                                            <td className="p-6">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-primary flex items-center justify-center font-bold shrink-0">
-                                                        <FileText size={20} />
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-primary flex items-center justify-center font-bold shrink-0">
+                                                        <FileText size={16} />
                                                     </div>
                                                     <div className="min-w-0">
                                                         <button
                                                             type="button"
                                                             onClick={() => toggleExpandName(bill.id)}
                                                             className={`font-bold text-navy text-sm text-left hover:text-primary transition-colors cursor-pointer ${
-                                                                isExpanded ? 'whitespace-normal break-words' : 'truncate max-w-[200px] lg:max-w-xs xl:max-w-md block'
+                                                                isExpanded ? 'whitespace-normal break-words' : 'truncate max-w-[170px] lg:max-w-xs xl:max-w-sm block'
                                                             }`}
                                                             title="Clic para ver nombre completo"
                                                         >
                                                             {cleanTitle}
                                                         </button>
-                                                        <div className="flex items-center gap-2 mt-0.5">
-                                                            <p className="text-xs text-secondary opacity-60">
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <p className="text-xs text-secondary opacity-60 truncate">
+                                                                {bill.provider && bill.provider !== cleanTitle ? `${bill.provider} • ` : ''}
                                                                 {bill.invoiceNumber ? `Factura: #${bill.invoiceNumber}` : `ID: #${bill.id.substring(0, 8)}`}
                                                             </p>
                                                             {bill.supportFile && (
                                                                 <button
                                                                     onClick={() => openSupportModal(bill.supportFile, bill.supportFileName)}
-                                                                    className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-2 py-0.5 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer select-none"
+                                                                    className="text-primary hover:text-primary-dark transition-colors inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-50 text-[10px] font-bold border border-blue-100 cursor-pointer select-none shrink-0"
                                                                     title="Ver documento de soporte"
                                                                 >
                                                                     Soporte
@@ -311,28 +312,34 @@ const Invoices = () => {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-6">
-                                                <p className="text-sm font-medium text-secondary">{bill.provider || '-'}</p>
+                                            <td className="px-4 py-3 hidden lg:table-cell">
+                                                <p className="text-xs font-medium text-secondary truncate max-w-[140px] xl:max-w-[190px]" title={bill.provider}>
+                                                    {bill.provider || '-'}
+                                                </p>
                                             </td>
-                                            <td className="p-6">
-                                                <div className="flex items-start gap-2 text-secondary text-sm">
-                                                    <CalendarIcon size={16} className="opacity-60 mt-0.5" />
+                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                <div className="flex items-start gap-1.5 text-secondary text-xs">
+                                                    <CalendarIcon size={14} className="opacity-60 mt-0.5 shrink-0" />
                                                     <div className="flex flex-col">
-                                                        <span className="font-bold text-navy text-xs" title="Fecha de Vencimiento">Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}</span>
+                                                        <span className="font-bold text-navy text-xs" title="Fecha de Vencimiento">
+                                                            Vence: {new Date(bill.dueDate + 'T12:00:00').toLocaleDateString()}
+                                                        </span>
                                                         {bill.invoiceDate && (
-                                                            <span className="text-[10px] text-secondary opacity-60 font-semibold" title="Fecha de Facturación">Factura: {new Date(bill.invoiceDate + 'T12:00:00').toLocaleDateString()}</span>
+                                                            <span className="text-[10px] text-secondary opacity-60 font-semibold" title="Fecha de Facturación">
+                                                                Factura: {new Date(bill.invoiceDate + 'T12:00:00').toLocaleDateString()}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-6">
+                                            <td className="px-4 py-3 whitespace-nowrap">
                                                 {bill.status === 'COMPLETED' || bill.status === 'PAID' ? (
-                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-success">
-                                                        <CheckCircle size={12} /> Pagado
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-50 text-success">
+                                                        <CheckCircle size={11} /> Pagado
                                                     </span>
                                                 ) : bill.status === 'PARTIAL' ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-primary border border-indigo-100/50 w-fit">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-primary border border-indigo-100/50 w-fit">
                                                             <Clock size={10} /> Abonado: {formatCurrency(bill.paidAmount || 0)}
                                                         </span>
                                                         <span className="text-[10px] text-secondary opacity-60 font-semibold pl-1">
@@ -340,23 +347,23 @@ const Invoices = () => {
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 text-warning">
-                                                        <Clock size={12} /> Pendiente
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-50 text-warning">
+                                                        <Clock size={11} /> Pendiente
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="p-6 text-right">
-                                                <p className="font-bold text-navy">{formatCurrency(bill.amount)}</p>
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                <p className="font-bold text-navy text-sm">{formatCurrency(bill.amount)}</p>
                                             </td>
-                                            <td className="p-6 text-right">
-                                                <div className="flex items-center justify-end gap-2">
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-1.5">
                                                     <button
                                                         onClick={() => setSelectedPurchaseForReceipt(bill)}
-                                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs select-none"
+                                                        className="px-2 py-1 bg-slate-100 hover:bg-navy hover:text-white text-navy rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs select-none"
                                                         title="Ver detalle y reimprimir comprobante de compra"
                                                     >
-                                                        <Printer size={13} />
-                                                        <span className="hidden sm:inline">Reimprimir</span>
+                                                        <Printer size={12} />
+                                                        <span>Reimprimir</span>
                                                     </button>
                                                     {(bill.status !== 'PAID' && bill.status !== 'COMPLETED') && (
                                                         <button
@@ -364,19 +371,19 @@ const Invoices = () => {
                                                                 setSelectedBillForAbono(bill);
                                                                 setShowAbonoModal(true);
                                                             }}
-                                                            className="px-3 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 cursor-pointer select-none"
+                                                            className="px-2.5 py-1 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-xs font-black transition-all flex items-center gap-1 cursor-pointer select-none"
                                                             title="Registrar Pago de Abono"
                                                         >
                                                             <Landmark size={12} />
-                                                            Abonar
+                                                            <span>Abonar</span>
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={() => handleDelete(bill.id)}
-                                                        className="p-2 text-gray-300 hover:text-danger hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                        className="p-1 text-gray-300 hover:text-danger hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
                                                         title="Eliminar factura"
                                                     >
-                                                        <Trash2 size={18} />
+                                                        <Trash2 size={15} />
                                                     </button>
                                                 </div>
                                             </td>
