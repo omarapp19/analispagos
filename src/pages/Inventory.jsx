@@ -56,6 +56,7 @@ const Inventory = () => {
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [costManuallyEdited, setCostManuallyEdited] = useState(false);
     const [formData, setFormData] = useState({
         productType: 'product', // 'product' | 'service'
         name: '',
@@ -265,6 +266,8 @@ const Inventory = () => {
         }
 
         const cost = parseFloat(cleanVal) || 0;
+        setCostManuallyEdited(cost > 0);
+
         let margin = parseFloat(formData.marginPercentage) || 0;
         if (margin <= 0) {
             margin = 30;
@@ -306,21 +309,23 @@ const Inventory = () => {
         }
 
         const selling = parseFloat(cleanVal) || 0;
-        const cost = parseFloat(formData.costPrice) || 0;
         
-        // Si se agrega un precio de venta sin costo, se calcula automáticamente el costo con margen del 30%
-        if (cost <= 0 && selling > 0) {
-            const calculatedCost = Number((selling / 1.30).toFixed(2));
+        // Si el costo NO ha sido ingresado manualmente (ej. producto nuevo o sin costo establecido),
+        // cada tecla que escriba en Precio Final calcula automáticamente el costo al 30% de margen
+        if (!costManuallyEdited) {
+            const margin = parseFloat(formData.marginPercentage) || 30;
+            const calculatedCost = selling > 0 ? (selling / (1 + margin / 100)) : 0;
             setFormData(prev => ({
                 ...prev,
-                costPrice: calculatedCost.toFixed(2),
+                costPrice: calculatedCost > 0 ? calculatedCost.toFixed(2) : '0.00',
                 sellingPrice: cleanVal,
-                marginPercentage: '30'
+                marginPercentage: prev.marginPercentage && parseFloat(prev.marginPercentage) > 0 ? prev.marginPercentage : '30'
             }));
             return;
         }
 
-        // Calculate margin
+        // Si el costo sí fue ingresado manualmente por el usuario, calcular el margen que resulta
+        const cost = parseFloat(formData.costPrice) || 0;
         let margin = 0;
         if (cost > 0) {
             margin = ((selling - cost) / cost) * 100;
@@ -437,6 +442,7 @@ const Inventory = () => {
             // Reset Form and close modal
             setIsModalOpen(false);
             setEditingProduct(null);
+            setCostManuallyEdited(false);
             setFormData({
                 productType: 'product',
                 name: '',
@@ -484,6 +490,7 @@ const Inventory = () => {
         const resolvedImage = thumbOf(product) || '';
         const costNum = product.costPrice || 0;
         const sellNum = product.sellingPrice || 0;
+        setCostManuallyEdited(Boolean(costNum > 0));
         let initialMargin = '30';
         if (product.marginPercentage && parseFloat(product.marginPercentage) > 0) {
             initialMargin = product.marginPercentage.toString();
@@ -666,6 +673,7 @@ const Inventory = () => {
                         <button 
                             onClick={() => {
                                 setEditingProduct(null);
+                                setCostManuallyEdited(false);
                                 setFormData({
                                     productType: 'product',
                                     name: '',
@@ -883,6 +891,7 @@ const Inventory = () => {
                         <button 
                             onClick={() => {
                                 setEditingProduct(null);
+                                setCostManuallyEdited(false);
                                 setFormData({
                                     productType: 'product',
                                     name: '',
