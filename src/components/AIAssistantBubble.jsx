@@ -71,7 +71,7 @@ const AIAssistantBubble = () => {
             id: 'welcome', 
             type: 'bot', 
             title: 'Valkar AI ⚡',
-            text: '¡Hola! Soy tu asistente inteligente impulsado por Google Gemini. Conozco las finanzas, inventario, deudas y ventas de Valkar en tiempo real. ¿En qué te puedo asesorar hoy?',
+            text: '¡Hola! Soy tu asistente inteligente. Conozco las finanzas, inventario, deudas y ventas de Valkar en tiempo real. ¿En qué te puedo asesorar hoy?',
             showQuickActions: true
         }
     ]);
@@ -150,15 +150,14 @@ const AIAssistantBubble = () => {
                     id: Date.now() + 1,
                     type: 'bot',
                     title: 'Valkar AI',
-                    text: geminiReply,
-                    badge: 'Gemini'
+                    text: geminiReply
                 }
             ]);
         } catch (error) {
-            console.error('Error procesando consulta Gemini:', error);
+            console.error('Error procesando consulta AI:', error);
             const errorMsg = error.message === 'NO_API_KEY'
-                ? 'No se ha detectado una clave de Google Gemini. Por favor configúrala en el archivo .env o en el botón de ajustes.'
-                : `Error en la conexión con Gemini: ${error.message || error}`;
+                ? 'No se ha detectado una clave de API. Por favor configúrala en el archivo .env o en el botón de ajustes.'
+                : `Ocurrió un inconveniente al consultar: ${error.message || error}`;
 
             setMessages(prev => [
                 ...prev,
@@ -194,7 +193,7 @@ const AIAssistantBubble = () => {
                                 <h3 className="text-xs font-black tracking-wide flex items-center gap-1.5">
                                     Valkar AI
                                     <span className="text-[9px] font-extrabold bg-teal-400/20 text-teal-300 px-1.5 py-0.2 rounded-full border border-teal-400/30 uppercase">
-                                        Gemini
+                                        Asistente
                                     </span>
                                 </h3>
                                 <p className="text-[10px] text-white/60 font-medium">Asesor Inteligente de Operaciones</p>
@@ -332,7 +331,7 @@ const AIAssistantBubble = () => {
                         {isTyping && (
                             <div className="flex items-center gap-2 text-xs text-secondary bg-white border border-gray-200 px-3.5 py-2.5 rounded-2xl rounded-tl-xs w-fit shadow-xs">
                                 <Loader2 size={13} className="animate-spin text-teal-600" />
-                                <span className="font-semibold text-[11px]">Gemini analizando datos en tiempo real...</span>
+                                <span className="font-semibold text-[11px]">Consultando datos...</span>
                             </div>
                         )}
 
@@ -353,7 +352,7 @@ const AIAssistantBubble = () => {
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Pregúntale a Gemini sobre Valkar..."
+                                placeholder="Escribe una pregunta sobre tu negocio..."
                                 disabled={isTyping}
                                 className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-primary focus:bg-white text-navy font-medium transition-all"
                             />
@@ -377,7 +376,7 @@ const AIAssistantBubble = () => {
                 className={`w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-navy to-slate-800 text-teal-300 rounded-full flex items-center justify-center shadow-xl shadow-navy/30 ring-2 ring-white/20 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer ${
                     isOpen ? 'rotate-90 text-white' : ''
                 }`}
-                title="Valkar AI · Asistente Gemini"
+                title="Valkar AI · Asistente"
             >
                 {isOpen ? <X size={22} /> : <Sparkles size={24} className="animate-pulse" />}
             </button>

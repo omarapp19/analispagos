@@ -266,8 +266,6 @@ REGLAS DE RESPUESTA:
         parts: [{ text: prompt }]
     });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
     const payload = {
         system_instruction: {
             parts: [{ text: systemInstruction }]
@@ -279,21 +277,36 @@ REGLAS DE RESPUESTA:
         }
     };
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
+    const candidateModels = [
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-flash-latest'
+    ];
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const msg = errorData?.error?.message || `Error HTTP ${response.status}`;
-        throw new Error(msg);
+    let lastError = null;
+
+    for (const model of candidateModels) {
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (reply) return reply;
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                lastError = new Error(errorData?.error?.message || `Error HTTP ${response.status} (${model})`);
+            }
+        } catch (err) {
+            lastError = err;
+        }
     }
 
-    const data = await response.json();
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!reply) throw new Error('No se recibió texto de respuesta de Gemini.');
-
-    return reply;
+    throw lastError || new Error('No se recibió respuesta del servicio de IA.');
 }

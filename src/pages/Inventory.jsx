@@ -576,11 +576,50 @@ const Inventory = () => {
         return counts;
     }, [products]);
 
+    // Categorías ordenadas: las que tienen productos (>0) primero (de mayor a menor cantidad), y las que están en 0 de último
+    const { categoriesWithProducts, emptyCategories, sortedCategories } = React.useMemo(() => {
+        const withProducts = [];
+        const empty = [];
+
+        categories.forEach(c => {
+            const count = categoryCounts[c.id] || 0;
+            if (count > 0) {
+                withProducts.push(c);
+            } else {
+                empty.push(c);
+            }
+        });
+
+        // Con productos: mayor cantidad primero; si empatan, por sortOrder o nombre
+        withProducts.sort((a, b) => {
+            const diff = (categoryCounts[b.id] || 0) - (categoryCounts[a.id] || 0);
+            if (diff !== 0) return diff;
+            const orderA = a.sortOrder ?? 0;
+            const orderB = b.sortOrder ?? 0;
+            if (orderA !== orderB) return orderA - orderB;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        // En 0: por sortOrder y luego nombre
+        empty.sort((a, b) => {
+            const orderA = a.sortOrder ?? 0;
+            const orderB = b.sortOrder ?? 0;
+            if (orderA !== orderB) return orderA - orderB;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
+        return {
+            categoriesWithProducts: withProducts,
+            emptyCategories: empty,
+            sortedCategories: [...withProducts, ...empty],
+        };
+    }, [categories, categoryCounts]);
+
     const categoryDropdownOptions = React.useMemo(() => {
         const opts = [
             { value: 'all', label: `Todas las categorías (${products.length})`, icon: Layers },
         ];
-        categories.forEach(c => {
+        sortedCategories.forEach(c => {
             const count = categoryCounts[c.id] || 0;
             opts.push({
                 value: c.id,
@@ -596,7 +635,7 @@ const Inventory = () => {
             });
         }
         return opts;
-    }, [categories, categoryCounts, products.length]);
+    }, [sortedCategories, categoryCounts, products.length]);
 
     // Inteligencia de Stock basada en rotación de ventas
     const isLowStock = React.useCallback((p) => {
@@ -880,7 +919,7 @@ const Inventory = () => {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
                         <button
                             type="button"
                             onClick={() => setSelectedCategory('all')}
@@ -899,7 +938,8 @@ const Inventory = () => {
                             </span>
                         </button>
 
-                        {categories.map((c) => {
+                        {/* Categorías con productos (ordenadas de mayor a menor cantidad) */}
+                        {categoriesWithProducts.map((c) => {
                             const count = categoryCounts[c.id] || 0;
                             const isSelected = selectedCategory === c.id;
                             return (
@@ -910,18 +950,14 @@ const Inventory = () => {
                                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
                                         isSelected
                                             ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20'
-                                            : count > 0 
-                                                ? 'bg-background hover:bg-slate-100 text-secondary' 
-                                                : 'bg-background/60 hover:bg-slate-100 text-secondary/50'
+                                            : 'bg-background hover:bg-slate-100 text-secondary'
                                     }`}
                                 >
                                     <span>{c.name}</span>
                                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                                         isSelected 
                                             ? 'bg-white/25 text-white' 
-                                            : count > 0 
-                                                ? 'bg-slate-200/80 text-secondary' 
-                                                : 'bg-slate-100 text-secondary/40'
+                                            : 'bg-slate-200/80 text-secondary'
                                     }`}>
                                         {count}
                                     </span>
@@ -929,6 +965,7 @@ const Inventory = () => {
                             );
                         })}
 
+                        {/* Productos sin categoría asignada */}
                         {categoryCounts['uncategorized'] > 0 && (
                             <button
                                 type="button"
@@ -946,6 +983,32 @@ const Inventory = () => {
                                 </span>
                             </button>
                         )}
+
+                        {/* Categorías con 0 productos (de último) */}
+                        {emptyCategories.map((c) => {
+                            const isSelected = selectedCategory === c.id;
+                            return (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(isSelected ? 'all' : c.id)}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                                        isSelected
+                                            ? 'bg-primary text-white shadow-sm ring-2 ring-primary/20'
+                                            : 'bg-background/60 hover:bg-slate-100 text-secondary/50'
+                                    }`}
+                                >
+                                    <span>{c.name}</span>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        isSelected 
+                                            ? 'bg-white/25 text-white' 
+                                            : 'bg-slate-100 text-secondary/40'
+                                    }`}>
+                                        0
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
