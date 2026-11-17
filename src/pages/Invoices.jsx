@@ -8,6 +8,13 @@ import AbonoFormModal from '../components/AbonoFormModal';
 import RecurringExpensesModal from '../components/RecurringExpensesModal';
 import PurchaseReceiptModal from '../components/PurchaseReceiptModal';
 import SupportViewerModal from '../components/SupportViewerModal';
+import CustomDropdown from '../components/ui/CustomDropdown';
+
+const BILL_FILTER_OPTIONS = [
+    { value: 'ALL', label: 'Todas · pendientes', icon: FileText },
+    { value: 'PENDING_DESC', label: 'Pendientes (Mayor a Menor)', icon: Clock },
+    { value: 'PAID', label: 'Pagadas', icon: CheckCircle }
+];
 
 const Invoices = () => {
     const navigate = useNavigate();
@@ -223,18 +230,16 @@ const Invoices = () => {
                         <div className="text-xs font-bold text-secondary whitespace-nowrap">
                             Mostrando: <strong className="text-navy">{filteredBills.length}</strong>
                         </div>
-                        <div className="relative flex items-center bg-background rounded-xl px-2.5 py-1.5 border border-gray-200 text-xs font-bold text-secondary flex-1 sm:flex-initial justify-between sm:justify-start">
-                            <Filter size={13} className="text-primary mr-1.5 shrink-0" />
-                            <select 
-                                value={filter} 
-                                onChange={(e) => setFilter(e.target.value)}
-                                className="bg-transparent focus:outline-none pr-2 cursor-pointer text-navy font-bold w-full sm:w-auto text-xs truncate"
-                            >
-                                <option value="ALL">Todas · pendientes</option>
-                                <option value="PENDING_DESC">Pendientes (Mayor a Menor)</option>
-                                <option value="PAID">Pagadas</option>
-                            </select>
-                        </div>
+                        <CustomDropdown
+                            value={filter}
+                            onChange={setFilter}
+                            options={BILL_FILTER_OPTIONS}
+                            prefixIcon={Filter}
+                            label="Filtro:"
+                            menuWidth="w-64"
+                            align="right"
+                            showOrderToggle={false}
+                        />
                     </div>
                 </div>
 

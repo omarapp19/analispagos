@@ -2,7 +2,9 @@
 import { 
     Plus, Search, Edit, Trash2, Package, AlertTriangle, 
     TrendingUp, Coins, Grid, List, Image as ImageIcon, 
-    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe, Camera } from 'lucide-react';
+    ArrowUpDown, Check, X, Loader2, DollarSign, Wrench, Globe, Camera,
+    Calendar, Type } from 'lucide-react';
+import CustomDropdown from '../components/ui/CustomDropdown';
 import { api } from '../services/api';
 import { supabase, subscribeToTable } from '../supabase';
 import { getRole, getUsername } from '../auth/session';
@@ -21,6 +23,13 @@ const webIssues = (p) => {
 
 const thumbOf = (p) => (p?.images?.length ? imageUrl(p.images[0]) : (p?.image || ''));
 
+const SORT_OPTIONS = [
+    { value: 'createdAt', label: 'Fecha Creado', icon: Calendar },
+    { value: 'name', label: 'Nombre', icon: Type },
+    { value: 'quantity', label: 'Cantidad en Stock', icon: Package },
+    { value: 'costPrice', label: 'Precio Costo', icon: DollarSign },
+    { value: 'sellingPrice', label: 'Precio Venta', icon: TrendingUp },
+];
 
 const Inventory = () => {
     const userRole = getRole();
@@ -802,27 +811,17 @@ const Inventory = () => {
                     </div>
 
                     {/* Sorting dropdown */}
-                    <div className="relative flex items-center bg-background rounded-xl px-3 py-1.5 border border-gray-100 text-xs font-bold text-secondary">
-                        <ArrowUpDown size={14} className="text-primary mr-2" />
-                        <select 
-                            value={sortBy} 
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="bg-transparent focus:outline-none pr-4 cursor-pointer"
-                        >
-                            <option value="createdAt">Fecha Creado</option>
-                            <option value="name">Nombre</option>
-                            <option value="quantity">Cantidad</option>
-                            <option value="costPrice">Costo</option>
-                            <option value="sellingPrice">Venta</option>
-                        </select>
-                        <button 
-                            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                            className="ml-2 hover:text-primary transition-colors font-extrabold"
-                            title="Alternar Orden"
-                        >
-                            {sortOrder === 'asc' ? '↑' : '↓'}
-                        </button>
-                    </div>
+                    <CustomDropdown
+                        value={sortBy}
+                        onChange={setSortBy}
+                        options={SORT_OPTIONS}
+                        prefixIcon={ArrowUpDown}
+                        label="Ordenar:"
+                        sortOrder={sortOrder}
+                        onToggleOrder={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        menuWidth="w-64"
+                        align="right"
+                    />
 
                     {/* View Mode Toggle */}
                     <div className="bg-background p-1 rounded-xl flex gap-1 border border-gray-100">
