@@ -99,7 +99,7 @@ const MainLayout = () => {
                 </main>
             </div>
 
-            {location.pathname !== '/pos' && <AIAssistantBubble />}
+            {userRole === 'administrador' && location.pathname !== '/pos' && <AIAssistantBubble />}
         </div>
     );
 };

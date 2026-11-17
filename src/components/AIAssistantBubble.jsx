@@ -1,455 +1,329 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { 
-    Bot, Sparkles, X, UploadCloud, CheckCircle2, Loader2, 
-    FileSpreadsheet, ChevronDown, ChevronUp, AlertCircle, Calendar
+    Bot, Sparkles, X, Send, Key, Settings, AlertCircle, 
+    TrendingUp, Package, CreditCard, Coins, Check, Loader2, RefreshCw
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { api } from '../services/api';
+import { 
+    getBusinessSnapshot, 
+    processLocalQuery, 
+    askGemini, 
+    getStoredApiKey, 
+    setStoredApiKey 
+} from '../services/aiService';
+import { getRole } from '../auth/session';
+
+const QUICK_ACTIONS = [
+    { label: '📊 Ventas de hoy', query: '¿Cuánto vendimos hoy?' },
+    { label: '⚠️ Stock bajo', query: '¿Cuáles repuestos tienen stock bajo o están agotados?' },
+    { label: '💳 Deudas a proveedores', query: '¿Qué facturas o deudas tenemos pendientes?' },
+    { label: '📦 Valor de inventario', query: '¿Cuál es el valor total del inventario?' },
+    { label: '💵 Tasa BCV', query: '¿Cuál es la tasa oficial BCV de hoy?' }
+];
+
+function FormattedMessage({ text }) {
+    if (!text) return null;
+    return (
+        <div className="space-y-1 text-xs">
+            {text.split('\n').map((line, idx) => {
+                if (line.trim() === '') return <div key={idx} className="h-1.5" />;
+                const parts = line.split(/(\*\*.*?\*\*)/g);
+                return (
+                    <p key={idx} className="leading-relaxed">
+                        {parts.map((part, pIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                                return (
+                                    <strong key={pIdx} className="font-extrabold text-navy">
+                                        {part.slice(2, -2)}
+                                    </strong>
+                                );
+                            }
+                            return part;
+                        })}
+                    </p>
+                );
+            })}
+        </div>
+    );
+}
 
 const AIAssistantBubble = () => {
+    const userRole = getRole();
+    if (userRole !== 'administrador') return null;
+
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
         { 
-            id: 1, 
+            id: 'welcome', 
             type: 'bot', 
-            text: '¡Hola! Soy tu Asistente Inteligente de Conciliación.',
-            subtitle: 'Sube tu archivo de caja en Excel (.xlsx) y extraeré automáticamente todas las ventas diarias para cargarlas en el sistema.'
+            title: '¡Hola! Soy Valkar AI ⚡',
+            text: 'Tu copiloto de operaciones, ventas y finanzas en tiempo real. Puedo darte cifras al instante de caja, deudas, repuestos o asesorarte estratégicamente con inteligencia artificial.',
+            showQuickActions: true
         }
     ]);
+    const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [processedData, setProcessedData] = useState(null);
-    const [importing, setImporting] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
-    const [showDetails, setShowDetails] = useState(true);
+    const [showKeyConfig, setShowKeyConfig] = useState(false);
+    const [apiKey, setApiKey] = useState(getStoredApiKey());
+    const [apiKeyInput, setApiKeyInput] = useState(getStoredApiKey());
+    const [keySavedMessage, setKeySavedMessage] = useState(false);
 
-    const fileInputRef = useRef(null);
     const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
     useEffect(() => {
         if (isOpen) {
             scrollToBottom();
+            setTimeout(() => inputRef.current?.focus(), 150);
         }
     }, [messages, isOpen, isTyping]);
 
-    const handleDragOver = (e) => {
+    const handleSaveKey = (e) => {
         e.preventDefault();
-        setIsDragging(true);
+        setStoredApiKey(apiKeyInput);
+        setApiKey(apiKeyInput.trim());
+        setKeySavedMessage(true);
+        setTimeout(() => {
+            setKeySavedMessage(false);
+            setShowKeyConfig(false);
+        }, 1200);
     };
 
-    const handleDragLeave = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-    };
+    const handleSend = async (customText) => {
+        const queryText = (customText || input).trim();
+        if (!queryText || isTyping) return;
 
-    const handleDrop = (e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) processFile(file);
-    };
+        setInput('');
 
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) processFile(file);
-    };
-
-    const processFile = (file) => {
-        setMessages(prev => [
-            ...prev, 
-            { id: Date.now(), type: 'user', text: file.name, isFile: true }
-        ]);
-        setIsTyping(true);
-
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-            const bstr = evt.target.result;
-            try {
-                const workbook = XLSX.read(bstr, { type: 'binary' });
-
-                let existingDates = new Set();
-                try {
-                    const existingTxs = await api.getTransactions();
-                    existingTxs.forEach(tx => {
-                        if (tx.date) existingDates.add(tx.date.split('T')[0]);
-                    });
-                } catch (err) {
-                    console.error("Error fetching verification data in bubble assistant:", err);
-                }
-
-                setTimeout(() => {
-                    try {
-                        const rawResult = processWorkbook(workbook);
-
-                        const newDays = rawResult.filter(day => !existingDates.has(day.date));
-                        const duplicateCount = rawResult.length - newDays.length;
-
-                        if (newDays.length === 0) {
-                            setIsTyping(false);
-                            setMessages(prev => [...prev, {
-                                id: Date.now(),
-                                type: 'bot',
-                                text: 'Tus datos están al día',
-                                subtitle: 'No se detectaron nuevos días de ventas en este archivo. Todos los registros ya existen en la base de datos.',
-                                isInfo: true
-                            }]);
-                            return;
-                        }
-
-                        setProcessedData(newDays);
-                        setIsTyping(false);
-
-                        const totalAmount = newDays.reduce((acc, day) => acc + day.sales.reduce((s, tx) => s + tx.amount, 0), 0);
-                        const totalDivisas = newDays.reduce((acc, day) => {
-                            const divisaSale = day.sales.find(s => s.method === 'divisas');
-                            return acc + (divisaSale ? divisaSale.amount : 0);
-                        }, 0);
-
-                        setMessages(prev => [...prev, {
-                            id: Date.now(),
-                            type: 'bot',
-                            isAnalysisCard: true,
-                            newDays,
-                            duplicateCount,
-                            totalAmount,
-                            totalDivisas
-                        }]);
-                    } catch (error) {
-                        console.error(error);
-                        setIsTyping(false);
-                        setMessages(prev => [...prev, { 
-                            id: Date.now(), 
-                            type: 'bot', 
-                            text: 'Error de Lectura',
-                            subtitle: `No pude procesar el archivo: ${error.message}. Asegúrate de usar la plantilla correcta.`,
-                            isError: true 
-                        }]);
-                    }
-                }, 1200);
-            } catch (error) {
-                console.error(error);
-                setIsTyping(false);
-                setMessages(prev => [...prev, { 
-                    id: Date.now(), 
-                    type: 'bot', 
-                    text: 'Error en Archivo',
-                    subtitle: 'No fue posible abrir el archivo. Comprueba que no esté dañado o protegido.',
-                    isError: true 
-                }]);
-            }
+        // Agregar mensaje del usuario
+        const userMsg = {
+            id: Date.now(),
+            type: 'user',
+            text: queryText
         };
-        reader.readAsBinaryString(file);
-    };
-
-    const processWorkbook = (workbook) => {
-        const extractedData = [];
-        const sheetNames = workbook.SheetNames;
-
-        sheetNames.forEach(sheetName => {
-            if (!/^\d{2}$/.test(sheetName) && !/^\d{1}$/.test(sheetName)) return;
-
-            const day = sheetName.padStart(2, '0');
-            const dateStr = `2026-01-${day}`;
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-            const sales = [];
-            const mappings = {
-                "TOTAL EFECTIVO BS": "Efectivo",
-                "TOTAL TARJETA": "Tarjeta",
-                "TOTAL PM": "Pago Móvil",
-                "TOTAL TRANSFERENCIA": "Transferencia"
-            };
-
-            let divisasSum = 0;
-            let zelleSum = 0;
-            let cashUSDSum = 0;
-
-            jsonData.forEach(row => {
-                if (!row || row.length < 2) return;
-                const rowStr = row.join(' ').toUpperCase();
-
-                const getValueAtOffset = (r, label, offset = 2) => {
-                    const index = r.findIndex(cell =>
-                        typeof cell === 'string' && cell.toUpperCase().includes(label)
-                    );
-                    if (index !== -1 && index + offset < r.length) {
-                        return parseValue(r[index + offset]);
-                    }
-                    return 0;
-                };
-
-                for (const [label, method] of Object.entries(mappings)) {
-                    if (rowStr.includes(label)) {
-                        const amount = getValueAtOffset(row, label, 2);
-                        if (amount > 0) {
-                            sales.push({ method, amount });
-                        }
-                    }
-                }
-
-                if (rowStr.includes("TOTAL EFECTIVO USD")) {
-                    const amount = getValueAtOffset(row, "TOTAL EFECTIVO USD", 2);
-                    if (amount > 0) {
-                        divisasSum += amount;
-                        cashUSDSum += amount;
-                    }
-                }
-                if (rowStr.includes("ZELLE")) {
-                    const amount = getValueAtOffset(row, "ZELLE", 2);
-                    if (amount > 0) {
-                        divisasSum += amount;
-                        zelleSum += amount;
-                    }
-                }
-            });
-
-            if (divisasSum > 0) {
-                sales.push({
-                    method: "divisas",
-                    amount: parseFloat(divisasSum.toFixed(2)),
-                    details: { zelle: zelleSum, cash: cashUSDSum }
-                });
-            }
-
-            if (sales.length > 0) {
-                extractedData.push({ date: dateStr, sales });
-            }
-        });
-
-        extractedData.sort((a, b) => a.date.localeCompare(b.date));
-        return extractedData;
-    };
-
-    const parseValue = (cell) => {
-        if (!cell) return 0;
-        if (typeof cell === 'number') return cell;
-
-        if (typeof cell === 'string') {
-            let clean = cell.replace(/[$\sBsBD]/g, '');
-            if (clean.includes('.') && clean.includes(',')) {
-                if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) {
-                    clean = clean.replace(/\./g, '').replace(',', '.');
-                } else {
-                    clean = clean.replace(/,/g, '');
-                }
-            } else if (clean.includes(',')) {
-                clean = clean.replace(',', '.');
-            }
-            const val = parseFloat(clean);
-            return isNaN(val) ? 0 : val;
-        }
-        return 0;
-    };
-
-    const confirmImport = async () => {
-        if (!processedData) return;
-
+        setMessages(prev => [...prev, userMsg]);
         setIsTyping(true);
-        setImporting(true);
 
         try {
-            let count = 0;
-            for (const day of processedData) {
-                for (const sale of day.sales) {
-                    await api.createTransaction({
-                        amount: sale.amount,
-                        method: sale.method === 'divisas' ? 'Divisas' : sale.method,
-                        date: day.date,
-                        note: 'Importado por Asistente IA',
-                        type: 'INCOME',
-                        category: 'Venta',
-                        status: 'COMPLETED'
-                    });
-                    count++;
-                }
+            // 1. Obtener datos frescos del negocio en tiempo real
+            const snapshot = await getBusinessSnapshot();
+
+            // 2. Intentar responder primero con el Motor Local (0ms, 100% gratis)
+            const localResponse = processLocalQuery(queryText, snapshot);
+
+            if (localResponse) {
+                // Respuesta instantánea con datos del ERP
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: Date.now() + 1,
+                        type: 'bot',
+                        title: localResponse.title,
+                        text: localResponse.text,
+                        badge: 'Datos en Vivo'
+                    }
+                ]);
+                setIsTyping(false);
+                return;
             }
 
-            setImporting(false);
-            setIsTyping(false);
-            setMessages(prev => [...prev, {
-                id: Date.now(),
-                type: 'bot',
-                text: 'Importación Completada',
-                subtitle: `Se guardaron exitosamente ${count} registros de ventas en tu flujo de caja.`,
-                isSuccess: true
-            }]);
-            setProcessedData(null);
-        } catch (error) {
-            console.error(error);
-            setImporting(false);
-            setIsTyping(false);
-            setMessages(prev => [...prev, { 
-                id: Date.now(), 
-                type: 'bot', 
-                text: 'Error en la Importación',
-                subtitle: 'Ocurrió un inconveniente al guardar las transacciones. Por favor intenta de nuevo.',
-                isError: true 
-            }]);
-        }
-    };
+            // 3. Si no es consulta estructurada local, consultar a Gemini AI
+            if (!apiKey) {
+                // Si el usuario no tiene clave de Gemini configurada, avisar amigablemente
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: Date.now() + 1,
+                        type: 'bot',
+                        title: 'Conexión con Gemini AI',
+                        text: 'Esta consulta requiere análisis avanzado de IA generativa. Puedes activar **Google Gemini** ingresando tu clave gratuita en el botón de ajustes (arriba a la derecha). \n\n_Tip: También puedes consultar directamente sobre ventas, deudas, stock o buscar repuestos de forma 100% gratuita y sin clave._',
+                        needsKey: true
+                    }
+                ]);
+                setIsTyping(false);
+                return;
+            }
 
-    const formatMoney = (amount) => {
-        return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' }).format(amount);
+            // Consultar a la API de Google Gemini con el snapshot del negocio
+            const geminiReply = await askGemini(queryText, snapshot, apiKey);
+
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: Date.now() + 1,
+                    type: 'bot',
+                    title: 'Valkar AI (Gemini)',
+                    text: geminiReply,
+                    badge: 'IA Generativa'
+                }
+            ]);
+        } catch (error) {
+            console.error('Error procesando consulta AI:', error);
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: Date.now() + 1,
+                    type: 'bot',
+                    title: 'Ocurrió un inconveniente',
+                    text: `No pude procesar la consulta: ${error.message || error}. Verifica tu conexión o clave de API.`,
+                    isError: true
+                }
+            ]);
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     return (
-        <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 no-print select-none">
-            {/* FLOATING CHATBOX WINDOW */}
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end print:hidden">
+            {/* VENTANA DEL ASISTENTE */}
             {isOpen && (
-                <div className="absolute bottom-16 right-0 w-[calc(100vw-2.5rem)] sm:w-[400px] h-[540px] bg-white rounded-2xl shadow-xl border border-slate-200/90 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
-                    
-                    {/* Soft Vibrant Header (No harsh black) */}
-                    <div className="bg-shell px-4 py-3 text-white flex items-center justify-between shadow-sm relative overflow-hidden">
-                        <div className="flex items-center gap-2.5 relative z-10">
+                <div className="w-[92vw] sm:w-[410px] h-[560px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-gray-200/80 flex flex-col overflow-hidden mb-3.5 animate-in fade-in slide-in-from-bottom-5 duration-200">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-navy via-slate-900 to-navy text-white px-4 py-3.5 flex items-center justify-between border-b border-white/10 shrink-0">
+                        <div className="flex items-center gap-2.5">
                             <div className="relative">
-                                <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20">
-                                    <Sparkles size={16} />
+                                <div className="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center shadow-xs">
+                                    <Bot size={18} />
                                 </div>
-                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-indigo-700"></span>
+                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-navy rounded-full animate-pulse" />
                             </div>
                             <div>
-                                <h4 className="font-semibold text-xs tracking-tight text-white flex items-center gap-1.5 leading-snug">
-                                    Asistente de Conciliación
-                                    <span className="text-[9px] font-medium uppercase tracking-wider bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/30">IA</span>
-                                </h4>
-                                <p className="text-[10px] text-indigo-100 font-normal opacity-90">
-                                    Importación Inteligente Excel
-                                </p>
+                                <h3 className="text-xs font-black tracking-wide flex items-center gap-1.5">
+                                    Valkar AI
+                                    <span className="text-[9px] font-extrabold bg-teal-400/20 text-teal-300 px-1.5 py-0.2 rounded-full border border-teal-400/30 uppercase">
+                                        Asistente
+                                    </span>
+                                </h3>
+                                <p className="text-[10px] text-white/60 font-medium">Finanzas & Repuestos en tiempo real</p>
                             </div>
                         </div>
 
-                        <button 
-                            onClick={() => setIsOpen(false)}
-                            className="p-1.5 hover:bg-white/15 rounded-lg text-white/80 hover:text-white transition-all cursor-pointer relative z-10"
-                        >
-                            <X size={16} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                onClick={() => setShowKeyConfig(!showKeyConfig)}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${showKeyConfig ? 'bg-white/20 text-teal-300' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                                title="Configurar clave de Gemini AI"
+                            >
+                                <Key size={15} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsOpen(false)}
+                                className="p-1.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                                title="Cerrar ventana"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Messages Body */}
-                    <div className="flex-grow overflow-y-auto p-4 bg-slate-50/70 space-y-3.5 text-xs custom-scrollbar">
+                    {/* Panel de Configuración de Clave Gemini */}
+                    {showKeyConfig && (
+                        <div className="bg-slate-50 border-b border-gray-200 p-3.5 shrink-0 text-xs animate-in slide-in-from-top-2 duration-150">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-extrabold text-navy flex items-center gap-1.5 text-xs">
+                                    <Sparkles size={13} className="text-teal-600" />
+                                    Clave de Google Gemini (Opcional)
+                                </span>
+                                <a 
+                                    href="https://aistudio.google.com/app/apikey" 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="text-[10px] font-bold text-primary hover:underline"
+                                >
+                                    Obtener clave gratis ↗
+                                </a>
+                            </div>
+                            <p className="text-[10.5px] text-secondary mb-2.5">
+                                Con Gemini activo podrás solicitar análisis estratégicos avanzados, recomendaciones de negocio y consultas libres.
+                            </p>
+                            <form onSubmit={handleSaveKey} className="flex gap-2">
+                                <input
+                                    type="password"
+                                    value={apiKeyInput}
+                                    onChange={(e) => setApiKeyInput(e.target.value)}
+                                    placeholder="Pega aquí tu API key (AIzaSy...)"
+                                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-primary font-mono text-navy"
+                                />
+                                <button
+                                    type="submit"
+                                    className="px-3 py-1.5 bg-primary hover:bg-teal-600 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                                >
+                                    {keySavedMessage ? <Check size={13} /> : 'Guardar'}
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* Área de Mensajes */}
+                    <div className="flex-1 overflow-y-auto p-3.5 space-y-3 bg-slate-50/50">
                         {messages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                {msg.type === 'bot' && (
-                                    <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 mr-2 mt-0.5 shadow-xs">
-                                        <Bot size={14} />
-                                    </div>
-                                )}
-
+                            <div
+                                key={msg.id}
+                                className={`flex flex-col ${msg.type === 'user' ? 'items-end' : 'items-start'}`}
+                            >
                                 {msg.type === 'user' ? (
-                                    <div className="bg-indigo-600 text-white rounded-xl rounded-tr-xs px-3 py-2 shadow-xs max-w-[85%] font-medium flex items-center gap-2">
-                                        {msg.isFile && <FileSpreadsheet size={15} className="text-indigo-200 flex-shrink-0" />}
-                                        <span className="truncate">{msg.text}</span>
+                                    <div className="max-w-[85%] bg-primary text-white rounded-2xl rounded-br-xs px-3.5 py-2.5 text-xs shadow-xs font-medium">
+                                        {msg.text}
                                     </div>
-                                ) : msg.isAnalysisCard ? (
-                                    /* Structured Analysis Result Card */
-                                    <div className="bg-white border border-slate-200 rounded-xl rounded-tl-xs p-3.5 shadow-sm max-w-[92%] space-y-3">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                            <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
-                                                <FileSpreadsheet size={14} className="text-indigo-600" />
-                                                <span>Resumen de Conciliación</span>
-                                            </div>
-                                            <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                                                {msg.newDays.length} días nuevos
-                                            </span>
-                                        </div>
-
-                                        {msg.duplicateCount > 0 && (
-                                            <div className="bg-amber-50/80 text-amber-800 text-[11px] p-2 rounded-lg border border-amber-200/60 flex items-start gap-1.5 font-normal">
-                                                <AlertCircle size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                                                <span>Se omitieron <strong>{msg.duplicateCount} días</strong> ya registrados.</span>
+                                ) : (
+                                    <div className={`max-w-[90%] rounded-2xl rounded-tl-xs p-3.5 shadow-xs border transition-all ${
+                                        msg.isError
+                                            ? 'bg-red-50 border-red-200 text-red-900'
+                                            : 'bg-white border-gray-100 text-slate-700'
+                                    }`}>
+                                        {msg.title && (
+                                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                <span className="font-black text-navy text-xs flex items-center gap-1.5">
+                                                    <Sparkles size={13} className="text-teal-600" />
+                                                    {msg.title}
+                                                </span>
+                                                {msg.badge && (
+                                                    <span className="text-[9px] font-extrabold bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.2 rounded-full uppercase">
+                                                        {msg.badge}
+                                                    </span>
+                                                )}
                                             </div>
                                         )}
 
-                                        {/* Totals Summary Chips */}
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-150">
-                                                <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider block">Monto Total</span>
-                                                <span className="text-xs font-bold text-slate-800">{formatMoney(msg.totalAmount)}</span>
-                                            </div>
-                                            <div className="bg-indigo-50/60 p-2 rounded-lg border border-indigo-100">
-                                                <span className="text-[9px] font-medium text-indigo-600 uppercase tracking-wider block">Total Divisas</span>
-                                                <span className="text-xs font-bold text-indigo-900">{formatMoney(msg.totalDivisas)}</span>
-                                            </div>
-                                        </div>
+                                        <FormattedMessage text={msg.text} />
 
-                                        {/* Collapsible Breakdown */}
-                                        <div className="border border-slate-150 rounded-lg overflow-hidden bg-slate-50/40">
-                                            <button 
-                                                onClick={() => setShowDetails(!showDetails)}
-                                                className="w-full px-2.5 py-1.5 text-[11px] font-medium text-slate-700 flex items-center justify-between hover:bg-slate-100/60 transition-colors"
+                                        {/* Botón para configurar clave si la necesita */}
+                                        {msg.needsKey && !showKeyConfig && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowKeyConfig(true)}
+                                                className="mt-2.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                                             >
-                                                <span className="flex items-center gap-1.5">
-                                                    <Calendar size={12} className="text-indigo-600" />
-                                                    Desglose por día ({msg.newDays.length})
-                                                </span>
-                                                {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                                <Key size={12} />
+                                                Ingresar clave gratuita de Gemini
                                             </button>
+                                        )}
 
-                                            {showDetails && (
-                                                <div className="p-2 border-t border-slate-150 space-y-2 max-h-44 overflow-y-auto custom-scrollbar bg-white">
-                                                    {msg.newDays.map((day) => (
-                                                        <div key={day.date} className="text-[11px] border border-slate-100 rounded-md p-1.5 bg-slate-50/30">
-                                                            <div className="font-medium text-slate-800 mb-1 flex items-center gap-1">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                                                                Fecha: {day.date}
-                                                            </div>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {day.sales.map((s, idx) => (
-                                                                    <span key={idx} className="bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-normal text-[10px]">
-                                                                        {s.method === 'divisas' ? 'Divisas' : s.method}: ${s.amount.toFixed(2)}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        </div>
+                                        {/* Botones de Acción Rápida sugeridos */}
+                                        {msg.showQuickActions && (
+                                            <div className="mt-3 pt-2.5 border-t border-gray-100">
+                                                <p className="text-[10px] font-extrabold text-secondary uppercase tracking-wider mb-2">
+                                                    Preguntas rápidas:
+                                                </p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {QUICK_ACTIONS.map((action, i) => (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => handleSend(action.query)}
+                                                            className="text-[11px] font-bold bg-slate-100 hover:bg-primary/10 hover:text-primary text-secondary px-2.5 py-1 rounded-lg transition-colors cursor-pointer text-left border border-gray-200/60"
+                                                        >
+                                                            {action.label}
+                                                        </button>
                                                     ))}
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        {/* CTA Action Button */}
-                                        <button
-                                            onClick={confirmImport}
-                                            disabled={importing}
-                                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                        >
-                                            {importing ? (
-                                                <>
-                                                    <Loader2 size={14} className="animate-spin" />
-                                                    <span>Guardando en caja...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <CheckCircle2 size={14} />
-                                                    <span>Guardar {msg.newDays.length} Días de Ventas</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                ) : (
-                                    /* Standard Bot Message Bubble */
-                                    <div className={`
-                                        max-w-[85%] rounded-xl rounded-tl-xs p-3 shadow-xs text-xs leading-relaxed
-                                        ${msg.isSuccess 
-                                            ? 'bg-emerald-50 border border-emerald-200/70 text-emerald-900' 
-                                            : msg.isError
-                                            ? 'bg-rose-50 border border-rose-200/70 text-rose-900'
-                                            : 'bg-white border border-slate-200/80 text-slate-700'
-                                        }
-                                    `}>
-                                        <div className="font-semibold text-slate-800 text-xs mb-0.5 flex items-center gap-1.5">
-                                            {msg.isSuccess && <CheckCircle2 size={14} className="text-emerald-600" />}
-                                            {msg.isError && <AlertCircle size={14} className="text-rose-600" />}
-                                            <span>{msg.text}</span>
-                                        </div>
-                                        {msg.subtitle && (
-                                            <p className="text-[11px] text-slate-500 font-normal leading-normal">
-                                                {msg.subtitle}
-                                            </p>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -457,69 +331,57 @@ const AIAssistantBubble = () => {
                         ))}
 
                         {isTyping && (
-                            <div className="flex justify-start items-center gap-1.5">
-                                <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-                                    <Bot size={14} />
-                                </div>
-                                <div className="bg-white border border-slate-200 rounded-xl rounded-tl-xs px-3 py-2 shadow-xs flex gap-1 items-center">
-                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>
-                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                                    <span className="text-[10px] font-normal text-slate-400 ml-1">Analizando Excel...</span>
-                                </div>
+                            <div className="flex items-center gap-2 text-xs text-secondary bg-white border border-gray-200 px-3 py-2 rounded-2xl rounded-tl-xs w-fit shadow-xs">
+                                <Loader2 size={13} className="animate-spin text-primary" />
+                                <span className="font-semibold text-[11px]">Consultando datos en tiempo real...</span>
                             </div>
                         )}
+
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Drag and Drop File Input Area */}
-                    <div 
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        className={`p-2.5 border-t border-slate-200 bg-white flex flex-col items-center justify-center transition-colors duration-200 ${isDragging ? 'bg-indigo-50/60 border-indigo-300' : ''}`}
-                    >
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            onChange={handleFileUpload} 
-                            accept=".xlsx, .xls" 
-                            className="hidden" 
-                        />
-                        <button 
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full py-2.5 border border-dashed border-slate-200 hover:border-indigo-500 rounded-xl flex items-center justify-center gap-2 text-center transition-all bg-slate-50/50 hover:bg-indigo-50/20 group cursor-pointer"
+                    {/* Input y Botón de Envío */}
+                    <div className="p-2.5 bg-white border-t border-gray-100 shrink-0">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSend();
+                            }}
+                            className="flex items-center gap-1.5"
                         >
-                            <div className="w-7 h-7 rounded-lg bg-indigo-50 group-hover:bg-indigo-600 text-indigo-600 group-hover:text-white flex items-center justify-center transition-colors">
-                                <UploadCloud size={16} />
-                            </div>
-                            <div className="text-left">
-                                <span className="text-xs font-medium text-slate-700 group-hover:text-indigo-600 block leading-tight">
-                                    {isDragging ? '¡Suelta el archivo aquí!' : 'Subir reporte de Excel (.xlsx)'}
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-normal">Haz clic o arrastra tu plantilla de caja</span>
-                            </div>
-                        </button>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Escribe una pregunta sobre tu negocio..."
+                                disabled={isTyping}
+                                className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-primary focus:bg-white text-navy font-medium transition-all"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isTyping}
+                                className="w-9 h-9 rounded-xl bg-primary hover:bg-teal-600 disabled:opacity-40 disabled:hover:bg-primary text-white flex items-center justify-center transition-colors shadow-xs cursor-pointer shrink-0"
+                                title="Enviar mensaje"
+                            >
+                                <Send size={15} />
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}
 
-            {/* MAIN FLOATING CIRCULAR TOGGLE BUTTON */}
-            <div className="relative group">
-                
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className={`relative w-12 h-12 md:w-14 md:h-14 bg-shell text-white rounded-full flex items-center justify-center shadow-[0_10px_24px_-8px_rgba(21,23,26,0.55),0_2px_6px_rgba(21,23,26,0.2)] ring-1 ring-white/10 hover:bg-shell-2 transition-[transform,background-color] duration-200 cursor-pointer ${isOpen ? 'rotate-90' : ''}`}
-                    title="Asistente de Conciliación IA"
-                >
-                    {isOpen ? (
-                        <X size={24} />
-                    ) : (
-                        <Sparkles size={24} />
-                    )}
-                </button>
-            </div>
+            {/* BOTÓN FLOTANTE CIRCULAR */}
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-12 h-12 md:w-14 md:h-14 bg-gradient-to-tr from-navy to-slate-800 text-teal-300 rounded-full flex items-center justify-center shadow-xl shadow-navy/30 ring-2 ring-white/20 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer ${
+                    isOpen ? 'rotate-90 text-white' : ''
+                }`}
+                title="Valkar AI · Asistente de Negocio"
+            >
+                {isOpen ? <X size={22} /> : <Sparkles size={24} className="animate-pulse" />}
+            </button>
         </div>
     );
 };
