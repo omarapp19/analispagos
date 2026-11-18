@@ -130,7 +130,7 @@ const AIAssistantBubble = () => {
                         id: Date.now() + 1,
                         type: 'bot',
                         title: 'Configuración de Gemini Requerida',
-                        text: 'Para conectar el asistente directamente con Google Gemini, agrega tu clave en el archivo `.env` (`VITE_GEMINI_API_KEY=tu_clave`) o ingrésala en la configuración de la esquina superior derecha.',
+                        text: 'Para conectar el asistente directamente con Google Gemini, agrega tu clave en el archivo `.env` (`VITE_GEMINI_API_KEY=tu_clave`) o haz clic en el botón de abajo para ingresarla.',
                         needsKey: true
                     }
                 ]);
@@ -156,7 +156,7 @@ const AIAssistantBubble = () => {
         } catch (error) {
             console.error('Error procesando consulta AI:', error);
             const errorMsg = error.message === 'NO_API_KEY'
-                ? 'No se ha detectado una clave de API. Por favor configúrala en el archivo .env o en el botón de ajustes.'
+                ? 'No se ha detectado una clave de API. Por favor configúrala en el archivo .env o en el botón de abajo.'
                 : `Ocurrió un inconveniente al consultar: ${error.message || error}`;
 
             setMessages(prev => [
@@ -203,14 +203,6 @@ const AIAssistantBubble = () => {
                         <div className="flex items-center gap-1">
                             <button
                                 type="button"
-                                onClick={() => setShowKeyConfig(!showKeyConfig)}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${showKeyConfig ? 'bg-white/20 text-teal-300' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-                                title="Configuración de API Key"
-                            >
-                                <Key size={15} />
-                            </button>
-                            <button
-                                type="button"
                                 onClick={() => setIsOpen(false)}
                                 className="p-1.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                                 title="Cerrar ventana"
@@ -228,14 +220,24 @@ const AIAssistantBubble = () => {
                                     <Sparkles size={13} className="text-teal-600" />
                                     Google Gemini API Key
                                 </span>
-                                <a 
-                                    href="https://aistudio.google.com/app/apikey" 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="text-[10px] font-bold text-primary hover:underline"
-                                >
-                                    Obtener clave gratis ↗
-                                </a>
+                                <div className="flex items-center gap-2">
+                                    <a 
+                                        href="https://aistudio.google.com/app/apikey" 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="text-[10px] font-bold text-primary hover:underline"
+                                    >
+                                        Obtener clave gratis ↗
+                                    </a>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowKeyConfig(false)}
+                                        className="p-1 text-secondary/60 hover:text-navy rounded-lg transition-colors cursor-pointer"
+                                        title="Cerrar panel"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
                             </div>
                             <p className="text-[10.5px] text-secondary mb-2.5">
                                 También puedes definir <code className="font-mono text-primary font-bold">VITE_GEMINI_API_KEY</code> en tu archivo <code className="font-mono font-bold">.env</code>.

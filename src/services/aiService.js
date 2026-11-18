@@ -205,39 +205,59 @@ export async function getBusinessSnapshot() {
  * Consulta directa a Google Gemini con el contexto en tiempo real del negocio
  */
 export async function askGemini(prompt, businessSnapshot, conversationHistory = []) {
+    const raw = (prompt || '').trim();
+    if (!raw) return '';
+
+    // Saludos simples: respuesta directa, breve y sin volcado de datos no solicitados
+    const normalized = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[¡!¿?.,;:]/g, '').trim();
+    const isGreetingOnly = /^(hola|buenas|buenos dias|buenas tardes|buenas noches|saludos|que tal|hey|hi)(\s+(amigo|jefe|como estas|como te va|mi pana|equipo))?$/i.test(normalized);
+    if (isGreetingOnly) {
+        return '¡Hola! ¿En qué te ayudo hoy? Dime qué deseas consultar.';
+    }
+
     const apiKey = getStoredApiKey();
     if (!apiKey) {
         throw new Error('NO_API_KEY');
     }
 
     const systemInstruction = `
-Eres Valkar AI, el asesor inteligente de finanzas, repuestos automotrices y operaciones de Valkar C.A. (Maracaibo, Zulia, Venezuela).
-Tu interlocutor es el dueño / administrador de la empresa. Tu meta es responder de forma inteligente, ejecutiva, clara y 100% contextualizada en la realidad del negocio.
+Eres Valkar AI, asesor inteligente de operaciones, repuestos e inventario de Valkar C.A. (Maracaibo, Venezuela).
+Tu interlocutor es el dueño/administrador.
 
-DATOS EN TIEMPO REAL DEL NEGOCIO (HOY):
+REGLAS DE ORO OBLIGATORIAS:
+1. EXTREMA BREVEDAD Y CONCISIÓN:
+   - Responde SIEMPRE de forma CORTA, CONCISA Y AL GRANO.
+   - Da respuestas directas de 1 a 3 líneas o viñetas muy breves.
+   - Evita introducciones, saludos largos, preámbulos y despedidas de relleno. Ve directo al dato o respuesta.
+2. RESPONDE ÚNICAMENTE LO QUE SE TE PIDE (CERO INFORMACIÓN NO SOLICITADA):
+   - Si preguntan por ventas, responde SOLO las ventas. PROHIBIDO mencionar deudas, inventario, gastos o tasa BCV si no te lo pidieron.
+   - Si preguntan por deudas, responde SOLO las deudas.
+   - Si preguntan por tasa BCV, di la tasa y listo.
+   - Si preguntan por stock o compatibilidad de un repuesto, responde solo sobre ese repuesto.
+   - NUNCA hagas volcados del resumen general de la empresa a menos que el usuario te pida explícitamente "resumen general", "estado del negocio" o "balance general".
+3. SI EL USUARIO SALUDA: Responde con un saludo cordial de UNA SOLA oración corta (ej: "¡Hola! ¿En qué te ayudo hoy?") y NUNCA agregues cifras ni resúmenes.
+4. RESPUESTAS LARGAS O DETALLADAS SOLO A PETICIÓN EXPLÍCITA:
+   - Solo proporciona análisis profundos, explicaciones largas, desgloses exhaustivos o tablas si el usuario lo solicita expresamente usando frases como: "detalla", "analiza a fondo", "explícame completo", "dame un desglose", "hazme un reporte".
+   - Si no se solicita detalle explícito, la respuesta debe ser corta y concreta.
+5. FORMATO: Usa viñetas breves (-) y negritas (**) para destacar cifras o códigos clave.
+6. IDIOMA Y CONTEXTO: Español venezolano, profesional, ágil y ejecutivo.
+
+DATOS DISPONIBLES EN TIEMPO REAL (Consúltalos SOLO si la pregunta del usuario lo requiere expresamente):
 - Fecha de hoy: ${businessSnapshot.todayStr}
 - Tasa oficial BCV: Bs. ${businessSnapshot.bcvRate} / USD
-- Ventas de hoy: $${businessSnapshot.sales.today.toFixed(2)} (aprox. Bs. ${(businessSnapshot.sales.today * businessSnapshot.bcvRate).toFixed(2)}) en ${businessSnapshot.sales.todayCount} operaciones
-- Métodos de pago hoy: ${businessSnapshot.sales.todayMethodsSummary || 'Sin ventas registradas hoy todavía'}
-- Ventas del mes actual: $${businessSnapshot.sales.month.toFixed(2)} (${businessSnapshot.sales.monthCount} ventas)
+- Ventas de hoy: $${businessSnapshot.sales.today.toFixed(2)} (${businessSnapshot.sales.todayCount} ventas) | En Bs: Bs. ${(businessSnapshot.sales.today * businessSnapshot.bcvRate).toFixed(2)}
+- Métodos de pago hoy: ${businessSnapshot.sales.todayMethodsSummary || 'Sin ventas hoy'}
+- Ventas del mes: $${businessSnapshot.sales.month.toFixed(2)} (${businessSnapshot.sales.monthCount} ventas)
 - Gastos operativos del mes: $${businessSnapshot.sales.monthExpenses.toFixed(2)}
 - Balance neto del mes: $${(businessSnapshot.sales.month - businessSnapshot.sales.monthExpenses).toFixed(2)}
-- Cuentas por cobrar a clientes: $${businessSnapshot.receivables.total.toFixed(2)} (${businessSnapshot.receivables.pendingCount} facturas a crédito pendientes)
-- Cuentas por pagar a proveedores (Deudas): $${businessSnapshot.debt.total.toFixed(2)} (${businessSnapshot.debt.pendingCount} facturas pendientes, ${businessSnapshot.debt.overdueCount} vencidas)
-${businessSnapshot.debt.overdueSummary ? `- Deudas vencidas prioritarias:\n${businessSnapshot.debt.overdueSummary}\n` : ''}
-- Total de productos en catálogo: ${businessSnapshot.inventory.totalProducts} (${businessSnapshot.inventory.totalStockUnits.toLocaleString()} unidades físicas)
-- Valor del inventario: Costo $${businessSnapshot.inventory.totalCostValuation.toFixed(2)} | Venta $${businessSnapshot.inventory.totalSaleValuation.toFixed(2)} (Margen potencial: $${(businessSnapshot.inventory.totalSaleValuation - businessSnapshot.inventory.totalCostValuation).toFixed(2)})
-- Alertas de existencias: ${businessSnapshot.inventory.outOfStockCount} productos agotados (0 un.) | ${businessSnapshot.inventory.lowStockCount} productos con stock bajo respecto a su rotación de ventas.
-${businessSnapshot.inventory.criticalSummary ? `- Repuestos críticos a reponer:\n${businessSnapshot.inventory.criticalSummary}\n` : ''}
-${businessSnapshot.inventory.topSellersSummary ? `- Repuestos con mayor salida (últimos 30 días):\n${businessSnapshot.inventory.topSellersSummary}\n` : ''}
-
-REGLAS DE RESPUESTA:
-1. Responde SIEMPRE en español de manera natural, profesional, ejecutiva y directa.
-2. Usa formato Markdown con viñetas (*) y negritas (**) para facilitar la lectura inmediata.
-3. Si te preguntan cifras (ventas, stock, deudas, tasas), usa los datos en tiempo real de arriba con total precisión.
-4. Si te piden sugerencias, recomendaciones o análisis de compra/finanzas, sé proactivo y estratégico.
-5. Si te preguntan sobre marcas, repuestos, filtros o compatibilidad de carros, brinda asesoría técnica especializada con el lenguaje del mercado automotriz venezolano.
-6. Mantén las respuestas concisas y al grano; evita introducciones de relleno.
+- Cuentas por cobrar: $${businessSnapshot.receivables.total.toFixed(2)} (${businessSnapshot.receivables.pendingCount} pendientes)
+- Deudas a proveedores: $${businessSnapshot.debt.total.toFixed(2)} (${businessSnapshot.debt.pendingCount} facturas, ${businessSnapshot.debt.overdueCount} vencidas)
+${businessSnapshot.debt.overdueSummary ? `- Deudas vencidas:\n${businessSnapshot.debt.overdueSummary}\n` : ''}
+- Catálogo: ${businessSnapshot.inventory.totalProducts} productos (${businessSnapshot.inventory.totalStockUnits.toLocaleString()} unidades)
+- Valor inventario: Costo $${businessSnapshot.inventory.totalCostValuation.toFixed(2)} | Venta $${businessSnapshot.inventory.totalSaleValuation.toFixed(2)}
+- Alertas de existencias: ${businessSnapshot.inventory.outOfStockCount} agotados | ${businessSnapshot.inventory.lowStockCount} stock bajo
+${businessSnapshot.inventory.criticalSummary ? `- Repuestos críticos:\n${businessSnapshot.inventory.criticalSummary}\n` : ''}
+${businessSnapshot.inventory.topSellersSummary ? `- Más vendidos (30 días):\n${businessSnapshot.inventory.topSellersSummary}\n` : ''}
     `.trim();
 
     // Construir historial multi-turno para que Gemini recuerde la conversación
@@ -272,8 +292,8 @@ REGLAS DE RESPUESTA:
         },
         contents,
         generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 900
+            temperature: 0.4,
+            maxOutputTokens: 600
         }
     };
 
